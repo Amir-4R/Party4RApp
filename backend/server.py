@@ -337,6 +337,7 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
             "user": {"id": user["id"], "nickname": user["nickname"], "avatar": user["avatar"]},
             "members": manager.get_members(room_id),
         },
+        exclude_user=user["id"],
     )
     await websocket.send_text(
         json.dumps(
