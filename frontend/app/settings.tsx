@@ -93,7 +93,7 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             {renderLangRow("en", "English", "Default", "🇺🇸")}
             <View style={styles.divider} />
-            {renderLangRow("ar", "العربية", "Arabic", "🇸🇦")}
+            {renderLangRow("ar", "العربية", "Arabic", "🇾🇪")}
           </View>
         </View>
 
