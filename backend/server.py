@@ -56,8 +56,21 @@ class UserPublic(BaseModel):
     username: str
     nickname: str
     avatar: str
+    avatar_image: Optional[str] = None
+    bio: Optional[str] = None
+    banner_id: Optional[str] = None
+    badges: list = []
     created_at: Optional[str] = None
     total_seconds: int = 0
+
+
+class FriendUser(BaseModel):
+    id: str
+    username: str
+    nickname: str
+    avatar: str
+    avatar_image: Optional[str] = None
+    online: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -141,8 +154,43 @@ def user_to_public(u: dict) -> UserPublic:
         username=u["username"],
         nickname=u["nickname"],
         avatar=u["avatar"],
+        avatar_image=u.get("avatar_image"),
+        bio=u.get("bio"),
+        banner_id=u.get("banner_id"),
+        badges=u.get("badges", []),
         created_at=u.get("created_at"),
         total_seconds=int(u.get("total_seconds", 0)),
+    )
+
+
+# Track online users by their WS connection count
+ONLINE_USERS: Dict[str, int] = {}
+
+
+def mark_online(uid: str):
+    ONLINE_USERS[uid] = ONLINE_USERS.get(uid, 0) + 1
+
+
+def mark_offline(uid: str):
+    n = ONLINE_USERS.get(uid, 0) - 1
+    if n <= 0:
+        ONLINE_USERS.pop(uid, None)
+    else:
+        ONLINE_USERS[uid] = n
+
+
+def is_online(uid: str) -> bool:
+    return uid in ONLINE_USERS
+
+
+def to_friend(u: dict) -> FriendUser:
+    return FriendUser(
+        id=u["id"],
+        username=u["username"],
+        nickname=u["nickname"],
+        avatar=u["avatar"],
+        avatar_image=u.get("avatar_image"),
+        online=is_online(u["id"]),
     )
 
 
@@ -270,17 +318,146 @@ async def me(current: Annotated[dict, Depends(get_current_user)]):
 async def update_profile(
     nickname: Optional[str] = None,
     avatar: Optional[str] = None,
+    avatar_image: Optional[str] = None,
+    bio: Optional[str] = None,
+    banner_id: Optional[str] = None,
+    badge: Optional[str] = None,
     current: dict = Depends(get_current_user),
 ):
     updates = {}
-    if nickname:
-        updates["nickname"] = nickname
-    if avatar:
+    if nickname is not None:
+        updates["nickname"] = nickname[:64]
+    if avatar is not None:
         updates["avatar"] = avatar
+    if avatar_image is not None:
+        # base64 data URI capped at ~700KB
+        if len(avatar_image) > 720_000:
+            raise HTTPException(400, "Avatar image too large (max ~500KB)")
+        updates["avatar_image"] = avatar_image
+    if bio is not None:
+        updates["bio"] = bio[:280]
+    if banner_id is not None:
+        updates["banner_id"] = banner_id
+    if badge is not None:
+        # toggle badge in/out of badges array
+        existing = current.get("badges", [])
+        if badge in existing:
+            existing.remove(badge)
+        else:
+            existing.append(badge)
+        updates["badges"] = existing
     if updates:
         await db.users.update_one({"id": current["id"]}, {"$set": updates})
         current.update(updates)
     return user_to_public(current)
+
+
+# ============== Users / Friends ==============
+@api.get("/users/search", response_model=list[FriendUser])
+async def users_search(q: str, current: dict = Depends(get_current_user)):
+    q = q.strip()
+    if not q or len(q) < 2:
+        return []
+    pattern = {"$regex": q, "$options": "i"}
+    users = await db.users.find(
+        {
+            "$and": [
+                {"id": {"$ne": current["id"]}},
+                {"$or": [{"username": pattern}, {"nickname": pattern}]},
+            ]
+        },
+        {"_id": 0},
+    ).limit(30).to_list(30)
+    return [to_friend(u) for u in users]
+
+
+@api.get("/friends")
+async def list_friends(current: dict = Depends(get_current_user)):
+    friend_ids = current.get("friends", [])
+    in_ids = current.get("friend_requests_in", [])
+    out_ids = current.get("friend_requests_out", [])
+
+    async def resolve(ids: list) -> list:
+        if not ids:
+            return []
+        users = await db.users.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+        return [to_friend(u).model_dump() for u in users]
+
+    return {
+        "friends": await resolve(friend_ids),
+        "incoming": await resolve(in_ids),
+        "outgoing": await resolve(out_ids),
+    }
+
+
+@api.post("/friends/request/{target_id}")
+async def friend_request_send(target_id: str, current: dict = Depends(get_current_user)):
+    if target_id == current["id"]:
+        raise HTTPException(400, "Cannot friend yourself")
+    target = await db.users.find_one({"id": target_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target_id in current.get("friends", []):
+        return {"ok": True, "status": "already_friends"}
+    if target_id in current.get("friend_requests_out", []):
+        return {"ok": True, "status": "already_requested"}
+    if target_id in current.get("friend_requests_in", []):
+        # They already requested us → auto-accept
+        return await friend_request_accept(target_id, current)
+    await db.users.update_one(
+        {"id": current["id"]}, {"$addToSet": {"friend_requests_out": target_id}}
+    )
+    await db.users.update_one(
+        {"id": target_id}, {"$addToSet": {"friend_requests_in": current["id"]}}
+    )
+    return {"ok": True, "status": "sent"}
+
+
+@api.post("/friends/accept/{requester_id}")
+async def friend_request_accept(
+    requester_id: str, current: dict = Depends(get_current_user)
+):
+    if requester_id not in current.get("friend_requests_in", []):
+        raise HTTPException(400, "No pending request from this user")
+    await db.users.update_one(
+        {"id": current["id"]},
+        {
+            "$pull": {"friend_requests_in": requester_id},
+            "$addToSet": {"friends": requester_id},
+        },
+    )
+    await db.users.update_one(
+        {"id": requester_id},
+        {
+            "$pull": {"friend_requests_out": current["id"]},
+            "$addToSet": {"friends": current["id"]},
+        },
+    )
+    return {"ok": True, "status": "accepted"}
+
+
+@api.post("/friends/reject/{requester_id}")
+async def friend_request_reject(
+    requester_id: str, current: dict = Depends(get_current_user)
+):
+    await db.users.update_one(
+        {"id": current["id"]}, {"$pull": {"friend_requests_in": requester_id}}
+    )
+    await db.users.update_one(
+        {"id": requester_id}, {"$pull": {"friend_requests_out": current["id"]}}
+    )
+    return {"ok": True}
+
+
+@api.delete("/friends/{friend_id}")
+async def friend_remove(friend_id: str, current: dict = Depends(get_current_user)):
+    await db.users.update_one(
+        {"id": current["id"]}, {"$pull": {"friends": friend_id}}
+    )
+    await db.users.update_one(
+        {"id": friend_id}, {"$pull": {"friends": current["id"]}}
+    )
+    return {"ok": True}
 
 
 # ============== Room Routes ==============
@@ -540,6 +717,7 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
         logger.exception("ws error: %s", e)
     finally:
         was_host = manager.get_host(room_id) == user["id"]
+        mark_offline(user["id"])
         # Track session duration for analytics
         session_secs = manager.pop_session_seconds(room_id, user["id"])
         if session_secs > 0:

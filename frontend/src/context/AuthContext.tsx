@@ -7,6 +7,10 @@ export interface User {
   username: string;
   nickname: string;
   avatar: string;
+  avatar_image?: string | null;
+  bio?: string | null;
+  banner_id?: string | null;
+  badges?: string[];
   created_at?: string;
   total_seconds?: number;
 }
