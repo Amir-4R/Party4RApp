@@ -1,60 +1,446 @@
-from fastapi import FastAPI, APIRouter
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List
 import uuid
-from datetime import datetime
+import json
+import secrets
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Annotated, Dict, Set
 
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Query
+from fastapi.security import OAuth2PasswordBearer
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+import bcrypt
+import jwt
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Config
+MONGO_URL = os.environ["MONGO_URL"]
+DB_NAME = os.environ["DB_NAME"]
+JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
+JWT_ALGO = "HS256"
+TOKEN_EXPIRE_HOURS = 24 * 7  # 1 week
 
-# Create the main app without a prefix
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
+
 app = FastAPI()
+api = APIRouter(prefix="/api")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+# ============== Models ==============
+class SignupRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=32)
+    password: str = Field(min_length=6, max_length=128)
+    nickname: str = Field(min_length=1, max_length=64)
+    avatar: str = Field(min_length=1, max_length=64)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserPublic(BaseModel):
+    id: str
+    username: str
+    nickname: str
+    avatar: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserPublic
+
+
+class CreateRoomRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    is_public: bool = True
+    password: Optional[str] = None
+    video_url: Optional[str] = None
+
+
+class RoomPublic(BaseModel):
+    id: str
+    name: str
+    host_id: str
+    host_nickname: str
+    host_avatar: str
+    is_public: bool
+    has_password: bool
+    video_url: Optional[str] = None
+    member_count: int = 0
+    created_at: str
+
+
+class JoinRoomRequest(BaseModel):
+    password: Optional[str] = None
+
+
+# ============== Helpers ==============
+def hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
+
+
+def create_token(user_id: str) -> str:
+    payload = {
+        "sub": user_id,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+
+def decode_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+        return payload["sub"]
+    except Exception as e:
+        raise ValueError(str(e))
+
+
+async def get_user_by_id(user_id: str) -> Optional[dict]:
+    return await db.users.find_one({"id": user_id}, {"_id": 0})
+
+
+async def get_current_user(token: Annotated[Optional[str], Depends(oauth2_scheme)]) -> dict:
+    if not token:
+        raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"})
+    try:
+        user_id = decode_token(token)
+    except ValueError:
+        raise HTTPException(401, "Invalid token", headers={"WWW-Authenticate": "Bearer"})
+    user = await get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(401, "User not found", headers={"WWW-Authenticate": "Bearer"})
+    return user
+
+
+def user_to_public(u: dict) -> UserPublic:
+    return UserPublic(id=u["id"], username=u["username"], nickname=u["nickname"], avatar=u["avatar"])
+
+
+# ============== WebSocket Room Manager ==============
+class RoomManager:
+    def __init__(self):
+        # room_id -> {user_id: WebSocket}
+        self.rooms: Dict[str, Dict[str, WebSocket]] = {}
+        # room_id -> user dict cache
+        self.members: Dict[str, Dict[str, dict]] = {}
+
+    async def connect(self, room_id: str, user: dict, ws: WebSocket):
+        await ws.accept()
+        self.rooms.setdefault(room_id, {})[user["id"]] = ws
+        self.members.setdefault(room_id, {})[user["id"]] = {
+            "id": user["id"], "nickname": user["nickname"], "avatar": user["avatar"]
+        }
+
+    def disconnect(self, room_id: str, user_id: str):
+        if room_id in self.rooms:
+            self.rooms[room_id].pop(user_id, None)
+            self.members.get(room_id, {}).pop(user_id, None)
+            if not self.rooms[room_id]:
+                self.rooms.pop(room_id, None)
+                self.members.pop(room_id, None)
+
+    async def broadcast(self, room_id: str, payload: dict, exclude_user: Optional[str] = None):
+        msg = json.dumps(payload)
+        conns = list(self.rooms.get(room_id, {}).items())
+        for uid, ws in conns:
+            if exclude_user and uid == exclude_user:
+                continue
+            try:
+                await ws.send_text(msg)
+            except Exception:
+                pass
+
+    def get_members(self, room_id: str) -> list:
+        return list(self.members.get(room_id, {}).values())
+
+    def member_count(self, room_id: str) -> int:
+        return len(self.rooms.get(room_id, {}))
+
+
+manager = RoomManager()
+
+
+# ============== Auth Routes ==============
+@api.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "PartyApp API"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api.post("/auth/signup", response_model=TokenResponse, status_code=201)
+async def signup(req: SignupRequest):
+    existing = await db.users.find_one({"username": req.username})
+    if existing:
+        raise HTTPException(400, "Username already taken")
+    user_id = str(uuid.uuid4())
+    doc = {
+        "id": user_id,
+        "username": req.username,
+        "password_hash": hash_password(req.password),
+        "nickname": req.nickname,
+        "avatar": req.avatar,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(doc)
+    token = create_token(user_id)
+    return TokenResponse(access_token=token, user=user_to_public(doc))
 
-# Include the router in the main app
-app.include_router(api_router)
 
+@api.post("/auth/login", response_model=TokenResponse)
+async def login(req: LoginRequest):
+    user = await db.users.find_one({"username": req.username}, {"_id": 0})
+    if not user or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(401, "Incorrect username or password")
+    token = create_token(user["id"])
+    return TokenResponse(access_token=token, user=user_to_public(user))
+
+
+@api.get("/auth/me", response_model=UserPublic)
+async def me(current: Annotated[dict, Depends(get_current_user)]):
+    return user_to_public(current)
+
+
+@api.patch("/auth/profile", response_model=UserPublic)
+async def update_profile(
+    nickname: Optional[str] = None,
+    avatar: Optional[str] = None,
+    current: dict = Depends(get_current_user),
+):
+    updates = {}
+    if nickname:
+        updates["nickname"] = nickname
+    if avatar:
+        updates["avatar"] = avatar
+    if updates:
+        await db.users.update_one({"id": current["id"]}, {"$set": updates})
+        current.update(updates)
+    return user_to_public(current)
+
+
+# ============== Room Routes ==============
+def room_to_public(r: dict) -> RoomPublic:
+    return RoomPublic(
+        id=r["id"],
+        name=r["name"],
+        host_id=r["host_id"],
+        host_nickname=r.get("host_nickname", ""),
+        host_avatar=r.get("host_avatar", ""),
+        is_public=r["is_public"],
+        has_password=bool(r.get("password")),
+        video_url=r.get("video_url"),
+        member_count=manager.member_count(r["id"]),
+        created_at=r["created_at"],
+    )
+
+
+@api.post("/rooms", response_model=RoomPublic, status_code=201)
+async def create_room(req: CreateRoomRequest, current: dict = Depends(get_current_user)):
+    room_id = str(uuid.uuid4())
+    doc = {
+        "id": room_id,
+        "name": req.name,
+        "host_id": current["id"],
+        "host_nickname": current["nickname"],
+        "host_avatar": current["avatar"],
+        "is_public": req.is_public,
+        "password": req.password if not req.is_public else None,
+        "video_url": req.video_url,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.rooms.insert_one(doc)
+    doc.pop("_id", None)
+    return room_to_public(doc)
+
+
+@api.get("/rooms/public", response_model=list[RoomPublic])
+async def list_public_rooms(current: dict = Depends(get_current_user)):
+    rooms = await db.rooms.find({"is_public": True}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return [room_to_public(r) for r in rooms]
+
+
+@api.get("/rooms/{room_id}", response_model=RoomPublic)
+async def get_room(room_id: str, current: dict = Depends(get_current_user)):
+    room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+    if not room:
+        raise HTTPException(404, "Room not found")
+    return room_to_public(room)
+
+
+@api.post("/rooms/{room_id}/join")
+async def join_room(room_id: str, req: JoinRoomRequest, current: dict = Depends(get_current_user)):
+    room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+    if not room:
+        raise HTTPException(404, "Room not found")
+    if not room["is_public"] and room.get("password"):
+        if req.password != room["password"]:
+            raise HTTPException(403, "Incorrect room password")
+    return {"ok": True, "room": room_to_public(room)}
+
+
+@api.post("/rooms/{room_id}/video")
+async def set_video(room_id: str, video_url: str, current: dict = Depends(get_current_user)):
+    room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+    if not room:
+        raise HTTPException(404, "Room not found")
+    if room["host_id"] != current["id"]:
+        raise HTTPException(403, "Only host can change video")
+    await db.rooms.update_one({"id": room_id}, {"$set": {"video_url": video_url}})
+    return {"ok": True}
+
+
+# ============== WebSocket ==============
+@app.websocket("/api/ws/rooms/{room_id}")
+async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
+    # Authenticate
+    try:
+        user_id = decode_token(token)
+    except ValueError:
+        await websocket.close(code=1008)
+        return
+    user = await get_user_by_id(user_id)
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+    room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+    if not room:
+        await websocket.close(code=1008)
+        return
+
+    is_host = room["host_id"] == user["id"]
+    await manager.connect(room_id, user, websocket)
+
+    # Notify others + send init
+    await manager.broadcast(
+        room_id,
+        {
+            "type": "user_joined",
+            "user": {"id": user["id"], "nickname": user["nickname"], "avatar": user["avatar"]},
+            "members": manager.get_members(room_id),
+        },
+    )
+    await websocket.send_text(
+        json.dumps(
+            {
+                "type": "init",
+                "is_host": is_host,
+                "host_id": room["host_id"],
+                "video_url": room.get("video_url"),
+                "members": manager.get_members(room_id),
+                "self": {"id": user["id"], "nickname": user["nickname"], "avatar": user["avatar"]},
+            }
+        )
+    )
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            mtype = data.get("type")
+
+            if mtype == "chat":
+                text = (data.get("text") or "").strip()
+                if not text:
+                    continue
+                await manager.broadcast(
+                    room_id,
+                    {
+                        "type": "chat",
+                        "text": text[:500],
+                        "user_id": user["id"],
+                        "nickname": user["nickname"],
+                        "avatar": user["avatar"],
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+            elif mtype == "playback":
+                # Only host can issue playback commands
+                if not is_host:
+                    continue
+                event = data.get("event")
+                if event not in ("play", "pause", "seek", "change_video"):
+                    continue
+                payload = {
+                    "type": "playback",
+                    "event": event,
+                    "time": data.get("time"),
+                    "video_url": data.get("video_url"),
+                    "host_id": user["id"],
+                }
+                if event == "change_video" and data.get("video_url"):
+                    await db.rooms.update_one(
+                        {"id": room_id}, {"$set": {"video_url": data["video_url"]}}
+                    )
+                await manager.broadcast(room_id, payload)
+            elif mtype == "state_request":
+                # New joiner asks for current playback state — forward to host
+                host_ws = manager.rooms.get(room_id, {}).get(room["host_id"])
+                if host_ws:
+                    try:
+                        await host_ws.send_text(
+                            json.dumps({"type": "state_request", "from": user["id"]})
+                        )
+                    except Exception:
+                        pass
+            elif mtype == "state_response":
+                # Host sends current state — relay to specific user
+                target = data.get("to")
+                if is_host and target:
+                    target_ws = manager.rooms.get(room_id, {}).get(target)
+                    if target_ws:
+                        try:
+                            await target_ws.send_text(
+                                json.dumps(
+                                    {
+                                        "type": "playback",
+                                        "event": "seek_sync",
+                                        "time": data.get("time"),
+                                        "playing": data.get("playing"),
+                                        "video_url": data.get("video_url"),
+                                    }
+                                )
+                            )
+                        except Exception:
+                            pass
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.exception("ws error: %s", e)
+    finally:
+        manager.disconnect(room_id, user["id"])
+        await manager.broadcast(
+            room_id,
+            {
+                "type": "user_left",
+                "user_id": user["id"],
+                "members": manager.get_members(room_id),
+            },
+        )
+
+
+app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -63,12 +449,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

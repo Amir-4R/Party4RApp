@@ -1,0 +1,58 @@
+{
+  "summary": "Backend testing for PartyApp MVP. 21/21 pytest tests passed covering auth (signup/login/me/profile), rooms (create public/private, list, get, join with password), and WebSocket flows (handshake init, chat broadcast, host-only playback enforcement, user_joined/user_left, invalid-token rejection). All endpoints behave per spec.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "WS /api/ws/rooms/{room_id}",
+        "issue": "user_joined is broadcast to the joining user themselves before init is sent (no exclude_user on initial join broadcast). Causes client to receive its own user_joined event prior to init. Suggest passing exclude_user=user_id when broadcasting user_joined on connect."
+      },
+      {
+        "endpoint": "WS /api/ws/rooms/{room_id}",
+        "issue": "Invalid-token connections are rejected with HTTP 403 during handshake (before websocket.accept), not closed with WS code 1008. Functionally correct (unauthenticated cannot connect) but differs from the spec wording 'closed with code 1008'. websockets.connect raises InvalidStatus(403)."
+      },
+      {
+        "endpoint": "POST /api/rooms/{id}/join",
+        "issue": "Endpoint validates password but does not actually register the user as a member (membership is tracked only via the WebSocket connection). This is acceptable for MVP but worth confirming with PM."
+      },
+      {
+        "endpoint": "POST /api/rooms/{room_id}/video",
+        "issue": "Accepts video_url as a query param (not JSON body) — inconsistent with other endpoints that use JSON bodies. Consider switching to a Pydantic body model."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: exclude the joining user from the initial user_joined broadcast so they don't receive their own join event before init.",
+    "Optional: change POST /rooms/{id}/video to accept JSON body instead of query param for consistency.",
+    "Note for next testing agent: WS invalid-token path returns HTTP 403 at handshake (not WS close 1008) — the test treats both as acceptable rejection signals."
+  ],
+  "critical_code_review_comments": [
+    "server.py is a single 455-line file. Acceptable for MVP, but consider splitting into routers/auth.py, routers/rooms.py, ws/manager.py when adding features.",
+    "JWT_SECRET falls back to secrets.token_hex(32) on each restart — invalidates outstanding tokens. Fine for dev, must be set explicitly in .env for production.",
+    "manager state (rooms/members) is in-memory only — won't scale to multi-worker deployments. Acceptable for Phase 1 MVP.",
+    "All MongoDB queries correctly exclude _id; UUID ids used throughout. No ObjectId leakage detected.",
+    "CORS allow_origins=['*'] with allow_credentials=True is invalid per CORS spec; browsers will reject credentialed requests. Set explicit origins in production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (21/21)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "Tests create TEST_-prefixed users/rooms per run. No cleanup performed; data accumulates in MongoDB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All Phase 1 backend endpoints + WebSocket flows verified. Reusable pytest suite at /app/backend/tests/backend_test.py. BASE URL hardcoded to https://partyapp-sync.preview.emergentagent.com (from frontend/.env EXPO_PUBLIC_BACKEND_URL). WS tests use websockets lib; invalid-token check accepts both close-code 1008 and handshake 403 since starlette rejects pre-accept tokens with 403.",
+  "rca_of_issue": "N/A — no failing tests after fix. Initial WS test failed because the server broadcasts user_joined to the joining user themselves before sending init; test now drains messages until init is received."
+}

@@ -1,0 +1,627 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  Alert,
+  useWindowDimensions,
+  StatusBar as RNStatusBar,
+} from "react-native";
+import { WebView } from "react-native-webview";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as ScreenOrientation from "expo-screen-orientation";
+import { storage } from "@/src/utils/storage";
+import { apiGet } from "@/src/api/client";
+import { TOKEN_KEY, getWsUrl } from "@/src/api/client";
+import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
+import { useAuth } from "@/src/context/AuthContext";
+
+interface ChatMsg {
+  id: string;
+  user_id: string;
+  nickname: string;
+  avatar: string;
+  text: string;
+  timestamp: string;
+}
+
+interface Member {
+  id: string;
+  nickname: string;
+  avatar: string;
+}
+
+function extractYouTubeId(url: string): string | null {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function buildEmbedHtml(videoId: string | null): string {
+  if (!videoId) {
+    return `<!DOCTYPE html><html><body style="background:#0B0B0F;color:#6C7A89;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px;"><div><div style="font-size:48px;margin-bottom:12px;">📺</div><div style="font-weight:700;color:#fff;">No video loaded</div><div style="margin-top:8px;font-size:14px;">Host needs to paste a YouTube link</div></div></body></html>`;
+  }
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:0}</style>
+  </head>
+  <body>
+    <div id="player"></div>
+    <script>
+      var tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(tag);
+      var player;
+      var suppressEvent = false;
+      function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+          videoId: '${videoId}',
+          playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1 },
+          events: {
+            'onReady': function(e){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'})); },
+            'onStateChange': function(e){
+              if (suppressEvent) return;
+              var t = player.getCurrentTime();
+              if (e.data === YT.PlayerState.PLAYING) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'play', time:t}));
+              } else if (e.data === YT.PlayerState.PAUSED) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'pause', time:t}));
+              }
+            }
+          }
+        });
+      }
+      document.addEventListener('message', handleMessage);
+      window.addEventListener('message', handleMessage);
+      function handleMessage(ev){
+        try {
+          var data = JSON.parse(ev.data);
+          if (!player || !player.seekTo) return;
+          suppressEvent = true;
+          if (data.event === 'play') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.playVideo(); }
+          else if (data.event === 'pause') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.pauseVideo(); }
+          else if (data.event === 'seek' || data.event === 'seek_sync') { if (typeof data.time === 'number') player.seekTo(data.time, true); if (data.playing) player.playVideo(); else player.pauseVideo(); }
+          else if (data.event === 'get_state') {
+            var s = { type: 'state_response', time: player.getCurrentTime(), playing: player.getPlayerState() === 1, to: data.to };
+            window.ReactNativeWebView.postMessage(JSON.stringify(s));
+          }
+          setTimeout(function(){ suppressEvent = false; }, 300);
+        } catch(e){}
+      }
+    </script>
+  </body>
+</html>`;
+}
+
+export default function RoomScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { user } = useAuth();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const webRef = useRef<WebView>(null);
+  const [connected, setConnected] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [draft, setDraft] = useState("");
+  const [forceFullscreen, setForceFullscreen] = useState(false);
+  const [showVideoInput, setShowVideoInput] = useState(false);
+  const [newVideo, setNewVideo] = useState("");
+
+  const videoId = extractYouTubeId(videoUrl || "");
+  const fullscreen = isLandscape || forceFullscreen;
+
+  // Unlock orientation while in room
+  useEffect(() => {
+    ScreenOrientation.unlockAsync().catch(() => {});
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, []);
+
+  // Connect WebSocket
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      const token = await storage.secureGet<string>(TOKEN_KEY, "");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+      const ws = new WebSocket(getWsUrl(id, token));
+      wsRef.current = ws;
+      ws.onopen = () => {
+        if (!cancelled) setConnected(true);
+      };
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleServerEvent(data);
+        } catch {}
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => {
+        if (!cancelled) setConnected(false);
+      };
+    })();
+    return () => {
+      cancelled = true;
+      try {
+        wsRef.current?.close();
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const handleServerEvent = useCallback((data: any) => {
+    switch (data.type) {
+      case "init":
+        setIsHost(data.is_host);
+        setVideoUrl(data.video_url || null);
+        setMembers(data.members || []);
+        if (!data.is_host) {
+          // Ask host for current playback state
+          setTimeout(() => {
+            wsRef.current?.send(JSON.stringify({ type: "state_request" }));
+          }, 1500);
+        }
+        break;
+      case "user_joined":
+      case "user_left":
+        setMembers(data.members || []);
+        break;
+      case "chat":
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `${data.user_id}-${data.timestamp}-${Math.random()}`,
+            user_id: data.user_id,
+            nickname: data.nickname,
+            avatar: data.avatar,
+            text: data.text,
+            timestamp: data.timestamp,
+          },
+        ]);
+        break;
+      case "playback":
+        if (data.event === "change_video" && data.video_url) {
+          setVideoUrl(data.video_url);
+        } else {
+          // Forward to WebView
+          webRef.current?.injectJavaScript(
+            `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+              JSON.stringify({ event: data.event, time: data.time, playing: data.playing })
+            )} }));true;`
+          );
+        }
+        break;
+      case "state_request":
+        if (isHost) {
+          // Reply with current state
+          webRef.current?.injectJavaScript(
+            `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+              JSON.stringify({ event: "get_state", to: data.from })
+            )} }));true;`
+          );
+        }
+        break;
+    }
+  }, [isHost]);
+
+  const onWebViewMessage = (e: any) => {
+    try {
+      const data = JSON.parse(e.nativeEvent.data);
+      if (data.type === "state" && isHost) {
+        wsRef.current?.send(
+          JSON.stringify({ type: "playback", event: data.event, time: data.time })
+        );
+      } else if (data.type === "state_response" && isHost) {
+        wsRef.current?.send(
+          JSON.stringify({
+            type: "state_response",
+            to: data.to,
+            time: data.time,
+            playing: data.playing,
+            video_url: videoUrl,
+          })
+        );
+      }
+    } catch {}
+  };
+
+  const sendChat = () => {
+    const text = draft.trim();
+    if (!text || !wsRef.current) return;
+    wsRef.current.send(JSON.stringify({ type: "chat", text }));
+    setDraft("");
+  };
+
+  const changeVideo = () => {
+    const url = newVideo.trim();
+    if (!url) return;
+    if (!extractYouTubeId(url)) {
+      Alert.alert("Invalid URL", "Please paste a valid YouTube link.");
+      return;
+    }
+    wsRef.current?.send(
+      JSON.stringify({ type: "playback", event: "change_video", video_url: url })
+    );
+    setVideoUrl(url);
+    setNewVideo("");
+    setShowVideoInput(false);
+  };
+
+  const leaveRoom = () => {
+    try {
+      wsRef.current?.close();
+    } catch {}
+    router.replace("/(tabs)/home");
+  };
+
+  // Render
+  return (
+    <View style={[styles.root, fullscreen && styles.rootFs]}>
+      {fullscreen && <RNStatusBar hidden />}
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: COLORS.bg }}
+        edges={fullscreen ? [] : ["top"]}
+      >
+        {/* Header (hidden in fullscreen) */}
+        {!fullscreen && (
+          <View style={styles.header}>
+            <TouchableOpacity testID="room-leave" onPress={leaveRoom} style={styles.iconBtn}>
+              <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {isHost ? "HOSTING" : "WATCHING"}
+              </Text>
+              <View style={styles.statusRow}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: connected ? COLORS.success : COLORS.error },
+                  ]}
+                />
+                <Text style={styles.statusText}>
+                  {connected ? `${members.length} live` : "connecting..."}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              testID="room-fullscreen"
+              onPress={() => setForceFullscreen(true)}
+              style={styles.iconBtn}
+            >
+              <Ionicons name="expand" size={22} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Video area */}
+        <View
+          style={[
+            styles.videoContainer,
+            fullscreen ? styles.videoFs : styles.videoPortrait,
+          ]}
+        >
+          {videoId ? (
+            <WebView
+              ref={webRef}
+              originWhitelist={["*"]}
+              source={{ html: buildEmbedHtml(videoId) }}
+              style={{ flex: 1, backgroundColor: "#000" }}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled
+              onMessage={onWebViewMessage}
+              testID="room-webview"
+            />
+          ) : (
+            <View style={styles.noVideo}>
+              <Ionicons name="play-circle-outline" size={56} color={COLORS.textDisabled} />
+              <Text style={styles.noVideoText}>No video yet</Text>
+              {isHost && (
+                <Text style={styles.noVideoSub}>Tap "Set Video" below to start</Text>
+              )}
+            </View>
+          )}
+
+          {fullscreen && (
+            <TouchableOpacity
+              testID="room-exit-fullscreen"
+              onPress={() => setForceFullscreen(false)}
+              style={styles.exitFsBtn}
+            >
+              <Ionicons name="contract" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Chat & controls (hidden in fullscreen) */}
+        {!fullscreen && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+            style={styles.chatPanel}
+          >
+            {isHost && (
+              <View style={styles.hostBar}>
+                {showVideoInput ? (
+                  <View style={styles.videoInputRow}>
+                    <TextInput
+                      testID="set-video-input"
+                      value={newVideo}
+                      onChangeText={setNewVideo}
+                      placeholder="Paste YouTube URL..."
+                      placeholderTextColor={COLORS.textDisabled}
+                      style={styles.videoInput}
+                      autoCapitalize="none"
+                    />
+                    <TouchableOpacity
+                      testID="set-video-cancel"
+                      onPress={() => {
+                        setShowVideoInput(false);
+                        setNewVideo("");
+                      }}
+                      style={styles.videoBtn}
+                    >
+                      <Ionicons name="close" size={18} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      testID="set-video-confirm"
+                      onPress={changeVideo}
+                      style={[styles.videoBtn, { backgroundColor: COLORS.brand }]}
+                    >
+                      <Ionicons name="checkmark" size={18} color={COLORS.bg} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    testID="set-video-btn"
+                    onPress={() => setShowVideoInput(true)}
+                    style={styles.setVideoBtn}
+                  >
+                    <Ionicons name="link" size={16} color={COLORS.brand} />
+                    <Text style={styles.setVideoText}>
+                      {videoUrl ? "Change Video" : "Set Video"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            <FlatList
+              data={messages}
+              keyExtractor={(m) => m.id}
+              renderItem={({ item }) => {
+                const mine = item.user_id === user?.id;
+                return (
+                  <View
+                    style={[
+                      styles.msgRow,
+                      { flexDirection: mine ? "row-reverse" : "row" },
+                    ]}
+                  >
+                    {!mine && (
+                      <Image
+                        source={{ uri: getAvatarUrl(item.avatar) }}
+                        style={styles.msgAvatar}
+                      />
+                    )}
+                    <View style={{ maxWidth: "75%" }}>
+                      {!mine && <Text style={styles.msgNick}>{item.nickname}</Text>}
+                      <View
+                        style={[
+                          styles.msgBubble,
+                          mine ? styles.msgBubbleMine : styles.msgBubbleOther,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.msgText,
+                            mine ? { color: COLORS.bg } : { color: COLORS.textPrimary },
+                          ]}
+                        >
+                          {item.text}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }}
+              contentContainerStyle={{ padding: 12, paddingBottom: 4 }}
+              ListEmptyComponent={
+                <View style={styles.chatEmpty}>
+                  <Text style={styles.chatEmptyText}>Say hi to the room 👋</Text>
+                </View>
+              }
+            />
+
+            <View style={styles.composer}>
+              <TextInput
+                testID="chat-input"
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Send a message..."
+                placeholderTextColor={COLORS.textDisabled}
+                style={styles.composerInput}
+                onSubmitEditing={sendChat}
+                returnKeyType="send"
+              />
+              <TouchableOpacity
+                testID="chat-send"
+                onPress={sendChat}
+                style={styles.sendBtn}
+                disabled={!draft.trim()}
+              >
+                <Ionicons name="send" size={18} color={COLORS.bg} />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+
+        {!connected && !fullscreen && (
+          <View style={styles.connecting}>
+            <ActivityIndicator size="small" color={COLORS.brand} />
+          </View>
+        )}
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: COLORS.bg },
+  rootFs: { backgroundColor: "#000" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    gap: 8,
+  },
+  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  headerTitle: {
+    color: COLORS.brand,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 2,
+  },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { color: COLORS.textSecondary, fontSize: 12 },
+  videoContainer: { backgroundColor: "#000", position: "relative" },
+  videoPortrait: { aspectRatio: 16 / 9 },
+  videoFs: { flex: 1 },
+  noVideo: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  noVideoText: { color: COLORS.textPrimary, fontSize: 16, fontWeight: "700", marginTop: 12 },
+  noVideoSub: { color: COLORS.textSecondary, fontSize: 13, marginTop: 6 },
+  exitFsBtn: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatPanel: { flex: 1, backgroundColor: COLORS.bg },
+  hostBar: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingBottom: 10,
+  },
+  setVideoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.brandDim,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: COLORS.brand,
+  },
+  setVideoText: { color: COLORS.brand, fontWeight: "700", fontSize: 13, letterSpacing: 0.5 },
+  videoInputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  videoInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: COLORS.textPrimary,
+    fontSize: 14,
+  },
+  videoBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  msgRow: { gap: 8, marginBottom: 10, alignItems: "flex-end" },
+  msgAvatar: { width: 28, height: 28, borderRadius: 8, backgroundColor: COLORS.surfaceElevated },
+  msgNick: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 4, marginLeft: 4 },
+  msgBubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  msgBubbleMine: {
+    backgroundColor: COLORS.brand,
+    borderBottomRightRadius: 4,
+  },
+  msgBubbleOther: {
+    backgroundColor: COLORS.surfaceElevated,
+    borderBottomLeftRadius: 4,
+  },
+  msgText: { fontSize: 14, lineHeight: 20 },
+  chatEmpty: { alignItems: "center", padding: 40 },
+  chatEmptyText: { color: COLORS.textSecondary, fontSize: 14 },
+  composer: {
+    flexDirection: "row",
+    padding: 12,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  composerInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === "ios" ? 10 : 8,
+    color: COLORS.textPrimary,
+    fontSize: 15,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connecting: {
+    position: "absolute",
+    top: 70,
+    alignSelf: "center",
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+});
