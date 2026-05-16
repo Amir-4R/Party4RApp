@@ -15,7 +15,14 @@ import {
   useWindowDimensions,
   StatusBar as RNStatusBar,
 } from "react-native";
-import { TOKEN_KEY, getWsUrl } from "@/src/api/client";
+import { WebView } from "react-native-webview";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as ScreenOrientation from "expo-screen-orientation";
+import * as ImagePicker from "expo-image-picker";
+import { storage } from "@/src/utils/storage";
+import { apiGet, TOKEN_KEY, getWsUrl } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
 
