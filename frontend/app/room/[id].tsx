@@ -1,4 +1,15 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+// =============================================================================
+// /app/frontend/app/room/[id].tsx
+// Party4RApp — Room screen (clean rewrite)
+//
+// Architecture:
+//   1. Imports (top)
+//   2. Helpers (extractYouTubeId, buildEmbedHtml)
+//   3. RoomScreen component (all hooks, state, JSX inside)
+//   4. styles (StyleSheet.create, at the very bottom, outside the component)
+// =============================================================================
+
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,6 +23,7 @@ import {
   Image,
   Alert,
   Modal,
+  Linking,
   useWindowDimensions,
   StatusBar as RNStatusBar,
 } from "react-native";
@@ -26,6 +38,9 @@ import { apiGet, TOKEN_KEY, getWsUrl } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 interface ChatMsg {
   id: string;
   user_id: string;
@@ -42,76 +57,74 @@ interface Member {
   avatar: string;
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
-  }
-  return null;
+  const m = url.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
 }
 
 function buildEmbedHtml(videoId: string | null): string {
   if (!videoId) {
-    return `<!DOCTYPE html><html><body style="background:#0B0B0F;color:#6C7A89;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px;"><div><div style="font-size:48px;margin-bottom:12px;">📺</div><div style="font-weight:700;color:#fff;">No video loaded</div><div style="margin-top:8px;font-size:14px;">Host needs to paste a YouTube link</div></div></body></html>`;
+    return `<!DOCTYPE html><html><body style="background:#0B0B0F;color:#6C7A89;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px;"><div><div style="font-size:48px;margin-bottom:12px;">📺</div><div style="font-weight:700;color:#fff;">No video loaded</div><div style="margin-top:8px;font-size:14px;">Host needs to pick a YouTube video</div></div></body></html>`;
   }
   return `<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:0}</style>
-  </head>
-  <body>
-    <div id="player"></div>
-    <script>
-      var tag = document.createElement('script');
-      tag.src = "https://www.youtube.com/iframe_api";
-      document.head.appendChild(tag);
-      var player;
-      var suppressEvent = false;
-      function onYouTubeIframeAPIReady() {
-        player = new YT.Player('player', {
-          videoId: '${videoId}',
-          playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1 },
-          events: {
-            'onReady': function(e){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'})); },
-            'onStateChange': function(e){
-              if (suppressEvent) return;
-              var t = player.getCurrentTime();
-              if (e.data === YT.PlayerState.PLAYING) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'play', time:t}));
-              } else if (e.data === YT.PlayerState.PAUSED) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'pause', time:t}));
-              }
-            }
-          }
-        });
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:0}</style>
+</head><body>
+<div id="player"></div>
+<script>
+var tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(tag);
+var player; var suppressEvent = false;
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player('player', {
+    videoId: '${videoId}',
+    playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1 },
+    events: {
+      'onReady': function(){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'})); },
+      'onStateChange': function(e){
+        if (suppressEvent) return;
+        var t = player.getCurrentTime();
+        if (e.data === YT.PlayerState.PLAYING) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'play', time:t}));
+        } else if (e.data === YT.PlayerState.PAUSED) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'pause', time:t}));
+        }
       }
-      document.addEventListener('message', handleMessage);
-      window.addEventListener('message', handleMessage);
-      function handleMessage(ev){
-        try {
-          var data = JSON.parse(ev.data);
-          if (!player || !player.seekTo) return;
-          suppressEvent = true;
-          if (data.event === 'play') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.playVideo(); }
-          else if (data.event === 'pause') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.pauseVideo(); }
-          else if (data.event === 'seek' || data.event === 'seek_sync') { if (typeof data.time === 'number') player.seekTo(data.time, true); if (data.playing) player.playVideo(); else player.pauseVideo(); }
-          else if (data.event === 'get_state') {
-            var s = { type: 'state_response', time: player.getCurrentTime(), playing: player.getPlayerState() === 1, to: data.to };
-            window.ReactNativeWebView.postMessage(JSON.stringify(s));
-          }
-          setTimeout(function(){ suppressEvent = false; }, 300);
-        } catch(e){}
-      }
-    </script>
-  </body>
-</html>`;
+    }
+  });
+}
+function handleMessage(ev){
+  try {
+    var data = JSON.parse(ev.data);
+    if (!player || !player.seekTo) return;
+    suppressEvent = true;
+    if (data.event === 'play') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.playVideo(); }
+    else if (data.event === 'pause') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.pauseVideo(); }
+    else if (data.event === 'seek' || data.event === 'seek_sync') { if (typeof data.time === 'number') player.seekTo(data.time, true); if (data.playing) player.playVideo(); else player.pauseVideo(); }
+    else if (data.event === 'get_state') {
+      var s = { type: 'state_response', time: player.getCurrentTime(), playing: player.getPlayerState() === 1, to: data.to };
+      window.ReactNativeWebView.postMessage(JSON.stringify(s));
+    }
+    setTimeout(function(){ suppressEvent = false; }, 300);
+  } catch(e){}
+}
+document.addEventListener('message', handleMessage);
+window.addEventListener('message', handleMessage);
+</script>
+</body></html>`;
 }
 
+// ---------------------------------------------------------------------------
+// RoomScreen Component
+// ---------------------------------------------------------------------------
 export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -119,30 +132,119 @@ export default function RoomScreen() {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
+  // Refs
   const wsRef = useRef<WebSocket | null>(null);
   const webRef = useRef<WebView>(null);
+
+  // State
   const [connected, setConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [hostId, setHostId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState("");
   const [forceFullscreen, setForceFullscreen] = useState(false);
-  const [showVideoInput, setShowVideoInput] = useState(false);
-  const [newVideo, setNewVideo] = useState("");
+
+  // Hub modal
+  const [showSearch, setShowSearch] = useState(false);
+  const [hubTab, setHubTab] = useState<"youtube" | "web">("youtube");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [webUrl, setWebUrl] = useState("https://www.google.com");
+  const [webDraftUrl, setWebDraftUrl] = useState("https://www.google.com");
 
   const videoId = extractYouTubeId(videoUrl || "");
   const fullscreen = isLandscape || forceFullscreen;
 
-  // Unlock orientation while in room
+  // -------------------------------------------------------------------------
+  // Orientation unlock while in room
+  // -------------------------------------------------------------------------
   useEffect(() => {
     ScreenOrientation.unlockAsync().catch(() => {});
     return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
+        () => {}
+      );
     };
   }, []);
 
+  // -------------------------------------------------------------------------
+  // WebSocket events
+  // -------------------------------------------------------------------------
+  const handleServerEvent = useCallback(
+    (data: any) => {
+      switch (data.type) {
+        case "init":
+          setIsHost(!!data.is_host);
+          setHostId(data.host_id || null);
+          setVideoUrl(data.video_url || null);
+          setMembers(data.members || []);
+          if (!data.is_host) {
+            setTimeout(() => {
+              wsRef.current?.send(JSON.stringify({ type: "state_request" }));
+            }, 1500);
+          }
+          break;
+        case "host_changed":
+          setHostId(data.host_id || null);
+          setIsHost(data.host_id === user?.id);
+          break;
+        case "user_joined":
+        case "user_left":
+          setMembers(data.members || []);
+          if (data.new_host_id) {
+            setHostId(data.new_host_id);
+            setIsHost(data.new_host_id === user?.id);
+          }
+          break;
+        case "chat":
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `${data.user_id}-${data.timestamp}-${Math.random()}`,
+              user_id: data.user_id,
+              nickname: data.nickname,
+              avatar: data.avatar,
+              text: data.text || "",
+              image: data.image,
+              timestamp: data.timestamp,
+            },
+          ]);
+          break;
+        case "playback":
+          if (data.event === "change_video" && data.video_url) {
+            setVideoUrl(data.video_url);
+          } else {
+            webRef.current?.injectJavaScript(
+              `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+                JSON.stringify({
+                  event: data.event,
+                  time: data.time,
+                  playing: data.playing,
+                })
+              )} }));true;`
+            );
+          }
+          break;
+        case "state_request":
+          if (isHost) {
+            webRef.current?.injectJavaScript(
+              `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+                JSON.stringify({ event: "get_state", to: data.from })
+              )} }));true;`
+            );
+          }
+          break;
+      }
+    },
+    [isHost, user?.id]
+  );
+
+  // -------------------------------------------------------------------------
   // Connect WebSocket
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -177,70 +279,9 @@ export default function RoomScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleServerEvent = useCallback((data: any) => {
-    switch (data.type) {
-      case "init":
-        setIsHost(data.is_host);
-        setHostId(data.host_id);
-        setVideoUrl(data.video_url || null);
-        setMembers(data.members || []);
-        if (!data.is_host) {
-          setTimeout(() => {
-            wsRef.current?.send(JSON.stringify({ type: "state_request" }));
-          }, 1500);
-        }
-        break;
-      case "host_changed":
-        setHostId(data.host_id);
-        setIsHost(data.host_id === user?.id);
-        break;
-      case "user_joined":
-      case "user_left":
-        setMembers(data.members || []);
-        if (data.new_host_id) {
-          setHostId(data.new_host_id);
-          setIsHost(data.new_host_id === user?.id);
-        }
-        break;
-      case "chat":
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `${data.user_id}-${data.timestamp}-${Math.random()}`,
-            user_id: data.user_id,
-            nickname: data.nickname,
-            avatar: data.avatar,
-            text: data.text,
-            image: data.image,
-            timestamp: data.timestamp,
-          },
-        ]);
-        break;
-      case "playback":
-        if (data.event === "change_video" && data.video_url) {
-          setVideoUrl(data.video_url);
-        } else {
-          // Forward to WebView
-          webRef.current?.injectJavaScript(
-            `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-              JSON.stringify({ event: data.event, time: data.time, playing: data.playing })
-            )} }));true;`
-          );
-        }
-        break;
-      case "state_request":
-        if (isHost) {
-          // Reply with current state
-          webRef.current?.injectJavaScript(
-            `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-              JSON.stringify({ event: "get_state", to: data.from })
-            )} }));true;`
-          );
-        }
-        break;
-    }
-  }, [isHost, user?.id]);
-
+  // -------------------------------------------------------------------------
+  // WebView -> RN bridge
+  // -------------------------------------------------------------------------
   const onWebViewMessage = (e: any) => {
     try {
       const data = JSON.parse(e.nativeEvent.data);
@@ -262,6 +303,9 @@ export default function RoomScreen() {
     } catch {}
   };
 
+  // -------------------------------------------------------------------------
+  // Actions
+  // -------------------------------------------------------------------------
   const sendChat = () => {
     const text = draft.trim();
     if (!text || !wsRef.current) return;
@@ -285,8 +329,23 @@ export default function RoomScreen() {
   const pushWebToRoom = () => {
     const u = webDraftUrl.trim();
     if (!u) return;
-    const final = u.startsWith("http") ? u : `https://${u}`;
-    changeVideo(final);
+    changeVideo(u.startsWith("http") ? u : `https://${u}`);
+  };
+
+  const runSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const res = await apiGet<{ items: any[] }>(
+        `/youtube/search?q=${encodeURIComponent(q)}`
+      );
+      setSearchResults(res.items || []);
+    } catch (e: any) {
+      Alert.alert("Search failed", e.message || "Try again");
+    } finally {
+      setSearching(false);
+    }
   };
 
   const sendImage = async () => {
@@ -302,7 +361,7 @@ export default function RoomScreen() {
         "Share photos in chat by allowing access in Settings.",
         [
           { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => import("react-native").then((m) => m.Linking.openSettings()) },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
         ]
       );
       return;
@@ -323,36 +382,18 @@ export default function RoomScreen() {
     wsRef.current?.send(JSON.stringify({ type: "chat", text: "", image: dataUri }));
   };
 
-  const runSearch = async () => {
-    const q = searchQuery.trim();
-    if (!q) return;
-    setSearching(true);
-    try {
-      const res = await apiGet<{ items: any[] }>(`/youtube/search?q=${encodeURIComponent(q)}`);
-      setSearchResults(res.items || []);
-    } catch (e: any) {
-      Alert.alert("Search failed", e.message || "Try again");
-    } finally {
-      setSearching(false);
-    }
-  };
-
   const transferHost = (targetId: string) => {
     if (!isHost || targetId === user?.id) return;
     const target = members.find((m) => m.id === targetId);
     if (!target) return;
-    Alert.alert(
-      "Transfer Leadership",
-      `Make ${target.nickname} the host?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Transfer",
-          onPress: () =>
-            wsRef.current?.send(JSON.stringify({ type: "transfer_host", to: targetId })),
-        },
-      ]
-    );
+    Alert.alert("Transfer Leadership", `Make ${target.nickname} the host?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Transfer",
+        onPress: () =>
+          wsRef.current?.send(JSON.stringify({ type: "transfer_host", to: targetId })),
+      },
+    ]);
   };
 
   const leaveRoom = () => {
@@ -362,24 +403,24 @@ export default function RoomScreen() {
     router.replace("/(tabs)/home");
   };
 
+  // -------------------------------------------------------------------------
   // Render
+  // -------------------------------------------------------------------------
   return (
-    <View style={[styles.root, fullscreen && styles.rootFs]}>
+    <View style={[styles.container, fullscreen && styles.containerFs]}>
       {fullscreen && <RNStatusBar hidden />}
       <SafeAreaView
         style={{ flex: 1, backgroundColor: COLORS.bg }}
         edges={fullscreen ? [] : ["top"]}
       >
-        {/* Header (hidden in fullscreen) */}
+        {/* Header */}
         {!fullscreen && (
           <View style={styles.header}>
             <TouchableOpacity testID="room-leave" onPress={leaveRoom} style={styles.iconBtn}>
               <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {isHost ? "HOSTING" : "WATCHING"}
-              </Text>
+              <Text style={styles.headerTitle}>{isHost ? "HOSTING" : "WATCHING"}</Text>
               <View style={styles.statusRow}>
                 <View
                   style={[
@@ -402,13 +443,8 @@ export default function RoomScreen() {
           </View>
         )}
 
-        {/* Video area */}
-        <View
-          style={[
-            styles.videoContainer,
-            fullscreen ? styles.videoFs : styles.videoPortrait,
-          ]}
-        >
+        {/* Video */}
+        <View style={[styles.videoBox, fullscreen ? styles.videoFs : styles.videoPortrait]}>
           {videoId ? (
             <WebView
               ref={webRef}
@@ -425,9 +461,9 @@ export default function RoomScreen() {
             <View style={styles.noVideo}>
               <Ionicons name="play-circle-outline" size={56} color={COLORS.textDisabled} />
               <Text style={styles.noVideoText}>No video yet</Text>
-              {isHost && (
-                <Text style={styles.noVideoSub}>Tap "Set Video" below to start</Text>
-              )}
+              {isHost ? (
+                <Text style={styles.bText}>Open the YouTube hub below</Text>
+              ) : null}
             </View>
           )}
 
@@ -442,11 +478,10 @@ export default function RoomScreen() {
           )}
         </View>
 
-        {/* Chat & controls (hidden in fullscreen) */}
+        {/* Chat panel + composer */}
         {!fullscreen && (
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
             style={styles.chatPanel}
           >
             {isHost && (
@@ -471,10 +506,7 @@ export default function RoomScreen() {
                 const mine = item.user_id === user?.id;
                 return (
                   <View
-                    style={[
-                      styles.msgRow,
-                      { flexDirection: mine ? "row-reverse" : "row" },
-                    ]}
+                    style={[styles.msgRow, { flexDirection: mine ? "row-reverse" : "row" }]}
                   >
                     {!mine && (
                       <Image
@@ -501,7 +533,9 @@ export default function RoomScreen() {
                           <Text
                             style={[
                               styles.msgText,
-                              mine ? { color: COLORS.bg } : { color: COLORS.textPrimary },
+                              mine
+                                ? { color: COLORS.bg }
+                                : { color: COLORS.textPrimary },
                             ]}
                           >
                             {item.text}
@@ -556,7 +590,7 @@ export default function RoomScreen() {
           </View>
         )}
 
-        {/* Members strip — tap to transfer if I am host */}
+        {/* Members strip (with crown) */}
         {!fullscreen && members.length > 0 && (
           <View style={styles.membersStrip}>
             {members.map((m) => {
@@ -569,7 +603,10 @@ export default function RoomScreen() {
                   disabled={!isHost || m.id === user?.id}
                   style={styles.memberPill}
                 >
-                  <Image source={{ uri: getAvatarUrl(m.avatar) }} style={styles.memberAv} />
+                  <Image
+                    source={{ uri: getAvatarUrl(m.avatar) }}
+                    style={styles.memberAv}
+                  />
                   {isThisHost && (
                     <View style={styles.crown} testID={`crown-${m.id}`}>
                       <Ionicons name="trophy" size={10} color={COLORS.bg} />
@@ -581,7 +618,7 @@ export default function RoomScreen() {
           </View>
         )}
 
-        {/* YouTube Search Modal */}
+        {/* Hub Modal */}
         <Modal
           visible={showSearch}
           animationType="slide"
@@ -589,7 +626,6 @@ export default function RoomScreen() {
           onRequestClose={() => setShowSearch(false)}
         >
           <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
-            {/* Hub Tabs */}
             <View style={styles.hubTabs}>
               <TouchableOpacity
                 testID="hub-tab-youtube"
@@ -673,7 +709,10 @@ export default function RoomScreen() {
                         onPress={() => changeVideo(item.video_id)}
                         style={styles.ytRow}
                       >
-                        <Image source={{ uri: item.thumbnail }} style={styles.ytThumb} />
+                        <Image
+                          source={{ uri: item.thumbnail }}
+                          style={styles.ytThumb}
+                        />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.ytTitle} numberOfLines={2}>
                             {item.title}
@@ -681,14 +720,14 @@ export default function RoomScreen() {
                           <Text style={styles.ytChan} numberOfLines={1}>
                             {item.channel}
                           </Text>
-                          {styles && styles.addBadge ? (
-                            <View style={styles.addBadge}>
-                              <Ionicons name="add-circle" size={12} color={COLORS.brand} />
-                              {styles.addBadgeText ? (
-                                <Text style={styles.addBadgeText}>ADD TO ROOM</Text>
-                              ) : null}
-                            </View>
-                          ) : null}
+                          <View style={styles.addBadge}>
+                            <Ionicons
+                              name="add-circle"
+                              size={12}
+                              color={COLORS.brand}
+                            />
+                            <Text style={styles.bText}>ADD TO ROOM</Text>
+                          </View>
                         </View>
                       </TouchableOpacity>
                     )}
@@ -707,7 +746,13 @@ export default function RoomScreen() {
                     testID="web-url-input"
                     value={webDraftUrl}
                     onChangeText={setWebDraftUrl}
-                    onSubmitEditing={() => setWebUrl(webDraftUrl.startsWith("http") ? webDraftUrl : `https://${webDraftUrl}`)}
+                    onSubmitEditing={() =>
+                      setWebUrl(
+                        webDraftUrl.startsWith("http")
+                          ? webDraftUrl
+                          : `https://${webDraftUrl}`
+                      )
+                    }
                     placeholder="https://..."
                     placeholderTextColor={COLORS.textDisabled}
                     style={styles.searchInput}
@@ -717,7 +762,13 @@ export default function RoomScreen() {
                   />
                   <TouchableOpacity
                     testID="web-go"
-                    onPress={() => setWebUrl(webDraftUrl.startsWith("http") ? webDraftUrl : `https://${webDraftUrl}`)}
+                    onPress={() =>
+                      setWebUrl(
+                        webDraftUrl.startsWith("http")
+                          ? webDraftUrl
+                          : `https://${webDraftUrl}`
+                      )
+                    }
                     style={styles.searchGo}
                   >
                     <Ionicons name="arrow-forward" size={18} color={COLORS.bg} />
@@ -748,9 +799,13 @@ export default function RoomScreen() {
   );
 }
 
+// ===========================================================================
+// styles — global StyleSheet, OUTSIDE the component, at the very bottom
+// ===========================================================================
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.bg },
-  rootFs: { backgroundColor: "#000" },
+  // Layout
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  containerFs: { backgroundColor: "#000" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -770,12 +825,18 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { color: COLORS.textSecondary, fontSize: 12 },
-  videoContainer: { backgroundColor: "#000", position: "relative" },
+
+  // Video area
+  videoBox: { backgroundColor: "#000", position: "relative" },
   videoPortrait: { aspectRatio: 16 / 9 },
   videoFs: { flex: 1 },
   noVideo: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  noVideoText: { color: COLORS.textPrimary, fontSize: 16, fontWeight: "700", marginTop: 12 },
-  noVideoSub: { color: COLORS.textSecondary, fontSize: 13, marginTop: 6 },
+  noVideoText: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 12,
+  },
   exitFsBtn: {
     position: "absolute",
     top: 20,
@@ -787,13 +848,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  // Chat
   chatPanel: { flex: 1, backgroundColor: COLORS.bg },
   hostBar: {
     paddingHorizontal: 12,
     paddingTop: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    paddingBottom: 10,
   },
   setVideoBtn: {
     flexDirection: "row",
@@ -807,40 +870,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.brand,
   },
-  setVideoText: { color: COLORS.brand, fontWeight: "700", fontSize: 13, letterSpacing: 0.5 },
-  videoInputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  videoInput: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: COLORS.textPrimary,
-    fontSize: 14,
-  },
-  videoBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: COLORS.surface,
-    alignItems: "center",
-    justifyContent: "center",
+  setVideoText: {
+    color: COLORS.brand,
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
   msgRow: { gap: 8, marginBottom: 10, alignItems: "flex-end" },
-  msgAvatar: { width: 28, height: 28, borderRadius: 8, backgroundColor: COLORS.surfaceElevated },
-  msgNick: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 4, marginLeft: 4 },
-  msgBubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
-  msgBubbleMine: {
-    backgroundColor: COLORS.brand,
-    borderBottomRightRadius: 4,
+  msgAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceElevated,
   },
+  msgNick: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  msgBubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  msgBubbleMine: { backgroundColor: COLORS.brand, borderBottomRightRadius: 4 },
   msgBubbleOther: {
     backgroundColor: COLORS.surfaceElevated,
     borderBottomLeftRadius: 4,
   },
   msgText: { fontSize: 14, lineHeight: 20 },
+  msgImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceElevated,
+    marginBottom: 4,
+  },
   chatEmpty: { alignItems: "center", padding: 40 },
   chatEmptyText: { color: COLORS.textSecondary, fontSize: 14 },
   composer: {
@@ -850,6 +912,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.bg,
+  },
+  attachBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
   composerInput: {
     flex: 1,
@@ -879,6 +951,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
+
+  // Members strip + crown
   membersStrip: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -912,6 +986,30 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 6,
   },
+
+  // Hub modal
+  hubTabs: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  hubTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  hubTabActive: { borderBottomColor: COLORS.brand },
+  hubTabText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
   searchHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -937,7 +1035,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  searchHint: { color: COLORS.textSecondary, textAlign: "center", marginTop: 40, fontSize: 14 },
+  searchHint: {
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginTop: 40,
+    fontSize: 14,
+  },
   ytRow: {
     flexDirection: "row",
     gap: 12,
@@ -946,33 +1049,27 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: 12,
   },
-  ytThumb: { width: 120, height: 68, borderRadius: 8, backgroundColor: COLORS.surfaceElevated },
-  ytTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "600", lineHeight: 19 },
+  ytThumb: {
+    width: 120,
+    height: 68,
+    borderRadius: 8,
+    backgroundColor: COLORS.surfaceElevated,
+  },
+  ytTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 19,
+  },
   ytChan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
-  hubTabs: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  hubTab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  hubTabActive: { borderBottomColor: COLORS.brand },
-  hubTabText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
   addBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginTop: 6,
   },
-  addBadgeText: {
+  // bText — reusable badge / hint text style (used by ADD TO ROOM badge & noVideo hint)
+  bText: {
     color: COLORS.brand,
     fontSize: 10,
     fontWeight: "800",
@@ -988,22 +1085,10 @@ const styles = StyleSheet.create({
     margin: 12,
     borderRadius: 12,
   },
-  addToRoomText: { color: COLORS.bg, fontWeight: "800", letterSpacing: 1.5, fontSize: 14 },
-  msgImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 14,
-    backgroundColor: COLORS.surfaceElevated,
-    marginBottom: 4,
-  },
-  attachBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: "center",
-    justifyContent: "center",
+  addToRoomText: {
+    color: COLORS.bg,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    fontSize: 14,
   },
 });
