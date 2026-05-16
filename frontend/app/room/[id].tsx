@@ -141,12 +141,14 @@ export default function RoomScreen() {
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
   const webRef = useRef<WebView>(null);
+  const pendingChangeVideoRef = useRef<string | null>(null);
 
   // State
   const [connected, setConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [hostId, setHostId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState("");
@@ -185,7 +187,12 @@ export default function RoomScreen() {
         case "init":
           setIsHost(!!data.is_host);
           setHostId(data.host_id || null);
-          setVideoUrl(data.video_url || null);
+          if (data.video_url) {
+            setVideoUrl(data.video_url);
+            setSessionId(
+              `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+            );
+          }
           setMembers(data.members || []);
           if (!data.is_host) {
             setTimeout(() => {
@@ -221,7 +228,12 @@ export default function RoomScreen() {
           break;
         case "playback":
           if (data.event === "change_video" && data.video_url) {
+            // Peer-side: ALWAYS init a fresh session for the new video so the
+            // WebView remounts cleanly (no "Loading…" stuck on stale player).
             setVideoUrl(data.video_url);
+            setSessionId(
+              `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+            );
           } else {
             webRef.current?.injectJavaScript(
               `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
@@ -264,6 +276,20 @@ export default function RoomScreen() {
       wsRef.current = ws;
       ws.onopen = () => {
         if (!cancelled) setConnected(true);
+        // Flush any queued change_video that fired before WS was ready
+        const pending = pendingChangeVideoRef.current;
+        if (pending) {
+          pendingChangeVideoRef.current = null;
+          try {
+            ws.send(
+              JSON.stringify({
+                type: "playback",
+                event: "change_video",
+                video_url: pending,
+              })
+            );
+          } catch {}
+        }
       };
       ws.onmessage = (e) => {
         try {
@@ -323,10 +349,28 @@ export default function RoomScreen() {
     const url = videoIdOrUrl.startsWith("http")
       ? videoIdOrUrl
       : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
-    wsRef.current?.send(
-      JSON.stringify({ type: "playback", event: "change_video", video_url: url })
-    );
+
+    // 1) ALWAYS initialize/replace the local active session immediately so the
+    //    host's WebView mounts the new video without waiting for the round-trip.
+    //    The `sessionId` change forces a fresh player session even if URL is reused.
     setVideoUrl(url);
+    setSessionId(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+    // 2) Push to room via WS. If socket isn't ready yet, queue and let the
+    //    onopen handler fire it once connected — no silent drops.
+    const ws = wsRef.current;
+    const payload = JSON.stringify({
+      type: "playback",
+      event: "change_video",
+      video_url: url,
+    });
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+    } else {
+      pendingChangeVideoRef.current = url;
+    }
+
+    // 3) Close the hub modal & reset its state
     setShowSearch(false);
     setSearchQuery("");
     setSearchResults([]);
