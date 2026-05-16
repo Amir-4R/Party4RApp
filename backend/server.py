@@ -25,6 +25,7 @@ DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 JWT_ALGO = "HS256"
 TOKEN_EXPIRE_HOURS = 24 * 7  # 1 week
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -141,8 +142,12 @@ class RoomManager:
     def __init__(self):
         # room_id -> {user_id: WebSocket}
         self.rooms: Dict[str, Dict[str, WebSocket]] = {}
+        # room_id -> ordered list of user_ids (join order, for host succession)
+        self.join_order: Dict[str, list] = {}
         # room_id -> user dict cache
         self.members: Dict[str, Dict[str, dict]] = {}
+        # room_id -> current host user_id
+        self.current_host: Dict[str, str] = {}
 
     async def connect(self, room_id: str, user: dict, ws: WebSocket):
         await ws.accept()
@@ -150,14 +155,36 @@ class RoomManager:
         self.members.setdefault(room_id, {})[user["id"]] = {
             "id": user["id"], "nickname": user["nickname"], "avatar": user["avatar"]
         }
+        order = self.join_order.setdefault(room_id, [])
+        if user["id"] not in order:
+            order.append(user["id"])
 
-    def disconnect(self, room_id: str, user_id: str):
+    def disconnect(self, room_id: str, user_id: str) -> bool:
+        """Returns True if room became empty and should be destroyed."""
+        empty = False
         if room_id in self.rooms:
             self.rooms[room_id].pop(user_id, None)
             self.members.get(room_id, {}).pop(user_id, None)
+            order = self.join_order.get(room_id, [])
+            if user_id in order:
+                order.remove(user_id)
             if not self.rooms[room_id]:
                 self.rooms.pop(room_id, None)
                 self.members.pop(room_id, None)
+                self.join_order.pop(room_id, None)
+                self.current_host.pop(room_id, None)
+                empty = True
+        return empty
+
+    def set_host(self, room_id: str, user_id: str):
+        self.current_host[room_id] = user_id
+
+    def get_host(self, room_id: str) -> Optional[str]:
+        return self.current_host.get(room_id)
+
+    def next_host(self, room_id: str) -> Optional[str]:
+        order = self.join_order.get(room_id, [])
+        return order[0] if order else None
 
     async def broadcast(self, room_id: str, payload: dict, exclude_user: Optional[str] = None):
         msg = json.dumps(payload)
@@ -307,6 +334,45 @@ async def set_video(room_id: str, video_url: str, current: dict = Depends(get_cu
     return {"ok": True}
 
 
+# ============== YouTube Search ==============
+import urllib.parse
+import httpx
+
+
+@api.get("/youtube/search")
+async def youtube_search(q: str, current: dict = Depends(get_current_user)):
+    if not YOUTUBE_API_KEY:
+        raise HTTPException(503, "YouTube API key not configured")
+    if not q.strip():
+        return {"items": []}
+    url = (
+        "https://www.googleapis.com/youtube/v3/search"
+        f"?part=snippet&type=video&maxResults=15&safeSearch=moderate"
+        f"&q={urllib.parse.quote(q)}&key={YOUTUBE_API_KEY}"
+    )
+    async with httpx.AsyncClient(timeout=10.0) as cx:
+        r = await cx.get(url)
+        if r.status_code != 200:
+            raise HTTPException(502, f"YouTube API error: {r.text[:200]}")
+        data = r.json()
+    items = []
+    for it in data.get("items", []):
+        vid = it.get("id", {}).get("videoId")
+        sn = it.get("snippet", {})
+        if not vid:
+            continue
+        items.append(
+            {
+                "video_id": vid,
+                "title": sn.get("title"),
+                "channel": sn.get("channelTitle"),
+                "thumbnail": sn.get("thumbnails", {}).get("medium", {}).get("url"),
+                "published_at": sn.get("publishedAt"),
+            }
+        )
+    return {"items": items}
+
+
 # ============== WebSocket ==============
 @app.websocket("/api/ws/rooms/{room_id}")
 async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
@@ -327,7 +393,17 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
         return
 
     is_host = room["host_id"] == user["id"]
+    creator_id = room["host_id"]
     await manager.connect(room_id, user, websocket)
+
+    # Host succession: creator returns → reclaim; otherwise current host stays
+    cur = manager.get_host(room_id)
+    if cur is None:
+        manager.set_host(room_id, user["id"])  # first connection = host
+    elif user["id"] == creator_id and cur != creator_id:
+        manager.set_host(room_id, creator_id)  # creator reclaims
+        await manager.broadcast(room_id, {"type": "host_changed", "host_id": creator_id})
+    is_host = manager.get_host(room_id) == user["id"]
 
     # Notify others + send init
     await manager.broadcast(
@@ -344,7 +420,8 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
             {
                 "type": "init",
                 "is_host": is_host,
-                "host_id": room["host_id"],
+                "host_id": manager.get_host(room_id),
+                "creator_id": creator_id,
                 "video_url": room.get("video_url"),
                 "members": manager.get_members(room_id),
                 "self": {"id": user["id"], "nickname": user["nickname"], "avatar": user["avatar"]},
@@ -377,8 +454,8 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                     },
                 )
             elif mtype == "playback":
-                # Only host can issue playback commands
-                if not is_host:
+                # Only current host can issue playback commands
+                if manager.get_host(room_id) != user["id"]:
                     continue
                 event = data.get("event")
                 if event not in ("play", "pause", "seek", "change_video"):
@@ -395,6 +472,14 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                         {"id": room_id}, {"$set": {"video_url": data["video_url"]}}
                     )
                 await manager.broadcast(room_id, payload)
+            elif mtype == "transfer_host":
+                # Only current host can transfer
+                if manager.get_host(room_id) != user["id"]:
+                    continue
+                target = data.get("to")
+                if target and target in manager.rooms.get(room_id, {}):
+                    manager.set_host(room_id, target)
+                    await manager.broadcast(room_id, {"type": "host_changed", "host_id": target})
             elif mtype == "state_request":
                 # New joiner asks for current playback state — forward to host
                 host_ws = manager.rooms.get(room_id, {}).get(room["host_id"])

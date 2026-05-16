@@ -11,16 +11,10 @@ import {
   Platform,
   Image,
   Alert,
+  Modal,
   useWindowDimensions,
   StatusBar as RNStatusBar,
 } from "react-native";
-import { WebView } from "react-native-webview";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import * as ScreenOrientation from "expo-screen-orientation";
-import { storage } from "@/src/utils/storage";
-import { apiGet } from "@/src/api/client";
 import { TOKEN_KEY, getWsUrl } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
@@ -179,18 +173,26 @@ export default function RoomScreen() {
     switch (data.type) {
       case "init":
         setIsHost(data.is_host);
+        setHostId(data.host_id);
         setVideoUrl(data.video_url || null);
         setMembers(data.members || []);
         if (!data.is_host) {
-          // Ask host for current playback state
           setTimeout(() => {
             wsRef.current?.send(JSON.stringify({ type: "state_request" }));
           }, 1500);
         }
         break;
+      case "host_changed":
+        setHostId(data.host_id);
+        setIsHost(data.host_id === user?.id);
+        break;
       case "user_joined":
       case "user_left":
         setMembers(data.members || []);
+        if (data.new_host_id) {
+          setHostId(data.new_host_id);
+          setIsHost(data.new_host_id === user?.id);
+        }
         break;
       case "chat":
         setMessages((prev) => [
@@ -228,7 +230,7 @@ export default function RoomScreen() {
         }
         break;
     }
-  }, [isHost]);
+  }, [isHost, user?.id]);
 
   const onWebViewMessage = (e: any) => {
     try {
@@ -258,19 +260,47 @@ export default function RoomScreen() {
     setDraft("");
   };
 
-  const changeVideo = () => {
-    const url = newVideo.trim();
-    if (!url) return;
-    if (!extractYouTubeId(url)) {
-      Alert.alert("Invalid URL", "Please paste a valid YouTube link.");
-      return;
-    }
+  const changeVideo = (videoId: string) => {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
     wsRef.current?.send(
       JSON.stringify({ type: "playback", event: "change_video", video_url: url })
     );
     setVideoUrl(url);
-    setNewVideo("");
-    setShowVideoInput(false);
+    setShowSearch(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  const runSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const res = await apiGet<{ items: any[] }>(`/youtube/search?q=${encodeURIComponent(q)}`);
+      setSearchResults(res.items || []);
+    } catch (e: any) {
+      Alert.alert("Search failed", e.message || "Try again");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const transferHost = (targetId: string) => {
+    if (!isHost || targetId === user?.id) return;
+    const target = members.find((m) => m.id === targetId);
+    if (!target) return;
+    Alert.alert(
+      "Transfer Leadership",
+      `Make ${target.nickname} the host?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Transfer",
+          onPress: () =>
+            wsRef.current?.send(JSON.stringify({ type: "transfer_host", to: targetId })),
+        },
+      ]
+    );
   };
 
   const leaveRoom = () => {
@@ -369,47 +399,16 @@ export default function RoomScreen() {
           >
             {isHost && (
               <View style={styles.hostBar}>
-                {showVideoInput ? (
-                  <View style={styles.videoInputRow}>
-                    <TextInput
-                      testID="set-video-input"
-                      value={newVideo}
-                      onChangeText={setNewVideo}
-                      placeholder="Paste YouTube URL..."
-                      placeholderTextColor={COLORS.textDisabled}
-                      style={styles.videoInput}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity
-                      testID="set-video-cancel"
-                      onPress={() => {
-                        setShowVideoInput(false);
-                        setNewVideo("");
-                      }}
-                      style={styles.videoBtn}
-                    >
-                      <Ionicons name="close" size={18} color={COLORS.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      testID="set-video-confirm"
-                      onPress={changeVideo}
-                      style={[styles.videoBtn, { backgroundColor: COLORS.brand }]}
-                    >
-                      <Ionicons name="checkmark" size={18} color={COLORS.bg} />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    testID="set-video-btn"
-                    onPress={() => setShowVideoInput(true)}
-                    style={styles.setVideoBtn}
-                  >
-                    <Ionicons name="link" size={16} color={COLORS.brand} />
-                    <Text style={styles.setVideoText}>
-                      {videoUrl ? "Change Video" : "Set Video"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  testID="open-yt-search"
+                  onPress={() => setShowSearch(true)}
+                  style={styles.setVideoBtn}
+                >
+                  <Ionicons name="logo-youtube" size={18} color={COLORS.brand} />
+                  <Text style={styles.setVideoText}>
+                    {videoUrl ? "Change Video" : "Search YouTube"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -488,6 +487,100 @@ export default function RoomScreen() {
             <ActivityIndicator size="small" color={COLORS.brand} />
           </View>
         )}
+
+        {/* Members strip — tap to transfer if I am host */}
+        {!fullscreen && members.length > 0 && (
+          <View style={styles.membersStrip}>
+            {members.map((m) => {
+              const isThisHost = m.id === hostId;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  testID={`member-${m.id}`}
+                  onPress={() => transferHost(m.id)}
+                  disabled={!isHost || m.id === user?.id}
+                  style={styles.memberPill}
+                >
+                  <Image source={{ uri: getAvatarUrl(m.avatar) }} style={styles.memberAv} />
+                  {isThisHost && (
+                    <View style={styles.crown} testID={`crown-${m.id}`}>
+                      <Ionicons name="trophy" size={10} color={COLORS.bg} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* YouTube Search Modal */}
+        <Modal
+          visible={showSearch}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowSearch(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+            <View style={styles.searchHeader}>
+              <TouchableOpacity
+                testID="search-close"
+                onPress={() => setShowSearch(false)}
+                style={{ padding: 8 }}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+              <TextInput
+                testID="yt-search-input"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={runSearch}
+                placeholder="Search YouTube..."
+                placeholderTextColor={COLORS.textDisabled}
+                style={styles.searchInput}
+                autoFocus
+                returnKeyType="search"
+              />
+              <TouchableOpacity
+                testID="yt-search-go"
+                onPress={runSearch}
+                style={styles.searchGo}
+              >
+                <Ionicons name="search" size={18} color={COLORS.bg} />
+              </TouchableOpacity>
+            </View>
+            {searching ? (
+              <ActivityIndicator color={COLORS.brand} style={{ marginTop: 24 }} />
+            ) : (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(i) => i.video_id}
+                contentContainerStyle={{ padding: 12 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    testID={`yt-result-${item.video_id}`}
+                    onPress={() => changeVideo(item.video_id)}
+                    style={styles.ytRow}
+                  >
+                    <Image source={{ uri: item.thumbnail }} style={styles.ytThumb} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.ytTitle} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.ytChan} numberOfLines={1}>
+                        {item.channel}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <Text style={styles.searchHint}>
+                    Type a query and tap search to find videos.
+                  </Text>
+                }
+              />
+            )}
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -624,4 +717,74 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
+  membersStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  memberPill: { position: "relative" },
+  memberAv: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: COLORS.surfaceElevated,
+  },
+  crown: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.brand,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: COLORS.brand,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
+  },
+  searchHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: COLORS.textPrimary,
+    fontSize: 15,
+  },
+  searchGo: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: COLORS.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchHint: { color: COLORS.textSecondary, textAlign: "center", marginTop: 40, fontSize: 14 },
+  ytRow: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 8,
+    marginBottom: 10,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+  },
+  ytThumb: { width: 120, height: 68, borderRadius: 8, backgroundColor: COLORS.surfaceElevated },
+  ytTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "600", lineHeight: 19 },
+  ytChan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
 });

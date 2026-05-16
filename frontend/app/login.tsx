@@ -54,7 +54,7 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.header}>
-              <Text style={styles.brandTag}>PARTY</Text>
+              <Text style={styles.brandTag}>PARTY4R</Text>
               <Text style={styles.title}>Watch.{"\n"}Together.</Text>
               <Text style={styles.subtitle}>
                 Sync YouTube with friends in real-time, no streaming needed.

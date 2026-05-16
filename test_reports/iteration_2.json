@@ -1,0 +1,67 @@
+{
+  "summary": "Iteration-2 backend patch testing. 25/28 tests passed. Regression suite 21/21 passes (auth, rooms, basic WS). YouTube search endpoint works (auth + items array). Manual transfer_host works and non-host transfer is ignored. CRITICAL: 3 patch features NOT implemented in server.py — (1) auto-destroy empty rooms, (2) dynamic host transfer on host disconnect, (3) user_left does not carry new_host_id. Creator-reclaim code is wired in connect() but un-reachable because #2 doesn't transfer in the first place.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "WS /api/ws/rooms/{room_id} (disconnect)",
+        "issue": "Empty-room auto-destroy NOT implemented. RoomManager.disconnect() correctly returns empty=True and clears in-memory state, but the WS handler's `finally` clause never calls `db.rooms.delete_one({'id': room_id})`. After last WS closes, GET /api/rooms/{id} still returns 200. Fix: in the finally block of room_ws, capture `empty = manager.disconnect(...)` and if empty, await `db.rooms.delete_one({'id': room_id})` BEFORE the broadcast (skip broadcast if empty).",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "WS /api/ws/rooms/{room_id} (host disconnect)",
+        "issue": "Dynamic host transfer on disconnect NOT implemented. When the host disconnects with other members still present, no `host_changed` is broadcast and `user_left` lacks `new_host_id`. Fix in finally clause: BEFORE broadcasting user_left, if disconnecting user was the current host and room is non-empty, call `manager.set_host(room_id, manager.next_host(room_id))`, broadcast {type:'host_changed', host_id:<new>, new_host_id:<new>}, and include `new_host_id` in the user_left payload.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "WS user_left payload",
+        "issue": "Spec requires `user_left` to include `new_host_id` when host transfer occurs. Current payload only has {type, user_id, members}. Add new_host_id (or null when no transfer happened).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "WS host_changed payload",
+        "issue": "Spec wording uses `new_host_id`, but server emits `host_id`. Either rename to new_host_id or include BOTH keys for clarity & forward-compat. Frontend contract should be confirmed."
+      },
+      {
+        "endpoint": "WS state_response handler",
+        "issue": "Uses local `is_host` (captured at connect time) instead of `manager.get_host(room_id) == user['id']`. After a host transfer, the new host can issue transfer_host/playback (those use manager.get_host correctly) but state_response gates on the stale flag. Use manager.get_host for consistency."
+      },
+      {
+        "endpoint": "GET /api/youtube/search",
+        "issue": "No input length/charset validation; YouTube API key exposed via 502 error text (`r.text[:200]`) on upstream failure — consider sanitising error response."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [], "react_native_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_patch_iter2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Implement empty-room auto-destroy: in room_ws finally block, await db.rooms.delete_one({'id': room_id}) when manager.disconnect returns True, and skip the user_left broadcast for the empty case.",
+    "Implement host transfer on disconnect: detect host disconnect BEFORE manager.disconnect removes them; pick next_host AFTER removal; manager.set_host; broadcast host_changed; include new_host_id in user_left.",
+    "Add `new_host_id` field to user_left payload (null when no transfer).",
+    "Confirm host_changed key name with frontend (host_id vs new_host_id) — currently emits host_id only.",
+    "Optional: use manager.get_host(room_id) instead of local is_host inside state_response branch."
+  ],
+  "critical_code_review_comments": [
+    "RoomManager.disconnect returns the empty flag but caller (room_ws finally) discards it — bug bait. Always consume return values you bothered to return.",
+    "Creator-reclaim block in connect() (lines 400-406) is correct and will start working automatically once host-transfer-on-disconnect (#2) is implemented.",
+    "Manual transfer_host implementation is clean and validated by tests.",
+    "JWT_SECRET still falls back to ephemeral secrets.token_hex on restart — set in .env for prod (still open from iter 1)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_patch_iter2.py (new — 7 patch tests)"
+  ],
+  "success_rate": {
+    "backend": "89% (25/28). Regression: 21/21. Patch: 4/7 (manual transfer + non-host ignore + youtube auth + youtube items). Failing: auto-destroy, host-transfer-on-disconnect, creator-reclaim (blocked by prior).",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "Each patch test signs up fresh TEST_-prefixed users and creates a fresh room per test. No cleanup; data accumulates.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run `pytest /app/backend/tests/ -v` — should reach 28/28 once main agent implements the 3 critical fixes in the WS finally clause and user_left payload. Reusable suite at test_patch_iter2.py. The creator-reclaim test will pass automatically once host transfer on disconnect is fixed (no extra code needed in connect()).",
+  "rca_of_issue": "Patch spec asked for (a) DB-level room deletion on last disconnect, (b) host succession + host_changed broadcast on host disconnect, (c) user_left enriched with new_host_id. Implementation added the in-memory plumbing (join_order, next_host, set_host, current_host) and the manual transfer_host path, but never invoked them in the disconnect path. RoomManager.disconnect returns True for empty rooms but the caller throws away the return value and never deletes from MongoDB. For host disconnect, there is no logic between manager.disconnect and the user_left broadcast to (1) promote next member, (2) broadcast host_changed, or (3) attach new_host_id. Fix is ~10 lines in the finally block of room_ws."
+}
