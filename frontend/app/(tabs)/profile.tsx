@@ -1,16 +1,41 @@
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { AVATARS, COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { apiGet, apiPost } from "@/src/api/client";
-import { useState } from "react";
+import React, { useState } from "react";
+
+function formatMemberSince(iso?: string): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+function formatHours(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds < 60) return "<1m";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, refresh } = useAuth();
   const [saving, setSaving] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
 
   const selectAvatar = async (avatarId: string) => {
     if (!user || avatarId === user.avatar) return;
@@ -44,6 +69,18 @@ export default function ProfileScreen() {
           <Text style={styles.username} testID="profile-username">
             @{user?.username}
           </Text>
+
+          {/* Analytics row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard} testID="stat-member-since">
+              <Text style={styles.statLabel}>MEMBER SINCE</Text>
+              <Text style={styles.statValue}>{formatMemberSince(user?.created_at)}</Text>
+            </View>
+            <View style={styles.statCard} testID="stat-hours-spent">
+              <Text style={styles.statLabel}>TOTAL HOURS</Text>
+              <Text style={styles.statValue}>{formatHours(user?.total_seconds || 0)}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -146,4 +183,28 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   logoutText: { color: COLORS.error, fontWeight: "800", letterSpacing: 1 },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+    paddingHorizontal: 4,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+  },
+  statLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+  statValue: { color: COLORS.brand, fontSize: 18, fontWeight: "800" },
 });

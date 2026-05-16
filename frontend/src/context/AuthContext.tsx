@@ -7,6 +7,8 @@ export interface User {
   username: string;
   nickname: string;
   avatar: string;
+  created_at?: string;
+  total_seconds?: number;
 }
 
 interface AuthContextValue {

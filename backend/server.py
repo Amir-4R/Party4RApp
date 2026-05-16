@@ -56,6 +56,8 @@ class UserPublic(BaseModel):
     username: str
     nickname: str
     avatar: str
+    created_at: Optional[str] = None
+    total_seconds: int = 0
 
 
 class TokenResponse(BaseModel):
@@ -134,7 +136,14 @@ async def get_current_user(token: Annotated[Optional[str], Depends(oauth2_scheme
 
 
 def user_to_public(u: dict) -> UserPublic:
-    return UserPublic(id=u["id"], username=u["username"], nickname=u["nickname"], avatar=u["avatar"])
+    return UserPublic(
+        id=u["id"],
+        username=u["username"],
+        nickname=u["nickname"],
+        avatar=u["avatar"],
+        created_at=u.get("created_at"),
+        total_seconds=int(u.get("total_seconds", 0)),
+    )
 
 
 # ============== WebSocket Room Manager ==============
@@ -148,6 +157,8 @@ class RoomManager:
         self.members: Dict[str, Dict[str, dict]] = {}
         # room_id -> current host user_id
         self.current_host: Dict[str, str] = {}
+        # (room_id, user_id) -> connect epoch seconds
+        self.connect_time: Dict[tuple, float] = {}
 
     async def connect(self, room_id: str, user: dict, ws: WebSocket):
         await ws.accept()
@@ -158,6 +169,15 @@ class RoomManager:
         order = self.join_order.setdefault(room_id, [])
         if user["id"] not in order:
             order.append(user["id"])
+        import time as _t
+        self.connect_time[(room_id, user["id"])] = _t.time()
+
+    def pop_session_seconds(self, room_id: str, user_id: str) -> int:
+        import time as _t
+        start = self.connect_time.pop((room_id, user_id), None)
+        if start is None:
+            return 0
+        return max(0, int(_t.time() - start))
 
     def disconnect(self, room_id: str, user_id: str) -> bool:
         """Returns True if room became empty and should be destroyed."""
@@ -440,19 +460,23 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
 
             if mtype == "chat":
                 text = (data.get("text") or "").strip()
-                if not text:
+                image = data.get("image")  # base64 data URI (optional)
+                if image and len(image) > 720_000:
+                    # ~500KB binary after base64 overhead
                     continue
-                await manager.broadcast(
-                    room_id,
-                    {
-                        "type": "chat",
-                        "text": text[:500],
-                        "user_id": user["id"],
-                        "nickname": user["nickname"],
-                        "avatar": user["avatar"],
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                )
+                if not text and not image:
+                    continue
+                payload = {
+                    "type": "chat",
+                    "text": text[:500] if text else "",
+                    "user_id": user["id"],
+                    "nickname": user["nickname"],
+                    "avatar": user["avatar"],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                if image:
+                    payload["image"] = image
+                await manager.broadcast(room_id, payload)
             elif mtype == "playback":
                 # Only current host can issue playback commands
                 if manager.get_host(room_id) != user["id"]:
@@ -516,6 +540,15 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
         logger.exception("ws error: %s", e)
     finally:
         was_host = manager.get_host(room_id) == user["id"]
+        # Track session duration for analytics
+        session_secs = manager.pop_session_seconds(room_id, user["id"])
+        if session_secs > 0:
+            try:
+                await db.users.update_one(
+                    {"id": user["id"]}, {"$inc": {"total_seconds": session_secs}}
+                )
+            except Exception:
+                pass
         empty = manager.disconnect(room_id, user["id"])
         if empty:
             await db.rooms.delete_one({"id": room_id})

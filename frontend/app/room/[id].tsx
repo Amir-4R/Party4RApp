@@ -25,6 +25,7 @@ interface ChatMsg {
   nickname: string;
   avatar: string;
   text: string;
+  image?: string;
   timestamp: string;
 }
 
@@ -203,6 +204,7 @@ export default function RoomScreen() {
             nickname: data.nickname,
             avatar: data.avatar,
             text: data.text,
+            image: data.image,
             timestamp: data.timestamp,
           },
         ]);
@@ -260,8 +262,10 @@ export default function RoomScreen() {
     setDraft("");
   };
 
-  const changeVideo = (videoId: string) => {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const changeVideo = (videoIdOrUrl: string) => {
+    const url = videoIdOrUrl.startsWith("http")
+      ? videoIdOrUrl
+      : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
     wsRef.current?.send(
       JSON.stringify({ type: "playback", event: "change_video", video_url: url })
     );
@@ -269,6 +273,47 @@ export default function RoomScreen() {
     setShowSearch(false);
     setSearchQuery("");
     setSearchResults([]);
+  };
+
+  const pushWebToRoom = () => {
+    const u = webDraftUrl.trim();
+    if (!u) return;
+    const final = u.startsWith("http") ? u : `https://${u}`;
+    changeVideo(final);
+  };
+
+  const sendImage = async () => {
+    const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+    let granted = perm.granted;
+    if (!granted && perm.canAskAgain) {
+      const ask = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      granted = ask.granted;
+    }
+    if (!granted) {
+      Alert.alert(
+        "Gallery access needed",
+        "Share photos in chat by allowing access in Settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => import("react-native").then((m) => m.Linking.openSettings()) },
+        ]
+      );
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.5,
+      allowsEditing: false,
+    });
+    if (res.canceled || !res.assets?.[0]?.base64) return;
+    const a = res.assets[0];
+    const dataUri = `data:${a.mimeType || "image/jpeg"};base64,${a.base64}`;
+    if (dataUri.length > 700_000) {
+      Alert.alert("Image too large", "Pick an image under ~500KB.");
+      return;
+    }
+    wsRef.current?.send(JSON.stringify({ type: "chat", text: "", image: dataUri }));
   };
 
   const runSearch = async () => {
@@ -432,21 +477,30 @@ export default function RoomScreen() {
                     )}
                     <View style={{ maxWidth: "75%" }}>
                       {!mine && <Text style={styles.msgNick}>{item.nickname}</Text>}
-                      <View
-                        style={[
-                          styles.msgBubble,
-                          mine ? styles.msgBubbleMine : styles.msgBubbleOther,
-                        ]}
-                      >
-                        <Text
+                      {item.image ? (
+                        <Image
+                          source={{ uri: item.image }}
+                          style={styles.msgImage}
+                          resizeMode="cover"
+                        />
+                      ) : null}
+                      {item.text ? (
+                        <View
                           style={[
-                            styles.msgText,
-                            mine ? { color: COLORS.bg } : { color: COLORS.textPrimary },
+                            styles.msgBubble,
+                            mine ? styles.msgBubbleMine : styles.msgBubbleOther,
                           ]}
                         >
-                          {item.text}
-                        </Text>
-                      </View>
+                          <Text
+                            style={[
+                              styles.msgText,
+                              mine ? { color: COLORS.bg } : { color: COLORS.textPrimary },
+                            ]}
+                          >
+                            {item.text}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                   </View>
                 );
@@ -460,6 +514,13 @@ export default function RoomScreen() {
             />
 
             <View style={styles.composer}>
+              <TouchableOpacity
+                testID="chat-attach"
+                onPress={sendImage}
+                style={styles.attachBtn}
+              >
+                <Ionicons name="image-outline" size={20} color={COLORS.brand} />
+              </TouchableOpacity>
               <TextInput
                 testID="chat-input"
                 value={draft}
@@ -521,63 +582,153 @@ export default function RoomScreen() {
           onRequestClose={() => setShowSearch(false)}
         >
           <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
-            <View style={styles.searchHeader}>
+            {/* Hub Tabs */}
+            <View style={styles.hubTabs}>
               <TouchableOpacity
-                testID="search-close"
-                onPress={() => setShowSearch(false)}
-                style={{ padding: 8 }}
+                testID="hub-tab-youtube"
+                onPress={() => setHubTab("youtube")}
+                style={[styles.hubTab, hubTab === "youtube" && styles.hubTabActive]}
               >
-                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                <Ionicons
+                  name="logo-youtube"
+                  size={16}
+                  color={hubTab === "youtube" ? COLORS.brand : COLORS.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.hubTabText,
+                    hubTab === "youtube" && { color: COLORS.brand },
+                  ]}
+                >
+                  YouTube
+                </Text>
               </TouchableOpacity>
-              <TextInput
-                testID="yt-search-input"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                onSubmitEditing={runSearch}
-                placeholder="Search YouTube..."
-                placeholderTextColor={COLORS.textDisabled}
-                style={styles.searchInput}
-                autoFocus
-                returnKeyType="search"
-              />
               <TouchableOpacity
-                testID="yt-search-go"
-                onPress={runSearch}
-                style={styles.searchGo}
+                testID="hub-tab-web"
+                onPress={() => setHubTab("web")}
+                style={[styles.hubTab, hubTab === "web" && styles.hubTabActive]}
               >
-                <Ionicons name="search" size={18} color={COLORS.bg} />
+                <Ionicons
+                  name="globe-outline"
+                  size={16}
+                  color={hubTab === "web" ? COLORS.brand : COLORS.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.hubTabText,
+                    hubTab === "web" && { color: COLORS.brand },
+                  ]}
+                >
+                  Web
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="hub-close"
+                onPress={() => setShowSearch(false)}
+                style={[styles.hubTab, { flex: 0, paddingHorizontal: 14 }]}
+              >
+                <Ionicons name="close" size={20} color={COLORS.textPrimary} />
               </TouchableOpacity>
             </View>
-            {searching ? (
-              <ActivityIndicator color={COLORS.brand} style={{ marginTop: 24 }} />
-            ) : (
-              <FlatList
-                data={searchResults}
-                keyExtractor={(i) => i.video_id}
-                contentContainerStyle={{ padding: 12 }}
-                renderItem={({ item }) => (
+
+            {hubTab === "youtube" ? (
+              <>
+                <View style={styles.searchHeader}>
+                  <TextInput
+                    testID="yt-search-input"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    onSubmitEditing={runSearch}
+                    placeholder="Search YouTube privately..."
+                    placeholderTextColor={COLORS.textDisabled}
+                    style={styles.searchInput}
+                    autoFocus
+                    returnKeyType="search"
+                  />
                   <TouchableOpacity
-                    testID={`yt-result-${item.video_id}`}
-                    onPress={() => changeVideo(item.video_id)}
-                    style={styles.ytRow}
+                    testID="yt-search-go"
+                    onPress={runSearch}
+                    style={styles.searchGo}
                   >
-                    <Image source={{ uri: item.thumbnail }} style={styles.ytThumb} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.ytTitle} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-                      <Text style={styles.ytChan} numberOfLines={1}>
-                        {item.channel}
-                      </Text>
-                    </View>
+                    <Ionicons name="search" size={18} color={COLORS.bg} />
                   </TouchableOpacity>
+                </View>
+                {searching ? (
+                  <ActivityIndicator color={COLORS.brand} style={{ marginTop: 24 }} />
+                ) : (
+                  <FlatList
+                    data={searchResults}
+                    keyExtractor={(i) => i.video_id}
+                    contentContainerStyle={{ padding: 12 }}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        testID={`yt-result-${item.video_id}`}
+                        onPress={() => changeVideo(item.video_id)}
+                        style={styles.ytRow}
+                      >
+                        <Image source={{ uri: item.thumbnail }} style={styles.ytThumb} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.ytTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+                          <Text style={styles.ytChan} numberOfLines={1}>
+                            {item.channel}
+                          </Text>
+                          <View style={styles.addBadge}>
+                            <Ionicons name="add-circle" size={12} color={COLORS.brand} />
+                            <Text style={styles.addBadgeText}>ADD TO ROOM</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={
+                      <Text style={styles.searchHint}>
+                        Search privately — only what you "Add to Room" gets shared.
+                      </Text>
+                    }
+                  />
                 )}
-                ListEmptyComponent={
-                  <Text style={styles.searchHint}>
-                    Type a query and tap search to find videos.
-                  </Text>
-                }
-              />
+              </>
+            ) : (
+              <>
+                <View style={styles.searchHeader}>
+                  <TextInput
+                    testID="web-url-input"
+                    value={webDraftUrl}
+                    onChangeText={setWebDraftUrl}
+                    onSubmitEditing={() => setWebUrl(webDraftUrl.startsWith("http") ? webDraftUrl : `https://${webDraftUrl}`)}
+                    placeholder="https://..."
+                    placeholderTextColor={COLORS.textDisabled}
+                    style={styles.searchInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="go"
+                  />
+                  <TouchableOpacity
+                    testID="web-go"
+                    onPress={() => setWebUrl(webDraftUrl.startsWith("http") ? webDraftUrl : `https://${webDraftUrl}`)}
+                    style={styles.searchGo}
+                  >
+                    <Ionicons name="arrow-forward" size={18} color={COLORS.bg} />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flex: 1, backgroundColor: COLORS.surface }}>
+                  <WebView
+                    testID="private-webview"
+                    source={{ uri: webUrl }}
+                    style={{ flex: 1 }}
+                    onNavigationStateChange={(s) => setWebDraftUrl(s.url)}
+                  />
+                </View>
+                <TouchableOpacity
+                  testID="web-add-to-room"
+                  onPress={pushWebToRoom}
+                  style={styles.addToRoomBtn}
+                >
+                  <Ionicons name="rocket" size={18} color={COLORS.bg} />
+                  <Text style={styles.addToRoomText}>ADD TO ROOM</Text>
+                </TouchableOpacity>
+              </>
             )}
           </SafeAreaView>
         </Modal>
@@ -787,4 +938,46 @@ const styles = StyleSheet.create({
   ytThumb: { width: 120, height: 68, borderRadius: 8, backgroundColor: COLORS.surfaceElevated },
   ytTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "600", lineHeight: 19 },
   ytChan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
+});
+bText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
+  addBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  addBadgeText: {
+    color: COLORS.brand,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  addToRoomBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: COLORS.brand,
+    paddingVertical: 16,
+    margin: 12,
+    borderRadius: 12,
+  },
+  addToRoomText: { color: COLORS.bg, fontWeight: "800", letterSpacing: 1.5, fontSize: 14 },
+  msgImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceElevated,
+    marginBottom: 4,
+  },
+  attachBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
