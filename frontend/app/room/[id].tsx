@@ -168,6 +168,10 @@ export default function RoomScreen() {
   const [webUrl, setWebUrl] = useState("https://www.google.com");
   const [webDraftUrl, setWebDraftUrl] = useState("https://www.google.com");
 
+  // Player runtime state
+  const [playerReady, setPlayerReady] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+
   const videoId = extractYouTubeId(videoUrl || "");
   const fullscreen = isLandscape || forceFullscreen;
 
@@ -316,13 +320,24 @@ export default function RoomScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Reset player state every time the active session changes
+  useEffect(() => {
+    setPlayerReady(false);
+    setPlayerError(null);
+  }, [sessionId]);
+
   // -------------------------------------------------------------------------
   // WebView -> RN bridge
   // -------------------------------------------------------------------------
   const onWebViewMessage = (e: any) => {
     try {
       const data = JSON.parse(e.nativeEvent.data);
-      if (data.type === "state" && isHost) {
+      if (data.type === "ready") {
+        setPlayerReady(true);
+        setPlayerError(null);
+      } else if (data.type === "yterror") {
+        setPlayerError(`YouTube error ${data.code}`);
+      } else if (data.type === "state" && isHost) {
         wsRef.current?.send(
           JSON.stringify({ type: "playback", event: data.event, time: data.time })
         );
@@ -338,6 +353,13 @@ export default function RoomScreen() {
         );
       }
     } catch {}
+  };
+
+  // Manual play trigger (for environments where autoplay is blocked)
+  const tapToPlay = () => {
+    webRef.current?.injectJavaScript(
+      `try{player.unMute();player.setVolume(100);player.playVideo();}catch(e){}true;`
+    );
   };
 
   // -------------------------------------------------------------------------
@@ -501,19 +523,50 @@ export default function RoomScreen() {
         {/* Video */}
         <View style={[styles.videoBox, fullscreen ? styles.videoFs : styles.videoPortrait]}>
           {videoId ? (
-            <WebView
-              key={videoId}
-              ref={webRef}
-              originWhitelist={["*"]}
-              source={{ html: buildEmbedHtml(videoId) }}
-              style={{ flex: 1, backgroundColor: "#000" }}
-              allowsInlineMediaPlayback
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled
-              domStorageEnabled
-              onMessage={onWebViewMessage}
-              testID="room-webview"
-            />
+            <View style={{ flex: 1, position: "relative" }}>
+              <WebView
+                key={`${sessionId || videoId}`}
+                ref={webRef}
+                originWhitelist={["*"]}
+                source={{ html: buildEmbedHtml(videoId) }}
+                style={{ flex: 1, backgroundColor: "#000" }}
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled
+                domStorageEnabled
+                onMessage={onWebViewMessage}
+                testID="room-webview"
+              />
+              {(!playerReady || playerError) && (
+                <TouchableOpacity
+                  testID="tap-to-play"
+                  activeOpacity={0.85}
+                  onPress={tapToPlay}
+                  style={styles.playOverlay}
+                >
+                  {playerError ? (
+                    <>
+                      <Ionicons name="alert-circle" size={56} color={COLORS.error} />
+                      <Text style={styles.overlayTitle}>Playback issue</Text>
+                      <Text style={styles.overlaySub}>{playerError}</Text>
+                      <Text style={[styles.overlaySub, { marginTop: 12 }]}>
+                        Tap to retry
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.playCircle}>
+                        <Ionicons name="play" size={36} color={COLORS.bg} />
+                      </View>
+                      <Text style={styles.overlayTitle}>Tap to play</Text>
+                      <Text style={styles.overlaySub}>
+                        {isHost ? "Starts the room session" : "Join the sync"}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
           ) : (
             <View style={styles.noVideo}>
               <Ionicons name="play-circle-outline" size={56} color={COLORS.textDisabled} />
@@ -1119,6 +1172,34 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   ytChan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(11,11,15,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  playCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.brand,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: COLORS.brand,
+    shadowOpacity: 0.7,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+    marginBottom: 8,
+  },
+  overlayTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  overlaySub: { color: COLORS.textSecondary, fontSize: 12 },
   addBadge: {
     flexDirection: "row",
     alignItems: "center",
