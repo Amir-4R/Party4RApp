@@ -674,10 +674,14 @@ export default function RoomScreen() {
                           <Text style={styles.ytChan} numberOfLines={1}>
                             {item.channel}
                           </Text>
-                          <View style={styles?.addBadge}>
-                            <Ionicons name="add-circle" size={12} color={COLORS.brand} />
-                            <Text style={styles?.addBadgeText}>ADD TO ROOM</Text>
-                          </View>
+                          {styles && styles.addBadge ? (
+                            <View style={styles.addBadge}>
+                              <Ionicons name="add-circle" size={12} color={COLORS.brand} />
+                              {styles.addBadgeText ? (
+                                <Text style={styles.addBadgeText}>ADD TO ROOM</Text>
+                              ) : null}
+                            </View>
+                          ) : null}
                         </View>
                       </TouchableOpacity>
                     )}
