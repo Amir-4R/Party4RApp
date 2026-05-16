@@ -515,15 +515,30 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
     except Exception as e:
         logger.exception("ws error: %s", e)
     finally:
-        manager.disconnect(room_id, user["id"])
-        await manager.broadcast(
-            room_id,
-            {
-                "type": "user_left",
-                "user_id": user["id"],
-                "members": manager.get_members(room_id),
-            },
-        )
+        was_host = manager.get_host(room_id) == user["id"]
+        empty = manager.disconnect(room_id, user["id"])
+        if empty:
+            await db.rooms.delete_one({"id": room_id})
+        else:
+            new_host_id = None
+            if was_host:
+                new_host_id = manager.next_host(room_id)
+                if new_host_id:
+                    manager.set_host(room_id, new_host_id)
+            await manager.broadcast(
+                room_id,
+                {
+                    "type": "user_left",
+                    "user_id": user["id"],
+                    "members": manager.get_members(room_id),
+                    "new_host_id": new_host_id,
+                },
+            )
+            if new_host_id:
+                await manager.broadcast(
+                    room_id,
+                    {"type": "host_changed", "host_id": new_host_id, "new_host_id": new_host_id},
+                )
 
 
 app.include_router(api)
