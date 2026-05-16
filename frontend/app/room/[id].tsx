@@ -938,8 +938,23 @@ const styles = StyleSheet.create({
   ytThumb: { width: 120, height: 68, borderRadius: 8, backgroundColor: COLORS.surfaceElevated },
   ytTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "600", lineHeight: 19 },
   ytChan: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
-});
-bText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
+  hubTabs: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  hubTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  hubTabActive: { borderBottomColor: COLORS.brand },
+  hubTabText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
   addBadge: {
     flexDirection: "row",
     alignItems: "center",
