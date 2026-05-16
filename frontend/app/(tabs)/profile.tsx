@@ -19,6 +19,7 @@ import { AVATARS, COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { BANNERS, BADGES, getBanner } from "@/src/constants/customization";
 import { storage } from "@/src/utils/storage";
 import { TOKEN_KEY, API_BASE } from "@/src/api/client";
+import { useT } from "@/src/context/LanguageContext";
 
 function formatMemberSince(iso?: string): string {
   if (!iso) return "—";
@@ -58,6 +59,7 @@ async function patchProfileBody(body: object) {
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, refresh } = useAuth();
+  const { t } = useT();
   const [busy, setBusy] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
@@ -142,6 +144,16 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
+      {/* Floating Settings gear (top-right) */}
+      <TouchableOpacity
+        testID="profile-settings-gear"
+        onPress={() => router.push("/settings")}
+        style={styles.gearBtn}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="settings-outline" size={20} color={COLORS.textPrimary} />
+      </TouchableOpacity>
+
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         {/* Banner */}
         <View
@@ -202,13 +214,13 @@ export default function ProfileScreen() {
           {/* Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statCard} testID="stat-member-since">
-              <Text style={styles.statLabel}>MEMBER SINCE</Text>
+              <Text style={styles.statLabel}>{t("member_since")}</Text>
               <Text style={styles.statValue}>
                 {formatMemberSince(user?.created_at)}
               </Text>
             </View>
             <View style={styles.statCard} testID="stat-hours-spent">
-              <Text style={styles.statLabel}>TOTAL HOURS</Text>
+              <Text style={styles.statLabel}>{t("total_hours")}</Text>
               <Text style={styles.statValue}>
                 {formatHours(user?.total_seconds || 0)}
               </Text>
@@ -219,7 +231,7 @@ export default function ProfileScreen() {
         {/* Bio */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>BIO</Text>
+            <Text style={styles.sectionLabel}>{t("bio")}</Text>
             {!editingBio && (
               <TouchableOpacity
                 testID="bio-edit"
@@ -228,7 +240,7 @@ export default function ProfileScreen() {
                   setEditingBio(true);
                 }}
               >
-                <Text style={styles.editLink}>EDIT</Text>
+                <Text style={styles.editLink}>{t("edit").toUpperCase()}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -250,27 +262,27 @@ export default function ProfileScreen() {
                   onPress={() => setEditingBio(false)}
                   style={styles.btnGhost}
                 >
-                  <Text style={styles.btnGhostText}>CANCEL</Text>
+                  <Text style={styles.btnGhostText}>{t("cancel").toUpperCase()}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   testID="bio-save"
                   onPress={saveBio}
                   style={styles.btnSolid}
                 >
-                  <Text style={styles.btnSolidText}>SAVE</Text>
+                  <Text style={styles.btnSolidText}>{t("save").toUpperCase()}</Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : (
             <Text style={styles.bioText} testID="bio-text">
-              {user?.bio || "Tap edit to add a bio"}
+              {user?.bio || t("bio_empty")}
             </Text>
           )}
         </View>
 
         {/* Avatar selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PRESET AVATARS</Text>
+          <Text style={styles.sectionLabel}>{t("preset_avatars")}</Text>
           <View style={styles.grid}>
             {AVATARS.map((a) => (
               <TouchableOpacity
@@ -291,7 +303,7 @@ export default function ProfileScreen() {
 
         {/* Banners */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PROFILE BANNER</Text>
+          <Text style={styles.sectionLabel}>{t("profile_banner")}</Text>
           <View style={styles.grid}>
             {BANNERS.map((b) => (
               <TouchableOpacity
@@ -323,7 +335,7 @@ export default function ProfileScreen() {
 
         {/* Badges */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>BADGES (TAP TO TOGGLE)</Text>
+          <Text style={styles.sectionLabel}>{t("badges_label")}</Text>
           <View style={styles.grid}>
             {BADGES.map((b) => {
               const active = userBadges.includes(b.id);
@@ -366,7 +378,7 @@ export default function ProfileScreen() {
           }}
         >
           <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-          <Text style={styles.logoutText}>LOG OUT</Text>
+          <Text style={styles.logoutText}>{t("log_out")}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -375,6 +387,20 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
+  gearBtn: {
+    position: "absolute",
+    top: 10,
+    right: 14,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(28,28,34,0.85)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   bannerWrap: { height: 130, position: "relative" },
   bannerOverlay: { ...StyleSheet.absoluteFillObject },
   avatarRow: { alignItems: "center", marginTop: -50 },

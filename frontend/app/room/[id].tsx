@@ -37,6 +37,7 @@ import { storage } from "@/src/utils/storage";
 import { apiGet, TOKEN_KEY, getWsUrl } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
+import { useT } from "@/src/context/LanguageContext";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -171,6 +172,12 @@ export default function RoomScreen() {
   // Player runtime state
   const [playerReady, setPlayerReady] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
+
+  // In-room control center
+  const [showSettings, setShowSettings] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
+  const [videoVolume, setVideoVolume] = useState(100); // 0..100
+  const { t } = useT();
 
   const videoId = extractYouTubeId(videoUrl || "");
   const fullscreen = isLandscape || forceFullscreen;
@@ -474,11 +481,33 @@ export default function RoomScreen() {
   };
 
   const leaveRoom = () => {
-    try {
-      wsRef.current?.close();
-    } catch {}
-    router.replace("/(tabs)/home");
+    Alert.alert(
+      t("leave_confirm_title"),
+      t("leave_confirm_msg"),
+      [
+        { text: t("stay"), style: "cancel" },
+        {
+          text: t("leave"),
+          style: "destructive",
+          onPress: () => {
+            try {
+              wsRef.current?.close();
+            } catch {}
+            router.replace("/(tabs)/home");
+          },
+        },
+      ]
+    );
   };
+
+  // Apply video volume to YouTube IFrame whenever it changes
+  useEffect(() => {
+    if (playerReady) {
+      webRef.current?.injectJavaScript(
+        `try{player.setVolume(${videoVolume});if(${videoVolume}>0)player.unMute();else player.mute();}catch(e){}true;`
+      );
+    }
+  }, [videoVolume, playerReady]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -497,7 +526,7 @@ export default function RoomScreen() {
               <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>{isHost ? "HOSTING" : "WATCHING"}</Text>
+              <Text style={styles.headerTitle}>{isHost ? t("hosting") : t("watching")}</Text>
               <View style={styles.statusRow}>
                 <View
                   style={[
@@ -506,10 +535,28 @@ export default function RoomScreen() {
                   ]}
                 />
                 <Text style={styles.statusText}>
-                  {connected ? `${members.length} live` : "connecting..."}
+                  {connected ? `${members.length} ${t("live")}` : t("connecting")}
                 </Text>
               </View>
             </View>
+            <TouchableOpacity
+              testID="room-friends-open"
+              onPress={() => setShowFriends(true)}
+              style={styles.iconBtn}
+            >
+              <Ionicons name="people" size={22} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="room-settings-open"
+              onPress={() => setShowSettings(true)}
+              style={styles.iconBtn}
+            >
+              <Ionicons
+                name={videoVolume === 0 ? "volume-mute" : "settings-sharp"}
+                size={22}
+                color={videoVolume === 0 ? COLORS.error : COLORS.textPrimary}
+              />
+            </TouchableOpacity>
             <TouchableOpacity
               testID="room-fullscreen"
               onPress={() => setForceFullscreen(true)}
@@ -558,9 +605,9 @@ export default function RoomScreen() {
                       <View style={styles.playCircle}>
                         <Ionicons name="play" size={36} color={COLORS.bg} />
                       </View>
-                      <Text style={styles.overlayTitle}>Tap to play</Text>
+                      <Text style={styles.overlayTitle}>{t("tap_to_play")}</Text>
                       <Text style={styles.overlaySub}>
-                        {isHost ? "Starts the room session" : "Join the sync"}
+                        {isHost ? t("tap_starts_session") : t("tap_join_sync")}
                       </Text>
                     </>
                   )}
@@ -570,9 +617,9 @@ export default function RoomScreen() {
           ) : (
             <View style={styles.noVideo}>
               <Ionicons name="play-circle-outline" size={56} color={COLORS.textDisabled} />
-              <Text style={styles.noVideoText}>No video yet</Text>
+              <Text style={styles.noVideoText}>{t("no_video")}</Text>
               {isHost ? (
-                <Text style={styles.bText}>Open the YouTube hub below</Text>
+                <Text style={styles.bText}>{t("open_yt_hub")}</Text>
               ) : null}
             </View>
           )}
@@ -659,7 +706,7 @@ export default function RoomScreen() {
               contentContainerStyle={{ padding: 12, paddingBottom: 4 }}
               ListEmptyComponent={
                 <View style={styles.chatEmpty}>
-                  <Text style={styles.chatEmptyText}>Say hi to the room 👋</Text>
+                  <Text style={styles.chatEmptyText}>{t("say_hi")} 👋</Text>
                 </View>
               }
             />
@@ -676,7 +723,7 @@ export default function RoomScreen() {
                 testID="chat-input"
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Send a message..."
+                placeholder={t("send_message")}
                 placeholderTextColor={COLORS.textDisabled}
                 style={styles.composerInput}
                 onSubmitEditing={sendChat}
@@ -904,13 +951,147 @@ export default function RoomScreen() {
             )}
           </SafeAreaView>
         </Modal>
+
+        {/* Settings Modal — video volume + voice volume placeholder + mic info */}
+        <Modal
+          visible={showSettings}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowSettings(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+            <View style={styles.modalHead}>
+              <Text style={styles.modalTitle}>{t("settings")}</Text>
+              <TouchableOpacity testID="settings-close" onPress={() => setShowSettings(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20, gap: 24 }}>
+              {/* Video volume stepper */}
+              <View>
+                <View style={styles.sliderHead}>
+                  <Ionicons name="videocam" size={18} color={COLORS.brand} />
+                  <Text style={styles.sliderLabel}>{t("video_volume")}</Text>
+                  <Text style={styles.sliderVal}>{videoVolume}%</Text>
+                </View>
+                <View style={styles.stepper}>
+                  {[0, 20, 40, 60, 80, 100].map((v) => (
+                    <TouchableOpacity
+                      key={v}
+                      testID={`vol-video-${v}`}
+                      onPress={() => setVideoVolume(v)}
+                      style={[
+                        styles.stepBtn,
+                        videoVolume >= v && v > 0 && { backgroundColor: COLORS.brand },
+                        v === 0 && videoVolume === 0 && { backgroundColor: COLORS.error },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.stepText,
+                          videoVolume >= v && v > 0 && { color: COLORS.bg },
+                          v === 0 && videoVolume === 0 && { color: "#fff" },
+                        ]}
+                      >
+                        {v}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.hintLine}>
+                  {videoVolume === 0
+                    ? t("muted_hint") || "Muted"
+                    : t("video_volume_hint") || "Controls the YouTube playback volume in this room."}
+                </Text>
+              </View>
+            </View>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Friends shortcut Modal — quick view without exiting room */}
+        <Modal
+          visible={showFriends}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowFriends(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+            <View style={styles.modalHead}>
+              <Text style={styles.modalTitle}>{t("friends_label")}</Text>
+              <TouchableOpacity testID="room-friends-close" onPress={() => setShowFriends(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <RoomFriendsList />
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </View>
   );
 }
 
 // ===========================================================================
-// styles — global StyleSheet, OUTSIDE the component, at the very bottom
+// Reusable inline Friends list component used inside the room friends modal
+// ===========================================================================
+function RoomFriendsList() {
+  const { t } = useT();
+  const [data, setData] = useState<{ friends: any[]; incoming: any[]; outgoing: any[] }>({
+    friends: [],
+    incoming: [],
+    outgoing: [],
+  });
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    apiGet<any>("/friends")
+      .then((d) => setData(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+  if (loading)
+    return <ActivityIndicator color={COLORS.brand} style={{ marginTop: 24 }} />;
+  const items = [
+    ...data.incoming.map((f: any) => ({ ...f, _kind: "incoming" })),
+    ...data.friends.map((f: any) => ({ ...f, _kind: "friend" })),
+  ];
+  return (
+    <FlatList
+      data={items}
+      keyExtractor={(i) => i.id}
+      renderItem={({ item }) => (
+        <View style={{ padding: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Image
+            source={{ uri: item.avatar_image || getAvatarUrl(item.avatar) }}
+            style={{ width: 40, height: 40, borderRadius: 12 }}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: COLORS.textPrimary, fontWeight: "700" }}>
+              {item.nickname}
+            </Text>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>
+              {item._kind === "incoming"
+                ? t("wants_friend")
+                : item.online
+                ? t("online")
+                : t("offline")}
+            </Text>
+          </View>
+        </View>
+      )}
+      ListEmptyComponent={
+        <Text
+          style={{
+            color: COLORS.textSecondary,
+            textAlign: "center",
+            marginTop: 24,
+          }}
+        >
+          {t("no_friends_show")}
+        </Text>
+      }
+    />
+  );
+}
+
 // ===========================================================================
 const styles = StyleSheet.create({
   // Layout
@@ -1228,5 +1409,41 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1.5,
     fontSize: 14,
+  },
+  modalHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: { color: COLORS.textPrimary, fontSize: 18, fontWeight: "800", letterSpacing: 0.5 },
+  sliderHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  sliderLabel: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "700", flex: 1 },
+  sliderVal: { color: COLORS.brand, fontWeight: "800", fontSize: 14 },
+  stepper: { flexDirection: "row", gap: 6 },
+  stepBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "700" },
+  comingSoon: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontStyle: "italic",
+    marginTop: 8,
+  },
+  hintLine: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

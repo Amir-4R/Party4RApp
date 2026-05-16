@@ -1,8 +1,10 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/src/constants/avatars";
+import { useT } from "@/src/context/LanguageContext";
 
 export default function TabsLayout() {
+  const { t } = useT();
   return (
     <Tabs
       screenOptions={{
@@ -23,7 +25,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: "ROOMS",
+          title: t("tab_rooms"),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="tv-outline" size={size} color={color} />
           ),
@@ -32,7 +34,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="friends"
         options={{
-          title: "FRIENDS",
+          title: t("tab_friends"),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -41,7 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "PROFILE",
+          title: t("tab_profile"),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-circle-outline" size={size} color={color} />
           ),

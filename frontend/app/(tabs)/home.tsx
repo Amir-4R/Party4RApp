@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { apiGet } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
+import { useT } from "@/src/context/LanguageContext";
 
 interface Room {
   id: string;
@@ -32,6 +33,7 @@ interface Room {
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useT();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,8 +98,8 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hey {user?.nickname}</Text>
-          <Text style={styles.title}>Public Rooms</Text>
+          <Text style={styles.greeting}>{t("hey")} {user?.nickname}</Text>
+          <Text style={styles.title}>{t("public_rooms")}</Text>
         </View>
         <TouchableOpacity
           testID="create-room-fab"
@@ -128,14 +130,14 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <View style={styles.empty} testID="empty-rooms-state">
               <Ionicons name="tv-outline" size={48} color={COLORS.textDisabled} />
-              <Text style={styles.emptyTitle}>No live rooms yet</Text>
-              <Text style={styles.emptySub}>Be the first to start a watch party.</Text>
+              <Text style={styles.emptyTitle}>{t("no_rooms")}</Text>
+              <Text style={styles.emptySub}>{t("be_first")}</Text>
               <TouchableOpacity
                 testID="empty-create-btn"
                 onPress={() => router.push("/create-room")}
                 style={styles.emptyBtn}
               >
-                <Text style={styles.emptyBtnText}>CREATE ROOM</Text>
+                <Text style={styles.emptyBtnText}>{t("create_room")}</Text>
               </TouchableOpacity>
             </View>
           }
