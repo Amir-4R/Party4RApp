@@ -86,10 +86,15 @@ var player; var suppressEvent = false;
 function onYouTubeIframeAPIReady() {
   player = new YT.Player('player', {
     videoId: '${videoId}',
-    playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 0 },
+    playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 1 },
     events: {
       'onReady': function(){
+        try { player.mute(); } catch(e){}
         try { player.playVideo(); } catch(e){}
+        // Try to unmute once playback has actually started (mobile WebViews
+        // allow muted autoplay; unmute usually succeeds once play is running).
+        setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 400);
+        setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 1200);
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
       },
       'onStateChange': function(e){
