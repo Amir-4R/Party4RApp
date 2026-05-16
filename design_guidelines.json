@@ -1,0 +1,256 @@
+{
+  "theme_archetype": "Archetype 7: Electric & Neon (Adapted for Premium Mobile)",
+  "mode": "Dark",
+  "brand_name": "PartyApp",
+  "design_philosophy": "A premium, distraction-free co-watching experience. The interface should feel like a high-end late-night lounge or modern gaming console UI. Void blacks provide depth, while neon turquoise acts as a functional indicator for active states. Avoid heavy animations; optimize for smooth, immediate interactions.",
+  "colors": {
+    "background": {
+      "primary": "#0B0B0F",
+      "surface": "#15151A",
+      "surface_elevated": "#1C1C22",
+      "overlay": "rgba(11, 11, 15, 0.85)"
+    },
+    "brand": {
+      "primary": "#00F2FE",
+      "primary_dim": "rgba(0, 242, 254, 0.15)",
+      "primary_glow": "rgba(0, 242, 254, 0.4)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#6C7A89",
+      "disabled": "#3A404A"
+    },
+    "status": {
+      "error": "#FF3B30",
+      "success": "#34C759",
+      "warning": "#FFCC00"
+    },
+    "borders": {
+      "default": "#23242A",
+      "active": "#00F2FE"
+    }
+  },
+  "typography": {
+    "primary_font": "Outfit",
+    "fallback_font": "System",
+    "scales": {
+      "h1": {
+        "fontSize": 32,
+        "fontWeight": "800",
+        "letterSpacing": -1,
+        "lineHeight": 40
+      },
+      "h2": {
+        "fontSize": 24,
+        "fontWeight": "700",
+        "letterSpacing": -0.5,
+        "lineHeight": 32
+      },
+      "h3": {
+        "fontSize": 18,
+        "fontWeight": "600",
+        "letterSpacing": 0,
+        "lineHeight": 24
+      },
+      "body": {
+        "fontSize": 16,
+        "fontWeight": "400",
+        "letterSpacing": 0,
+        "lineHeight": 24
+      },
+      "body_sm": {
+        "fontSize": 14,
+        "fontWeight": "400",
+        "letterSpacing": 0,
+        "lineHeight": 20
+      },
+      "caption": {
+        "fontSize": 12,
+        "fontWeight": "600",
+        "letterSpacing": 1.2,
+        "lineHeight": 16,
+        "textTransform": "uppercase"
+      }
+    }
+  },
+  "spacing": {
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "6": 24,
+    "8": 32,
+    "12": 48,
+    "16": 64
+  },
+  "components": {
+    "buttons": {
+      "primary": {
+        "backgroundColor": "#00F2FE",
+        "borderRadius": 12,
+        "paddingVertical": 16,
+        "paddingHorizontal": 24,
+        "alignItems": "center",
+        "shadowColor": "#00F2FE",
+        "shadowOffset": { "width": 0, "height": 4 },
+        "shadowOpacity": 0.3,
+        "shadowRadius": 8,
+        "elevation": 5
+      },
+      "primary_text": {
+        "color": "#0B0B0F",
+        "fontWeight": "700",
+        "fontSize": 16
+      },
+      "secondary": {
+        "backgroundColor": "#15151A",
+        "borderWidth": 1,
+        "borderColor": "#23242A",
+        "borderRadius": 12,
+        "paddingVertical": 16,
+        "paddingHorizontal": 24,
+        "alignItems": "center"
+      },
+      "secondary_text": {
+        "color": "#FFFFFF",
+        "fontWeight": "600",
+        "fontSize": 16
+      }
+    },
+    "inputs": {
+      "container": {
+        "backgroundColor": "#15151A",
+        "borderWidth": 1,
+        "borderColor": "#23242A",
+        "borderRadius": 12,
+        "paddingHorizontal": 16,
+        "paddingVertical": 14,
+        "color": "#FFFFFF",
+        "fontSize": 16
+      },
+      "focused": {
+        "borderColor": "#00F2FE",
+        "shadowColor": "#00F2FE",
+        "shadowOffset": { "width": 0, "height": 0 },
+        "shadowOpacity": 0.2,
+        "shadowRadius": 4,
+        "elevation": 2
+      }
+    },
+    "cards": {
+      "room_card": {
+        "backgroundColor": "#15151A",
+        "borderRadius": 16,
+        "padding": 16,
+        "borderWidth": 1,
+        "borderColor": "#23242A",
+        "marginBottom": 16
+      },
+      "active_room_card": {
+        "borderColor": "#00F2FE",
+        "shadowColor": "#00F2FE",
+        "shadowOffset": { "width": 0, "height": 0 },
+        "shadowOpacity": 0.4,
+        "shadowRadius": 10,
+        "elevation": 5
+      }
+    },
+    "chat": {
+      "message_bubble_received": {
+        "backgroundColor": "#1C1C22",
+        "borderRadius": 16,
+        "borderBottomLeftRadius": 4,
+        "padding": 12,
+        "marginBottom": 8,
+        "maxWidth": "80%"
+      },
+      "message_bubble_sent": {
+        "backgroundColor": "#00F2FE",
+        "borderRadius": 16,
+        "borderBottomRightRadius": 4,
+        "padding": 12,
+        "marginBottom": 8,
+        "maxWidth": "80%",
+        "alignSelf": "flex-end"
+      },
+      "text_sent": {
+        "color": "#0B0B0F"
+      },
+      "text_received": {
+        "color": "#FFFFFF"
+      }
+    },
+    "glassmorphism": {
+      "instruction": "Use expo-blur BlurView for fixed headers, bottom tabs, or overlays.",
+      "tint": "dark",
+      "intensity": 80
+    }
+  },
+  "layouts": {
+    "login_screen": {
+      "background": "Use the provided login_bg image as a full-screen ImageBackground with resizeMode='cover'",
+      "content": "Align content to bottom half, centered. Use primary buttons for Login/Signup. Keep inputs sleek."
+    },
+    "profile_setup": {
+      "avatars": "Display avatars in a wrapping flex row or a FlatList grid (numColumns=3). Active avatar gets a glowing neon border.",
+      "input": "Large, bold text input for the Nickname, centered."
+    },
+    "home_dashboard": {
+      "header": "Sticky top bar with 'PartyApp' logo/text. Use Glassmorphism.",
+      "content": "List of public rooms. prominent 'Create Room' floating action button or top CTA.",
+      "bottom_tabs": "Home and Profile. Active state uses neon turquoise."
+    },
+    "party_room": {
+      "portrait": "Split screen. Top 35-40% is the WebView (YouTube). Bottom 60-65% is the Chat interface and host controls. Chat should have a text input at the absolute bottom.",
+      "landscape": "WebView takes 100% of the screen. Hide all chat and nav UI. Provide a subtle overlay or gesture to exit fullscreen."
+    }
+  },
+  "media": {
+    "login_background": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/fe23407107d8ec51147db0e7004d8aabe78a835b4418012a37abfaa918253fbb.png",
+      "description": "Abstract deep dark background with subtle neon turquoise bleed for login/auth screens."
+    },
+    "avatars": [
+      {
+        "id": "avatar_ninja",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/9f445a6b5c2d87aaf1c4fb7765d4103acb39539b9c7b6504061dbf0f3f7ede48.png"
+      },
+      {
+        "id": "avatar_astronaut",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/2c9153d6859216661d262d8f1a5725d1eeda03987fe7a3893426139e2cd00563.png"
+      },
+      {
+        "id": "avatar_skull",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/f55dcb868c9bdeb03ce5912467520adf4b09fa4b2d71ba9a21e8cca3b664695b.png"
+      },
+      {
+        "id": "avatar_alien",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/eafe4503b44f3b955b91ebe64dd0176afe89e2a405acad0b4d82ade7bb5c8966.png"
+      },
+      {
+        "id": "avatar_robot",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/0b0ea51f9ba491da3116b8c31b2c1c18556ac4129b1d81aae3e37a21172434c1.png"
+      },
+      {
+        "id": "avatar_cat",
+        "url": "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/f5701e045a5d35f44a19e7cf722d824430077a3827a1a7790fb0ac6fa3c0f490.png"
+      }
+    ]
+  },
+  "testing_attributes": {
+    "rule": "Every interactive and key informational element MUST include a `testID` attribute (React Native equivalent of data-testid).",
+    "convention": "kebab-case, role-based",
+    "examples": [
+      "testID='login-form-submit-button'",
+      "testID='room-card-join-button'",
+      "testID='chat-message-input'",
+      "testID='avatar-select-robot'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "This is a React Native Expo application. Apply the style tokens using React Native's StyleSheet API or a styling library of your choice (like NativeWind/Tailwind) mapping to the hex codes provided.",
+    "Implement the strict Portrait vs Landscape logic using React Native's Dimensions API or expo-screen-orientation. Landscape must automatically hide the chat and expand the video.",
+    "For the UI, avoid standard iOS/Android native grays. Stick strictly to the #0B0B0F, #15151A, and #1C1C22 palette.",
+    "Use Phosphor Icons or Lucide Icons (lucide-react-native) for navigation and actions.",
+    "Ensure the WebView allows inline media playback to function correctly as a co-watching player."
+  ]
+}
