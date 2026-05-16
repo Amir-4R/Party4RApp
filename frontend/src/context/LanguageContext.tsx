@@ -241,7 +241,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const saved = await storage.get<string>(KEY, "");
+      const saved = (await storage.getItem(KEY, "")) as string;
       if (saved === "ar" || saved === "en") {
         setLangState(saved as Lang);
         // Try to keep RTL state in sync with stored choice (no force on load to avoid surprise reloads)
@@ -253,7 +253,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setLang: LangCtx["setLang"] = async (l) => {
-    await storage.set(KEY, l);
+    await storage.setItem(KEY, l);
     setLangState(l);
     const wantsRTL = l === "ar";
     let needsRestart = false;
