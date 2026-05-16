@@ -86,9 +86,12 @@ var player; var suppressEvent = false;
 function onYouTubeIframeAPIReady() {
   player = new YT.Player('player', {
     videoId: '${videoId}',
-    playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1 },
+    playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 0 },
     events: {
-      'onReady': function(){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'})); },
+      'onReady': function(){
+        try { player.playVideo(); } catch(e){}
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
+      },
       'onStateChange': function(e){
         if (suppressEvent) return;
         var t = player.getCurrentTime();
@@ -97,6 +100,9 @@ function onYouTubeIframeAPIReady() {
         } else if (e.data === YT.PlayerState.PAUSED) {
           window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'pause', time:t}));
         }
+      },
+      'onError': function(e){
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'yterror', code: e.data}));
       }
     }
   });
@@ -447,6 +453,7 @@ export default function RoomScreen() {
         <View style={[styles.videoBox, fullscreen ? styles.videoFs : styles.videoPortrait]}>
           {videoId ? (
             <WebView
+              key={videoId}
               ref={webRef}
               originWhitelist={["*"]}
               source={{ html: buildEmbedHtml(videoId) }}
@@ -454,6 +461,7 @@ export default function RoomScreen() {
               allowsInlineMediaPlayback
               mediaPlaybackRequiresUserAction={false}
               javaScriptEnabled
+              domStorageEnabled
               onMessage={onWebViewMessage}
               testID="room-webview"
             />
