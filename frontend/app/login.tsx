@@ -15,10 +15,12 @@ import { useRouter, Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/src/context/AuthContext";
 import { COLORS, LOGIN_BG_URL } from "@/src/constants/avatars";
+import { useT } from "@/src/context/LanguageContext";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const { t } = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +29,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setError("");
     if (!username.trim() || !password) {
-      setError("Username and password are required");
+      setError(t("err_user_pass_required"));
       return;
     }
     setLoading(true);
@@ -35,7 +37,7 @@ export default function LoginScreen() {
       await login(username.trim(), password);
       router.replace("/(tabs)/home");
     } catch (e: any) {
-      setError(e.message || "Login failed");
+      setError(e.message || t("err_login_failed"));
     } finally {
       setLoading(false);
     }
@@ -55,25 +57,23 @@ export default function LoginScreen() {
           >
             <View style={styles.header}>
               <Text style={styles.brandTag}>PARTY4R</Text>
-              <Text style={styles.title}>Watch.{"\n"}Together.</Text>
-              <Text style={styles.subtitle}>
-                Sync YouTube with friends in real-time, no streaming needed.
-              </Text>
+              <Text style={styles.title}>{t("watch_together")}</Text>
+              <Text style={styles.subtitle}>{t("auth_subtitle")}</Text>
             </View>
 
             <View style={styles.form}>
-              <Text style={styles.label}>USERNAME</Text>
+              <Text style={styles.label}>{t("username")}</Text>
               <TextInput
                 testID="login-username-input"
                 value={username}
                 onChangeText={setUsername}
-                placeholder="your-handle"
+                placeholder={t("your_handle")}
                 placeholderTextColor={COLORS.textDisabled}
                 style={styles.input}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <Text style={[styles.label, { marginTop: 16 }]}>PASSWORD</Text>
+              <Text style={[styles.label, { marginTop: 16 }]}>{t("password")}</Text>
               <TextInput
                 testID="login-password-input"
                 value={password}
@@ -97,12 +97,12 @@ export default function LoginScreen() {
                 {loading ? (
                   <ActivityIndicator color={COLORS.bg} />
                 ) : (
-                  <Text style={styles.primaryBtnText}>LOG IN</Text>
+                  <Text style={styles.primaryBtnText}>{t("login").toUpperCase()}</Text>
                 )}
               </TouchableOpacity>
               <Link href="/signup" asChild>
                 <TouchableOpacity testID="login-go-signup" style={styles.secondaryBtn}>
-                  <Text style={styles.secondaryBtnText}>Create new account</Text>
+                  <Text style={styles.secondaryBtnText}>{t("signup")}</Text>
                 </TouchableOpacity>
               </Link>
             </View>

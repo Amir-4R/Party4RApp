@@ -16,10 +16,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { AVATARS, COLORS } from "@/src/constants/avatars";
+import { useT } from "@/src/context/LanguageContext";
 
 export default function SignupScreen() {
   const router = useRouter();
   const { signup } = useAuth();
+  const { t } = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
@@ -30,15 +32,15 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     setError("");
     if (!username.trim() || username.trim().length < 3) {
-      setError("Username must be at least 3 characters");
+      setError(t("err_username_min"));
       return;
     }
     if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(t("err_password_min"));
       return;
     }
     if (!nickname.trim()) {
-      setError("Pick a nickname");
+      setError(t("err_pick_nickname"));
       return;
     }
     setLoading(true);
@@ -46,7 +48,7 @@ export default function SignupScreen() {
       await signup(username.trim(), password, nickname.trim(), avatar);
       router.replace("/(tabs)/home");
     } catch (e: any) {
-      setError(e.message || "Signup failed");
+      setError(e.message || t("err_signup_failed"));
     } finally {
       setLoading(false);
     }
@@ -67,22 +69,22 @@ export default function SignupScreen() {
             <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
           </TouchableOpacity>
 
-          <Text style={styles.brandTag}>JOIN PARTY</Text>
-          <Text style={styles.title}>Create your{"\n"}identity.</Text>
+          <Text style={styles.brandTag}>{t("join_party")}</Text>
+          <Text style={styles.title}>{t("create_identity")}</Text>
 
-          <Text style={[styles.label, { marginTop: 32 }]}>USERNAME</Text>
+          <Text style={[styles.label, { marginTop: 32 }]}>{t("username")}</Text>
           <TextInput
             testID="signup-username-input"
             value={username}
             onChangeText={setUsername}
-            placeholder="your-unique-handle"
+            placeholder={t("your_unique_handle")}
             placeholderTextColor={COLORS.textDisabled}
             style={styles.input}
             autoCapitalize="none"
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>PASSWORD</Text>
+          <Text style={styles.label}>{t("password")}</Text>
           <TextInput
             testID="signup-password-input"
             value={password}
@@ -93,17 +95,17 @@ export default function SignupScreen() {
             secureTextEntry
           />
 
-          <Text style={styles.label}>NICKNAME (DISPLAY NAME)</Text>
+          <Text style={styles.label}>{t("nickname")}</Text>
           <TextInput
             testID="signup-nickname-input"
             value={nickname}
             onChangeText={setNickname}
-            placeholder="What others see in rooms"
+            placeholder={t("what_others_see")}
             placeholderTextColor={COLORS.textDisabled}
             style={styles.input}
           />
 
-          <Text style={styles.label}>CHOOSE YOUR AVATAR</Text>
+          <Text style={styles.label}>{t("choose_avatar")}</Text>
           <View style={styles.avatarGrid}>
             {AVATARS.map((a) => (
               <TouchableOpacity
@@ -135,7 +137,7 @@ export default function SignupScreen() {
             {loading ? (
               <ActivityIndicator color={COLORS.bg} />
             ) : (
-              <Text style={styles.primaryBtnText}>CREATE ACCOUNT</Text>
+              <Text style={styles.primaryBtnText}>{t("create_account")}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>

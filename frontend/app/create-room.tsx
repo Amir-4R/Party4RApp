@@ -16,9 +16,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { apiPost } from "@/src/api/client";
 import { COLORS } from "@/src/constants/avatars";
+import { useT } from "@/src/context/LanguageContext";
 
 export default function CreateRoomScreen() {
   const router = useRouter();
+  const { t } = useT();
   const [name, setName] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [password, setPassword] = useState("");
@@ -29,7 +31,7 @@ export default function CreateRoomScreen() {
   const handleCreate = async () => {
     setError("");
     if (!name.trim()) {
-      setError("Room name is required");
+      setError(t("err_room_name_required"));
       return;
     }
     setLoading(true);
@@ -42,7 +44,7 @@ export default function CreateRoomScreen() {
       });
       router.replace(`/room/${room.id}` as any);
     } catch (e: any) {
-      setError(e.message || "Failed to create room");
+      setError(e.message || t("err_room_create_failed"));
     } finally {
       setLoading(false);
     }
@@ -63,25 +65,25 @@ export default function CreateRoomScreen() {
             <Ionicons name="close" size={28} color={COLORS.textPrimary} />
           </TouchableOpacity>
 
-          <Text style={styles.brandTag}>NEW PARTY</Text>
-          <Text style={styles.title}>Start a{"\n"}watch party.</Text>
+          <Text style={styles.brandTag}>{t("new_party")}</Text>
+          <Text style={styles.title}>{t("start_watch_party")}</Text>
 
-          <Text style={[styles.label, { marginTop: 32 }]}>ROOM NAME</Text>
+          <Text style={[styles.label, { marginTop: 32 }]}>{t("room_name")}</Text>
           <TextInput
             testID="room-name-input"
             value={name}
             onChangeText={setName}
-            placeholder="Friday Anime Night"
+            placeholder={t("friday_anime")}
             placeholderTextColor={COLORS.textDisabled}
             style={styles.input}
           />
 
-          <Text style={styles.label}>YOUTUBE URL (OPTIONAL)</Text>
+          <Text style={styles.label}>{t("youtube_url_optional")}</Text>
           <TextInput
             testID="room-video-input"
             value={videoUrl}
             onChangeText={setVideoUrl}
-            placeholder="https://youtube.com/watch?v=..."
+            placeholder={t("yt_url_placeholder")}
             placeholderTextColor={COLORS.textDisabled}
             style={styles.input}
             autoCapitalize="none"
@@ -90,8 +92,8 @@ export default function CreateRoomScreen() {
 
           <View style={styles.toggleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.toggleTitle}>Public Room</Text>
-              <Text style={styles.toggleSub}>Visible to everyone on the dashboard</Text>
+              <Text style={styles.toggleTitle}>{t("public_room")}</Text>
+              <Text style={styles.toggleSub}>{t("public_room_sub")}</Text>
             </View>
             <Switch
               testID="room-public-toggle"
@@ -104,12 +106,12 @@ export default function CreateRoomScreen() {
 
           {!isPublic && (
             <>
-              <Text style={styles.label}>ROOM PASSWORD (OPTIONAL)</Text>
+              <Text style={styles.label}>{t("room_password_optional")}</Text>
               <TextInput
                 testID="room-password-input"
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Keep it secret"
+                placeholder={t("keep_it_secret")}
                 placeholderTextColor={COLORS.textDisabled}
                 style={styles.input}
                 secureTextEntry
@@ -128,7 +130,7 @@ export default function CreateRoomScreen() {
             {loading ? (
               <ActivityIndicator color={COLORS.bg} />
             ) : (
-              <Text style={styles.primaryBtnText}>CREATE & ENTER</Text>
+              <Text style={styles.primaryBtnText}>{t("create_enter")}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>

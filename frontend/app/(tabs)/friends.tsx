@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiGet, apiPost, API_BASE } from "@/src/api/client";
 import { storage } from "@/src/utils/storage";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
+import { useT } from "@/src/context/LanguageContext";
 
 interface Friend {
   id: string;
@@ -49,6 +50,7 @@ function avatarOf(u: Friend): string {
 }
 
 export default function FriendsScreen() {
+  const { t } = useT();
   const [tab, setTab] = useState<"friends" | "search">("friends");
   const [data, setData] = useState<FriendsData>({
     friends: [],
@@ -173,15 +175,15 @@ export default function FriendsScreen() {
         </View>
       )}
       {mode === "outgoing" && (
-        <Text style={styles.pendingText}>PENDING</Text>
+        <Text style={styles.pendingText}>{t("pending")}</Text>
       )}
     </View>
   );
 
   const renderSearchRow = (item: Friend) => {
     let action;
-    if (isFriend(item.id)) action = <Text style={styles.tag}>FRIEND</Text>;
-    else if (isOutgoing(item.id)) action = <Text style={styles.tag}>SENT</Text>;
+    if (isFriend(item.id)) action = <Text style={styles.tag}>{t("friend_label")}</Text>;
+    else if (isOutgoing(item.id)) action = <Text style={styles.tag}>{t("sent")}</Text>;
     else if (isIncoming(item.id))
       action = (
         <TouchableOpacity
@@ -189,7 +191,7 @@ export default function FriendsScreen() {
           onPress={() => acceptRequest(item.id)}
           style={styles.addBtn}
         >
-          <Text style={styles.addBtnText}>ACCEPT</Text>
+          <Text style={styles.addBtnText}>{t("accept")}</Text>
         </TouchableOpacity>
       );
     else
@@ -200,7 +202,7 @@ export default function FriendsScreen() {
           style={styles.addBtn}
         >
           <Ionicons name="person-add" size={14} color={COLORS.bg} />
-          <Text style={styles.addBtnText}>ADD</Text>
+          <Text style={styles.addBtnText}>{t("add")}</Text>
         </TouchableOpacity>
       );
     return (
@@ -218,7 +220,7 @@ export default function FriendsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Friends</Text>
+        <Text style={styles.title}>{t("tab_friends")}</Text>
       </View>
 
       <View style={styles.tabs}>
@@ -228,7 +230,7 @@ export default function FriendsScreen() {
           onPress={() => setTab("friends")}
         >
           <Text style={[styles.tabText, tab === "friends" && { color: COLORS.brand }]}>
-            MY FRIENDS
+            {t("my_friends")}
           </Text>
           {data.incoming.length > 0 && (
             <View style={styles.badge}>
@@ -242,7 +244,7 @@ export default function FriendsScreen() {
           onPress={() => setTab("search")}
         >
           <Text style={[styles.tabText, tab === "search" && { color: COLORS.brand }]}>
-            FIND PEOPLE
+            {t("find_people")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -259,7 +261,7 @@ export default function FriendsScreen() {
               <>
                 {data.incoming.length > 0 && (
                   <>
-                    <Text style={styles.section}>INCOMING REQUESTS</Text>
+                    <Text style={styles.section}>{t("incoming_requests")}</Text>
                     {data.incoming.map((u) => (
                       <View key={u.id}>{renderFriend(u, "incoming")}</View>
                     ))}
@@ -267,22 +269,20 @@ export default function FriendsScreen() {
                 )}
                 {data.outgoing.length > 0 && (
                   <>
-                    <Text style={styles.section}>OUTGOING REQUESTS</Text>
+                    <Text style={styles.section}>{t("outgoing_requests")}</Text>
                     {data.outgoing.map((u) => (
                       <View key={u.id}>{renderFriend(u, "outgoing")}</View>
                     ))}
                   </>
                 )}
                 <Text style={styles.section}>
-                  FRIENDS · {data.friends.length}
+                  {t("friends_label")} · {data.friends.length}
                 </Text>
                 {data.friends.length === 0 ? (
                   <View style={styles.empty}>
                     <Ionicons name="people" size={40} color={COLORS.textDisabled} />
-                    <Text style={styles.emptyText}>No friends yet</Text>
-                    <Text style={styles.emptySub}>
-                      Tap "FIND PEOPLE" to add some
-                    </Text>
+                    <Text style={styles.emptyText}>{t("no_friends")}</Text>
+                    <Text style={styles.emptySub}>{t("tap_find_people")}</Text>
                   </View>
                 ) : (
                   data.friends.map((u) => (
@@ -303,7 +303,7 @@ export default function FriendsScreen() {
               value={query}
               onChangeText={setQuery}
               onSubmitEditing={runSearch}
-              placeholder="Search by username or nickname..."
+              placeholder={t("search_users_placeholder")}
               placeholderTextColor={COLORS.textDisabled}
               style={styles.searchInput}
               autoCapitalize="none"
