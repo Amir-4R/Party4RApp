@@ -1,0 +1,62 @@
+# =============================================================================
+# Party4RApp — Render Deployment Blueprint
+# -----------------------------------------------------------------------------
+# Deploys the FastAPI backend (backend/server.py) as a Web Service on Render.
+# Render does NOT offer a managed MongoDB add-on, so we wire up a free
+# MongoDB Atlas cluster via the MONGO_URL secret (set in the Render dashboard
+# after the service is created).
+#
+# Plan: Starter ($5/mo) — always-on, supports WebSockets, custom domains.
+# =============================================================================
+
+services:
+  - type: web
+    name: party4r-backend
+    runtime: python
+    plan: starter            # $5/mo, no cold starts, WebSockets supported
+    region: oregon           # change to your closest region (frankfurt, singapore, …)
+    rootDir: backend         # important: tells Render to operate inside /backend
+    branch: main             # change to your default branch if different
+    autoDeploy: true
+
+    # Render uses Python 3.11.9 by default; runtime.txt can pin a different version.
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 75
+
+    # Liveness probe — Render restarts the instance if /health stops responding.
+    healthCheckPath: /health
+
+    # Environment configuration ------------------------------------------------
+    envVars:
+      # MongoDB connection string — create a FREE M0 cluster on MongoDB Atlas
+      # (https://www.mongodb.com/cloud/atlas) and paste the connection string
+      # in the Render dashboard. Format:
+      #   mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGO_URL
+        sync: false           # user must paste this manually in dashboard
+
+      - key: DB_NAME
+        value: party4r
+
+      # 64-char random hex automatically generated and stored as a secret.
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Hours a JWT remains valid before re-login is required.
+      - key: TOKEN_EXPIRE_HOURS
+        value: "168"          # 1 week
+
+      # Get a free key at https://console.cloud.google.com/apis/credentials
+      # and enable "YouTube Data API v3".
+      - key: YOUTUBE_API_KEY
+        sync: false
+
+      # CORS — leave wide open for now so your Expo/web previews can call the
+      # backend. Tighten this later, e.g.:
+      #   "https://party4r.app,https://*.expo.dev"
+      - key: CORS_ORIGINS
+        value: "*"
+
+      # Render injects PORT automatically; declared here for clarity.
+      - key: PYTHON_VERSION
+        value: "3.11.9"

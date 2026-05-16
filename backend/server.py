@@ -19,23 +19,44 @@ import jwt
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-# Config
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
-JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
+# -----------------------------------------------------------------------------
+# Config — all read cleanly from environment with safe production defaults.
+# Render injects these via render.yaml / dashboard env vars.
+# -----------------------------------------------------------------------------
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = os.environ.get("DB_NAME", "party4r")
+JWT_SECRET = os.environ.get("JWT_SECRET") or secrets.token_hex(32)
 JWT_ALGO = "HS256"
-TOKEN_EXPIRE_HOURS = 24 * 7  # 1 week
+TOKEN_EXPIRE_HOURS = int(os.environ.get("TOKEN_EXPIRE_HOURS", "168"))  # 1 week
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
+
+# CORS origins: comma-separated env or "*" for fully open (current preview setup)
+CORS_ORIGINS_RAW = os.environ.get("CORS_ORIGINS", "*").strip()
+_CORS_LIST = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()] or ["*"]
+ALLOW_CREDENTIALS = "*" not in _CORS_LIST  # browsers reject "*" + credentials
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI()
+app = FastAPI(
+    title="Party4RApp Backend",
+    description="Co-watching rooms, friends, real-time sync (WebSockets), YouTube search.",
+    version="1.0.0",
+)
 api = APIRouter(prefix="/api")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+if not os.environ.get("JWT_SECRET"):
+    logger.warning(
+        "JWT_SECRET not set — generated ephemeral key. Tokens will invalidate on restart."
+    )
+if MONGO_URL.startswith("mongodb://localhost"):
+    logger.warning(
+        "MONGO_URL points to localhost — set a real MongoDB Atlas URI in production."
+    )
 
 
 # ============== Models ==============
@@ -755,11 +776,27 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
+    allow_credentials=ALLOW_CREDENTIALS,
+    allow_origins=_CORS_LIST,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+async def root():
+    """Plain root for Render healthchecks / uptime monitors."""
+    return {"service": "party4r-backend", "status": "ok", "version": app.version}
+
+
+@app.get("/health")
+async def health():
+    """Lightweight liveness probe — used by Render's healthCheckPath."""
+    try:
+        await db.command("ping")
+        return {"status": "ok", "db": "ok"}
+    except Exception as e:
+        return {"status": "degraded", "db": str(e)}
 
 
 @app.on_event("shutdown")
