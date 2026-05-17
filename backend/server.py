@@ -799,6 +799,43 @@ async def health():
         return {"status": "degraded", "db": str(e)}
 
 
+# ---------------------------------------------------------------------------
+# One-shot download endpoint for the Render deployment bundle.
+# Only exposed when /app/dist/party4r-backend-render.zip exists.
+# Safe to leave in place — it serves a static file, no DB access.
+# ---------------------------------------------------------------------------
+from fastapi.responses import FileResponse  # noqa: E402
+
+_BUNDLE_PATH = "/app/dist/party4r-backend-render.zip"
+
+
+@api.get("/download/backend.zip")
+async def download_backend_bundle_api():
+    return _serve_bundle()
+
+
+@app.get("/api/download/backend.zip")
+async def download_backend_bundle_direct():
+    """Mounted directly on `app` so it works even though the api router was
+    included before this module loaded."""
+    return _serve_bundle()
+
+
+@app.get("/download/backend.zip")
+async def download_backend_bundle_root():
+    return _serve_bundle()
+
+
+def _serve_bundle():
+    if not os.path.exists(_BUNDLE_PATH):
+        raise HTTPException(status_code=404, detail="bundle not built yet")
+    return FileResponse(
+        _BUNDLE_PATH,
+        media_type="application/zip",
+        filename="party4r-backend-render.zip",
+    )
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
