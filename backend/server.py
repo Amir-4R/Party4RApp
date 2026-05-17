@@ -808,7 +808,8 @@ from fastapi.responses import FileResponse  # noqa: E402
 
 _DIST_DIR = "/app/dist"
 _BUNDLES = {
-    "backend.zip": "party4r-backend-render.zip",   # backend + render.yaml
+    "backend.zip": "party4r-backend-render.zip",   # backend + render.yaml (nested /backend/)
+    "render-flat.zip": "party4r-render-flat.zip",  # FLAT layout for direct GitHub upload
     "frontend.zip": "party4r-frontend-eas.zip",    # Expo project + EAS config + APK guide
     "full.zip": "party4r-app-full.zip",            # everything in one archive
 }
@@ -842,6 +843,11 @@ async def download_frontend_bundle_direct():
 @app.get("/api/download/full.zip")
 async def download_full_bundle_direct():
     return _serve_bundle("full.zip")
+
+
+@app.get("/api/download/render-flat.zip")
+async def download_render_flat_bundle_direct():
+    return _serve_bundle("render-flat.zip")
 
 
 @app.get("/download/backend.zip")
