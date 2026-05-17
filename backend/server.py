@@ -806,34 +806,47 @@ async def health():
 # ---------------------------------------------------------------------------
 from fastapi.responses import FileResponse  # noqa: E402
 
-_BUNDLE_PATH = "/app/dist/party4r-backend-render.zip"
+_DIST_DIR = "/app/dist"
+_BUNDLES = {
+    "backend.zip": "party4r-backend-render.zip",   # backend + render.yaml
+    "frontend.zip": "party4r-frontend-eas.zip",    # Expo project + EAS config + APK guide
+    "full.zip": "party4r-app-full.zip",            # everything in one archive
+}
+
+
+def _serve_bundle(name: str):
+    fname = _BUNDLES.get(name)
+    if not fname:
+        raise HTTPException(status_code=404, detail="unknown bundle")
+    path = os.path.join(_DIST_DIR, fname)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="bundle not built yet")
+    return FileResponse(path, media_type="application/zip", filename=fname)
 
 
 @api.get("/download/backend.zip")
 async def download_backend_bundle_api():
-    return _serve_bundle()
+    return _serve_bundle("backend.zip")
 
 
 @app.get("/api/download/backend.zip")
 async def download_backend_bundle_direct():
-    """Mounted directly on `app` so it works even though the api router was
-    included before this module loaded."""
-    return _serve_bundle()
+    return _serve_bundle("backend.zip")
+
+
+@app.get("/api/download/frontend.zip")
+async def download_frontend_bundle_direct():
+    return _serve_bundle("frontend.zip")
+
+
+@app.get("/api/download/full.zip")
+async def download_full_bundle_direct():
+    return _serve_bundle("full.zip")
 
 
 @app.get("/download/backend.zip")
 async def download_backend_bundle_root():
-    return _serve_bundle()
-
-
-def _serve_bundle():
-    if not os.path.exists(_BUNDLE_PATH):
-        raise HTTPException(status_code=404, detail="bundle not built yet")
-    return FileResponse(
-        _BUNDLE_PATH,
-        media_type="application/zip",
-        filename="party4r-backend-render.zip",
-    )
+    return _serve_bundle("backend.zip")
 
 
 @app.on_event("shutdown")
