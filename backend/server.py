@@ -850,6 +850,20 @@ async def download_render_flat_bundle_direct():
     return _serve_bundle("render-flat.zip")
 
 
+@app.get("/api/download/main.py")
+async def download_main_py():
+    """Serve the production main.py (with MONGO_URI) as plain text so it
+    can be viewed/copied directly in a mobile browser."""
+    path = "/app/dist/main.py"
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="main.py not built yet")
+    return FileResponse(
+        path,
+        media_type="text/plain; charset=utf-8",
+        filename="main.py",
+    )
+
+
 @app.get("/download/backend.zip")
 async def download_backend_bundle_root():
     return _serve_bundle("backend.zip")
