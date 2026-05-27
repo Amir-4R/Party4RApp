@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { apiGet, apiPost, API_BASE } from "@/src/api/client";
 import { storage } from "@/src/utils/storage";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
@@ -221,6 +222,13 @@ export default function FriendsScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.title}>{t("tab_friends")}</Text>
+        <TouchableOpacity
+          testID="open-dms"
+          onPress={() => router.push("/dms")}
+          style={{ marginLeft: "auto", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: COLORS.brandDim, borderWidth: 1, borderColor: COLORS.brand }}
+        >
+          <Ionicons name="chatbubbles" size={20} color={COLORS.brand} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.tabs}>

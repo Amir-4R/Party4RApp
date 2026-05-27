@@ -781,19 +781,31 @@ app.include_router(api)
 # included `api` router). They all use the /api prefix explicitly.
 # ============================================================================
 from privacy_safety import register_routes as _register_phase2, ensure_indexes as _ensure_phase2_indexes  # noqa: E402
+from dms import (
+    register_routes as _register_dms,
+    register_ws as _register_dms_ws,
+    ensure_indexes as _ensure_dms_indexes,
+)  # noqa: E402
 
 # We create a NEW router for phase 2 then include it (works because we include after)
 _phase2_router = APIRouter(prefix="/api")
 _register_phase2(_phase2_router, db, get_current_user)
 app.include_router(_phase2_router)
 
+# Phase 3 — Direct Messages
+_dms_router = APIRouter(prefix="/api")
+_register_dms(_dms_router, db, get_current_user)
+app.include_router(_dms_router)
+_register_dms_ws(app, db, get_user_by_id, decode_token)
+
 
 @app.on_event("startup")
 async def _phase2_startup():
     try:
         await _ensure_phase2_indexes(db)
+        await _ensure_dms_indexes(db)
     except Exception as e:
-        logger.warning("Phase 2 index creation skipped: %s", e)
+        logger.warning("Phase 2/3 index creation skipped: %s", e)
 
 
 app.add_middleware(
