@@ -7,11 +7,17 @@ import { ThemeProvider, useTheme } from "@/src/context/ThemeContext";
 import { View } from "react-native";
 
 function RootShell() {
-  const { theme } = useTheme();
+  // Subscribing to themeId here triggers a remount of the inner Stack via
+  // `key={themeId}` whenever the user switches themes. Because every screen
+  // imports the (now mutable) FUTURISTIC tokens, a remount cleanly applies the
+  // new colors everywhere — navigation bars, cards, buttons, glows, gradients,
+  // chat bubbles, popups, search, settings — globally and instantly.
+  const { theme, themeId } = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <StatusBar style="light" backgroundColor={theme.bg} translucent={false} />
       <Stack
+        key={themeId}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: theme.bg },
