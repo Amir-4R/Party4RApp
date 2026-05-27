@@ -796,3 +796,52 @@ agent_communication:
           border, glow, language section recolors.
 
       No backend testing required.
+
+
+  - agent: "main"
+    message: |
+      **Cleanup & Optimization Pass — visual polish preserved 100%**
+
+      Deleted only verified-dead / unused / duplicate stuff. All animations,
+      glows, ambient light beams, metallic gradients, cinematic transitions,
+      and theme effects were kept intact.
+
+      Files removed (verified 0 imports / 0 references):
+
+      Frontend code (3 files):
+        - src/constants/themes.ts (legacy; settings.tsx now imports from
+          src/theme/themes.ts which is the single source of truth)
+        - src/components/futuristic/NeonButton.tsx (0 imports)
+        - src/components/futuristic/GlassPanel.tsx (0 imports)
+
+      Frontend assets (11 files, ~2 MB freed):
+        - assets/images/*.bak (4 backup files)
+        - assets/images/icon-source.png  (not referenced)
+        - assets/images/app-image.png    (not referenced)
+        - assets/images/react-logo.png + @2x + @3x (RN template, unused)
+        - assets/images/partial-react-logo.png (RN template, unused)
+        - assets/fonts/SpaceMono-Regular.ttf (RN template font, unused)
+
+      Backend (2 files):
+        - backend/tests/test_patch_iter2.py
+        - backend/tests/test_patch_iter3.py
+
+      package.json (2 unused deps via yarn remove):
+        - expo-haptics (0 imports)
+        - expo-symbols  (0 imports)
+
+      Explicitly KEPT (would have caused regressions):
+        - /app/dist/ entire folder - server.py serves /api/downloads/* from
+          here for the user Termux workflow.
+        - /app/backend_test*.py - referenced by test_result.md.
+        - react-native-screens, @react-navigation/bottom-tabs - peer deps
+          of expo-router (zero direct imports, but used internally).
+        - All in-use futuristic components: ScreenScaffold, MetallicCard,
+          GlowDivider, LightBeam.
+
+      Impact: assets 7.2MB -> 5.2MB, -3 dead source files, -2 npm pkgs.
+      Verified post-cleanup with Playwright after full Expo restart with
+      cleared Metro cache. Splash, Login, Home, Friends, Profile, Settings
+      (with expanded MORE THEMES grid) all rendered cleanly with full
+      neon glows, ambient beams, gradients, and animations intact.
+
