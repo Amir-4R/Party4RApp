@@ -14,19 +14,43 @@ export const AVATARS: Avatar[] = [
 
 export const LOGIN_BG_URL = "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/fe23407107d8ec51147db0e7004d8aabe78a835b4418012a37abfaa918253fbb.png";
 
+// =====================================================================
+// COLORS — Cyber Neon palette (Phase 1 Mega Update)
+// Neon green primary + neon purple accent on AMOLED-friendly dark.
+// All screens import this as their default. ThemeContext can override
+// at runtime; this object is the fallback / static reference.
+// =====================================================================
 export const COLORS = {
-  bg: "#0B0B0F",
-  surface: "#15151A",
-  surfaceElevated: "#1C1C22",
-  brand: "#00F2FE",
-  brandDim: "rgba(0, 242, 254, 0.15)",
-  brandGlow: "rgba(0, 242, 254, 0.4)",
+  // Backgrounds
+  bg: "#070710",
+  bgSoft: "#0C0C18",
+  surface: "#14141F",
+  surfaceElevated: "#1C1C2A",
+  // Borders
+  border: "#1F1F2D",
+  borderAccent: "#2A2A3D",
+  // Brand — neon green
+  brand: "#22FF88",
+  brandDim: "rgba(34, 255, 136, 0.16)",
+  brandGlow: "rgba(34, 255, 136, 0.40)",
+  // Accent — neon purple
+  accent: "#A855F7",
+  accentDim: "rgba(168, 85, 247, 0.18)",
+  accentGlow: "rgba(168, 85, 247, 0.40)",
+  // Text
   textPrimary: "#FFFFFF",
-  textSecondary: "#6C7A89",
-  textDisabled: "#3A404A",
-  border: "#23242A",
-  error: "#FF3B30",
-  success: "#34C759",
+  textSecondary: "#B0B0C4",
+  textMuted: "#7A7A92",
+  textDisabled: "#48485A",
+  // Semantic
+  error: "#FF3D71",
+  success: "#22FF88",
+  warning: "#FFB800",
+  info: "#33B5FF",
+  // Glow effect color for neon outlines
+  glow: "#22FF88",
+  // Bottom nav tint (semi-transparent over blur)
+  navBg: "rgba(10, 10, 16, 0.85)",
 };
 
 export const getAvatarUrl = (id: string): string => {

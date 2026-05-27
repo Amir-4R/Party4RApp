@@ -17,11 +17,15 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/src/constants/avatars";
 import { useT } from "@/src/context/LanguageContext";
+import { useTheme } from "@/src/context/ThemeContext";
+import { THEMES, ThemeId } from "@/src/constants/themes";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { t, lang, setLang } = useT();
+  const { theme, themeId, setThemeId } = useTheme();
   const [switching, setSwitching] = useState<null | "en" | "ar">(null);
+  const [themeSwitching, setThemeSwitching] = useState<ThemeId | null>(null);
 
   const handleSwitch = async (l: "en" | "ar") => {
     if (l === lang || switching) return;
@@ -33,6 +37,13 @@ export default function SettingsScreen() {
         { text: t("rtl_restart_ok") },
       ]);
     }
+  };
+
+  const handleTheme = async (id: ThemeId) => {
+    if (id === themeId) return;
+    setThemeSwitching(id);
+    await setThemeId(id);
+    setThemeSwitching(null);
   };
 
   const renderLangRow = (
@@ -87,6 +98,53 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Theme section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>THEME</Text>
+          <View style={styles.card}>
+            {(Object.keys(THEMES) as ThemeId[]).map((id, idx) => {
+              const tdef = THEMES[id];
+              const active = themeId === id;
+              const busy = themeSwitching === id;
+              return (
+                <React.Fragment key={id}>
+                  {idx > 0 && <View style={styles.divider} />}
+                  <TouchableOpacity
+                    testID={`theme-${id}`}
+                    onPress={() => handleTheme(id)}
+                    activeOpacity={0.85}
+                    style={[styles.themeRow, active && styles.langRowActive]}
+                  >
+                    <View style={styles.themePreview}>
+                      <View style={[styles.swatch, { backgroundColor: tdef.bg }]} />
+                      <View style={[styles.swatch, { backgroundColor: tdef.brand, borderWidth: 1, borderColor: tdef.brand }]} />
+                      <View style={[styles.swatch, { backgroundColor: tdef.accent }]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.themeName, active && { color: tdef.brand }]}>
+                        {tdef.name}
+                      </Text>
+                      <Text style={styles.langSub}>
+                        {id === "neon" ? "Neon green · Cyber default" :
+                          id === "midnight" ? "Blue · Calm dark" :
+                          id === "amoled" ? "Pure black · Battery saver" :
+                          "Purple-dominant · High contrast"}
+                      </Text>
+                    </View>
+                    {busy ? (
+                      <ActivityIndicator color={tdef.brand} />
+                    ) : active ? (
+                      <Ionicons name="checkmark-circle" size={22} color={tdef.brand} />
+                    ) : (
+                      <View style={styles.radio} />
+                    )}
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Language section */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{t("language_section")}</Text>
@@ -174,6 +232,28 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     borderWidth: 2,
     borderColor: COLORS.border,
+  },
+  themeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 14,
+    backgroundColor: COLORS.surface,
+  },
+  themePreview: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  swatch: {
+    width: 18,
+    height: 28,
+    borderRadius: 5,
+  },
+  themeName: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
   },
   divider: { height: 1, backgroundColor: COLORS.border, marginLeft: 60 },
   footer: {

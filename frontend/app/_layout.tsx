@@ -3,26 +3,35 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { LanguageProvider } from "@/src/context/LanguageContext";
-import { COLORS } from "@/src/constants/avatars";
+import { ThemeProvider, useTheme } from "@/src/context/ThemeContext";
 import { View } from "react-native";
+
+function RootShell() {
+  const { theme } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      <StatusBar style="light" backgroundColor={theme.bg} translucent={false} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: theme.bg },
+          animation: "fade",
+        }}
+      />
+    </View>
+  );
+}
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: COLORS.bg },
-                animation: "fade",
-              }}
-            />
-          </View>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <RootShell />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
