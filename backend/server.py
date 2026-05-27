@@ -774,6 +774,28 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
 
 
 app.include_router(api)
+
+# ============================================================================
+# Phase 2 (Mega Update) — Privacy, Safety, Moderation routes
+# Note: these routes register directly on `app` (so they bypass the already-
+# included `api` router). They all use the /api prefix explicitly.
+# ============================================================================
+from privacy_safety import register_routes as _register_phase2, ensure_indexes as _ensure_phase2_indexes  # noqa: E402
+
+# We create a NEW router for phase 2 then include it (works because we include after)
+_phase2_router = APIRouter(prefix="/api")
+_register_phase2(_phase2_router, db, get_current_user)
+app.include_router(_phase2_router)
+
+
+@app.on_event("startup")
+async def _phase2_startup():
+    try:
+        await _ensure_phase2_indexes(db)
+    except Exception as e:
+        logger.warning("Phase 2 index creation skipped: %s", e)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=ALLOW_CREDENTIALS,

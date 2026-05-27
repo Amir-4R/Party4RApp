@@ -155,6 +155,57 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Privacy & Safety section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PRIVACY & SAFETY</Text>
+          <View style={styles.card}>
+            <MenuRow icon="shield-checkmark-outline" label="Privacy Controls" sub="Online status, last seen, profile visibility" onPress={() => router.push("/privacy")} />
+            <View style={styles.divider} />
+            <MenuRow icon="ban-outline" label="Blocked Users" sub="Manage who can't contact you" onPress={() => router.push("/blocked")} />
+            <View style={styles.divider} />
+            <MenuRow icon="document-text-outline" label="Privacy Policy" sub="How we handle your data" onPress={() => router.push("/legal/privacy-policy")} />
+            <View style={styles.divider} />
+            <MenuRow icon="reader-outline" label="Terms of Service" sub="Community guidelines" onPress={() => router.push("/legal/terms")} />
+          </View>
+        </View>
+
+        {/* Account section (destructive) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCOUNT</Text>
+          <View style={[styles.card, { borderColor: COLORS.error }]}>
+            <MenuRow
+              icon="trash-outline"
+              label="Delete Account"
+              sub="Permanently erase all your data"
+              danger
+              onPress={() => {
+                Alert.alert(
+                  "Delete Account",
+                  "This permanently deletes your account, friends, rooms, and all data. This cannot be undone.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete Forever",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          const { apiDelete } = await import("@/src/api/client");
+                          await apiDelete("/auth/account");
+                          const { storage } = await import("@/src/utils/storage");
+                          await storage.secureRemove("party_auth_token");
+                          router.replace("/login");
+                        } catch (e: any) {
+                          Alert.alert("Error", e.message || "Failed to delete account");
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            />
+          </View>
+        </View>
+
         {/* Placeholder for future sections (kept simple, no fake links) */}
         <View style={styles.footer}>
           <Ionicons
@@ -168,6 +219,27 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function MenuRow({
+  icon, label, sub, onPress, danger,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  sub: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.menuRow}>
+      <Ionicons name={icon} size={22} color={danger ? COLORS.error : COLORS.brand} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.menuLabel, danger && { color: COLORS.error }]}>{label}</Text>
+        <Text style={styles.menuSub}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+    </TouchableOpacity>
   );
 }
 

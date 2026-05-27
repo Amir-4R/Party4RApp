@@ -36,6 +36,35 @@ export async function apiPost<T>(path: string, body?: any): Promise<T> {
   return res.json();
 }
 
+export async function apiPatch<T>(path: string, body?: any): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: await getHeaders(),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try { detail = JSON.parse(text).detail || text; } catch {}
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: await getHeaders(false),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try { detail = JSON.parse(text).detail || text; } catch {}
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export function getWsUrl(roomId: string, token: string): string {
   const wsBase = (BASE_URL || "").replace(/^http/, "ws");
   return `${wsBase}/api/ws/rooms/${roomId}?token=${encodeURIComponent(token)}`;
