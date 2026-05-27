@@ -1,27 +1,31 @@
 // /app/frontend/app/index.tsx
-// Party4R — cinematic splash screen.
+// Party4R — Cinematic Splash Screen (rebuilt for correct scaling)
 //
-// Premium futuristic feel:
-//   • Deep AMOLED black backdrop (matches native OS splash for zero flicker).
-//   • Tall metallic Party4R artwork centered, scaled to fill verticals.
-//   • Soft vignette + subtle slow color wash to keep the artwork moody.
-//   • Two diagonal LightBeam sweeps (one green, one purple, staggered).
-//   • Gentle pulsing neon glow behind the 4R logo region.
-//   • Letter-spaced loader text fades up at the bottom.
-//   • Smooth fade-in from black, smooth fade-out to the next screen.
+// Layout principles:
+//   • Display the FULL vertical artwork composition.
+//   • No aggressive zoom / cropping.
+//   • No circular overlay glow on top of the artwork.
+//   • Aspect-ratio-preserving CONTAIN fit, centered both axes.
+//   • Pure-black fill on the sides if the device aspect is taller/wider
+//     than the artwork (856×1536, ratio 0.557).
+//   • Cinematic only through a single clean fade-in.
+//   • Loader text + 3 pulsing dots stay at the bottom in the safe area.
 //
-// Lightweight: pure transforms / opacity (GPU-accelerated via Reanimated).
-// No particles, no heavy SVG, no extra image assets.
+// IMPORTANT: We give the Image EXPLICIT pixel dimensions (from
+// useWindowDimensions) and place `resizeMode` INSIDE the style prop so
+// React Native Web maps it to `object-fit: contain` reliably. Without
+// this, percentage-based widths get rendered at the image's natural
+// size and `objectFit` falls back to `fill`.
 
 import React, { useEffect } from "react";
 import {
-  Dimensions,
-  ImageBackground,
+  Image,
+  Platform,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -33,114 +37,86 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/context/AuthContext";
-import LightBeam from "@/src/components/futuristic/LightBeam";
 import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+const ART_W = 856;
+const ART_H = 1536;
+const ART_RATIO = ART_W / ART_H; // ~0.557
 
 export default function SplashScreen() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  // useWindowDimensions stays in sync with rotation / resize, unlike
+  // Dimensions.get() which captures a snapshot at import time.
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
 
-  // ---------------------- Reanimated values ----------------------
+  // ----- Compute exact contained artwork rect (no percentages, no maths
+  // happening inside React Native Web's resizeMode shim) -----
+  const SCREEN_RATIO = SCREEN_W / SCREEN_H;
+  let artW: number;
+  let artH: number;
+  if (SCREEN_RATIO > ART_RATIO) {
+    // Screen is wider than artwork → constrain by height.
+    artH = SCREEN_H;
+    artW = SCREEN_H * ART_RATIO;
+  } else {
+    // Screen is narrower / equal → constrain by width.
+    artW = SCREEN_W;
+    artH = SCREEN_W / ART_RATIO;
+  }
+
   const fade = useSharedValue(0);
   const exit = useSharedValue(0);
-  const glow = useSharedValue(0);
-  const scale = useSharedValue(1.05);
 
   useEffect(() => {
-    // Cinematic fade-in from black
-    fade.value = withTiming(1, { duration: 850, easing: Easing.out(Easing.cubic) });
-    // Subtle parallax-style scale settle (1.05 → 1.0)
-    scale.value = withTiming(1, { duration: 1600, easing: Easing.out(Easing.cubic) });
-    // Soft pulsing glow
-    glow.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      false
-    );
-  }, [fade, glow, scale]);
+    // Single clean fade-in. No scale, no zoom, no breathing.
+    fade.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
+  }, [fade]);
 
-  // ---------------------- Navigation timer ----------------------
   useEffect(() => {
     if (loading) return;
     const t = setTimeout(() => {
-      // Fade out gracefully then push.
       exit.value = withTiming(1, { duration: 380, easing: Easing.in(Easing.cubic) });
       setTimeout(() => router.replace(user ? "/(tabs)/home" : "/login"), 380);
     }, 1700);
     return () => clearTimeout(t);
   }, [user, loading, router, exit]);
 
-  // ---------------------- Animated styles ----------------------
   const containerStyle = useAnimatedStyle(() => ({
     opacity: fade.value * (1 - exit.value),
   }));
-  const artworkStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.20 + glow.value * 0.55,
-    transform: [{ scale: 0.92 + glow.value * 0.12 }],
-  }));
   const loaderStyle = useAnimatedStyle(() => ({
     opacity: withDelay(700, withTiming(fade.value, { duration: 600 })),
-    transform: [{ translateY: withDelay(700, withTiming(fade.value * -2, { duration: 600 })) }],
+    transform: [
+      { translateY: withDelay(700, withTiming(fade.value * -2, { duration: 600 })) },
+    ],
   }));
 
   return (
     <View style={styles.root} testID="splash-screen">
-      {/* Solid black underlay (matches native OS splash so transition is invisible) */}
-      <View style={StyleSheet.absoluteFill} />
-
-      <Animated.View style={[StyleSheet.absoluteFill, containerStyle]}>
-        {/* Tall metallic artwork as the centerpiece */}
-        <Animated.View style={[StyleSheet.absoluteFill, artworkStyle]}>
-          <ImageBackground
-            source={require("@/assets/images/party4r-splash.png")}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-          />
-        </Animated.View>
-
-        {/* Deep vignette top+bottom to keep the central logo region as hero */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[
-            "rgba(0,0,0,0.55)",
-            "rgba(0,0,0,0.05)",
-            "rgba(0,0,0,0.05)",
-            "rgba(0,0,0,0.85)",
+      <Animated.View style={[StyleSheet.absoluteFill, styles.center, containerStyle]}>
+        <Image
+          source={require("@/assets/images/party4r-splash.png")}
+          // EXPLICIT dimensions — guarantees the artwork is rendered at the
+          // exact contained size and centered, regardless of the platform
+          // layout engine. We then also set resizeMode inside the style so
+          // React Native Web maps it to object-fit: contain reliably.
+          style={[
+            {
+              width: artW,
+              height: artH,
+              // @ts-ignore — RN style does accept resizeMode here.
+              resizeMode: "contain",
+              ...Platform.select({
+                web: { objectFit: "contain" as const },
+                default: {},
+              }),
+            },
           ]}
-          locations={[0, 0.25, 0.7, 1]}
-          style={StyleSheet.absoluteFill}
+          fadeDuration={0}
         />
 
-        {/* Pulsing neon glow behind the 4R logo region (vertically centered) */}
-        <Animated.View pointerEvents="none" style={[styles.glow, glowStyle]} />
-
-        {/* Two diagonal light beams (staggered, slow) */}
-        <LightBeam
-          angle={-18}
-          color="rgba(34,255,136,0.32)"
-          speed={6000}
-          delay={0}
-          thickness={180}
-          intensity={0.55}
-        />
-        <LightBeam
-          angle={14}
-          color="rgba(168,85,247,0.28)"
-          speed={6800}
-          delay={1400}
-          thickness={160}
-          intensity={0.48}
-        />
-
-        {/* Bottom loader (letter-spaced premium label) */}
+        {/* Bottom cinematic loader */}
         <Animated.View style={[styles.loaderWrap, loaderStyle]} pointerEvents="none">
           <View style={styles.dotsRow}>
             <PulseDot delay={0} />
@@ -155,7 +131,7 @@ export default function SplashScreen() {
   );
 }
 
-// A small pulsing neon dot. 3 of these form the loader row.
+// ----- Pulse dot -----
 function PulseDot({ delay = 0 }: { delay?: number }) {
   const v = useSharedValue(0);
   useEffect(() => {
@@ -194,42 +170,18 @@ function PulseDot({ delay = 0 }: { delay?: number }) {
   );
 }
 
-const GLOW_SIZE = Math.min(SCREEN_W, 380);
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000000" },
-  glow: {
-    position: "absolute",
-    top: SCREEN_H * 0.30,
-    alignSelf: "center",
-    width: GLOW_SIZE,
-    height: GLOW_SIZE,
-    borderRadius: GLOW_SIZE / 2,
-    backgroundColor: "rgba(34,255,136,0.10)",
-    shadowColor: FUTURISTIC.brand,
-    shadowOpacity: 0.85,
-    shadowRadius: 110,
-    shadowOffset: { width: 0, height: 0 },
-  },
+  center: { alignItems: "center", justifyContent: "center" },
   loaderWrap: {
     position: "absolute",
-    bottom: 70,
+    bottom: 60,
     left: 0,
     right: 0,
     alignItems: "center",
-    gap: 14,
+    gap: 12,
   },
-  dotsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 4,
-  },
-  loaderText: {
-    ...TYPO.caption,
-    color: FUTURISTIC.textPrimary,
-    opacity: 0.88,
-  },
-  versionText: {
-    ...TYPO.micro,
-    color: FUTURISTIC.textMuted,
-  },
+  dotsRow: { flexDirection: "row", gap: 8, marginBottom: 2 },
+  loaderText: { ...TYPO.caption, color: FUTURISTIC.textPrimary, opacity: 0.88 },
+  versionText: { ...TYPO.micro, color: FUTURISTIC.textMuted },
 });
