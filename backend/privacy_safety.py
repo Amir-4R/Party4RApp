@@ -373,6 +373,76 @@ def register_routes(api: APIRouter, db: AsyncIOMotorDatabase, get_current_user):
         score = int(u.get("honor", HONOR_START))
         return {"score": score, "rank": honor_rank(score)}
 
+    # ====== ADMIN — moderation panel ============================================
+    # Admin access is controlled by the comma-separated ADMIN_USERNAMES env var.
+    # If unset/empty, all admin endpoints return 403.
+    def require_admin(current: dict = Depends(get_current_user)) -> dict:
+        admins = [
+            u.strip().lower()
+            for u in os.environ.get("ADMIN_USERNAMES", "").split(",")
+            if u.strip()
+        ]
+        if not admins:
+            raise HTTPException(403, "Admin panel disabled (ADMIN_USERNAMES not set)")
+        if (current.get("username") or "").lower() not in admins:
+            raise HTTPException(403, "Admin access required")
+        return current
+
+    @api.get("/admin/reports")
+    async def list_reports(
+        status: str = "open",
+        limit: int = 50,
+        _: dict = Depends(require_admin),
+    ):
+        """List reports filtered by status, newest first. Includes minimal
+        reporter/target profile info for the moderation UI."""
+        limit = max(1, min(limit, 200))
+        q = {} if status == "all" else {"status": status}
+        rows = await db.reports.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(length=limit)
+        # Enrich with reporter + target usernames (best-effort).
+        user_ids = {r["reporter_id"] for r in rows} | {r["target_id"] for r in rows}
+        users = {
+            u["id"]: u
+            async for u in db.users.find(
+                {"id": {"$in": list(user_ids)}},
+                {"_id": 0, "id": 1, "username": 1, "nickname": 1, "honor": 1},
+            )
+        }
+        for r in rows:
+            r["reporter"] = users.get(r["reporter_id"])
+            r["target"] = users.get(r["target_id"])
+            r.pop("created_at_dt", None)  # not JSON-serializable
+        return {"reports": rows, "count": len(rows)}
+
+    @api.patch("/admin/reports/{report_id}")
+    async def update_report(
+        report_id: str,
+        body: dict,
+        _: dict = Depends(require_admin),
+    ):
+        """Update a report's status. Allowed values: open|resolved|dismissed."""
+        new_status = (body.get("status") or "").strip().lower()
+        if new_status not in {"open", "resolved", "dismissed"}:
+            raise HTTPException(400, "Invalid status (open|resolved|dismissed)")
+        res = await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"status": new_status, "resolved_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        if not res.matched_count:
+            raise HTTPException(404, "Report not found")
+        return {"ok": True, "status": new_status}
+
+    @api.get("/admin/smtp/health")
+    async def smtp_health(_: dict = Depends(require_admin)):
+        """Quick check: does the backend have SMTP credentials configured?"""
+        return {
+            "configured": bool(SMTP_USER and SMTP_PASS),
+            "host": SMTP_HOST,
+            "port": SMTP_PORT,
+            "moderation_email": MODERATION_EMAIL,
+            "sender": SMTP_USER or None,
+        }
+
     # ====== ACCOUNT DELETION (GDPR / Play Data Safety) ======
     @api.delete("/auth/account")
     async def delete_account(current: dict = Depends(get_current_user)):
