@@ -1,7 +1,15 @@
-// /app/frontend/app/dms.tsx — Phase 3 DM Inbox
-// Lists all friends, last message preview, unread count.
+// /app/frontend/app/dms.tsx — Phase 3 DM Inbox (futuristic redesign)
+//
+// Lists all friends with last-message preview + unread count.
+// Visual upgrades:
+//   • Ambient LightBeams (subtle green + purple).
+//   • Header: chevron back + "MESSAGES" caps display + count subtitle.
+//   • Conversations use MetallicCard with iridescent border (green when unread/online).
+//   • Avatar wrapped in chrome+brand gradient ring; online dot is glowing.
+//   • Unread badge: red glow circle.
+//   • Empty state: neon-bordered icon ring.
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Image, RefreshControl,
@@ -9,8 +17,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
+import { LinearGradient } from "expo-linear-gradient";
+import { getAvatarUrl } from "@/src/constants/avatars";
 import { apiGet } from "@/src/api/client";
+import { FUTURISTIC, GRADIENTS, TYPO } from "@/src/theme/futuristic";
+import MetallicCard from "@/src/components/futuristic/MetallicCard";
+import GlowDivider from "@/src/components/futuristic/GlowDivider";
+import LightBeam from "@/src/components/futuristic/LightBeam";
+import { useT } from "@/src/context/LanguageContext";
 
 interface Conversation {
   friend: { id: string; username: string; nickname: string; avatar: string; avatar_image?: string };
@@ -21,6 +35,7 @@ interface Conversation {
 
 export default function DMInboxScreen() {
   const router = useRouter();
+  const { t } = useT();
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,91 +61,292 @@ export default function DMInboxScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={26} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>MESSAGES</Text>
-          <Text style={styles.subtitle}>{convs.length} {convs.length === 1 ? "conversation" : "conversations"}</Text>
-        </View>
-      </View>
+    <View style={styles.bg}>
+      <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
+      <LightBeam angle={-20} color="rgba(34,255,136,0.12)" speed={10000} thickness={200} intensity={0.45} />
+      <LightBeam angle={18} color="rgba(168,85,247,0.10)" speed={12000} delay={2500} thickness={180} intensity={0.4} />
 
-      {loading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
-      ) : (
-        <FlatList
-          data={convs}
-          keyExtractor={(i) => i.friend.id}
-          contentContainerStyle={{ padding: 14, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.brand} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="chatbubble-outline" size={48} color={COLORS.textMuted} />
-              <Text style={styles.emptyText}>No conversations yet</Text>
-              <Text style={styles.emptySub}>Add friends to start messaging.</Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => router.push(`/dms/${item.friend.id}`)}
-              activeOpacity={0.85}
-              style={styles.row}
-            >
-              <View style={styles.avatarBox}>
-                <Image source={{ uri: item.friend.avatar_image || getAvatarUrl(item.friend.avatar) }} style={styles.avatar} />
-                <View style={[styles.friendRing, { borderColor: COLORS.brand }]} />
-                {item.online && <View style={[styles.dot, { backgroundColor: COLORS.success }]} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.nick} numberOfLines={1}>{item.friend.nickname}</Text>
-                  {item.last_message && <Text style={styles.time}>{formatTime(item.last_message.created_at)}</Text>}
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={24} color={FUTURISTIC.textPrimary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, marginLeft: 6 }}>
+            <Text style={styles.kicker}>DIRECT</Text>
+            <Text style={styles.title}>{(t("messages") || "MESSAGES").toUpperCase()}</Text>
+          </View>
+          <View style={styles.countPill}>
+            <Ionicons name="chatbubbles" size={12} color={FUTURISTIC.brand} />
+            <Text style={styles.countText}>{convs.length}</Text>
+          </View>
+        </View>
+
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          <GlowDivider color={FUTURISTIC.brand} speed={5400} />
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={FUTURISTIC.brand} />
+            <Text style={styles.loadingText}>LOADING CONVERSATIONS…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={convs}
+            keyExtractor={(i) => i.friend.id}
+            contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={FUTURISTIC.brand} />}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <View style={styles.emptyIconRing}>
+                  <Ionicons name="chatbubbles-outline" size={42} color={FUTURISTIC.brand} />
                 </View>
-                <View style={styles.rowBottom}>
-                  <Text
-                    style={[styles.preview, item.unread > 0 && { color: COLORS.textPrimary, fontWeight: "700" }]}
-                    numberOfLines={1}
-                  >
-                    {item.last_message ?
-                      (item.last_message.image ? "📷 Photo" : item.last_message.text || "—")
-                      : "Say hi!"}
-                  </Text>
-                  {item.unread > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.unread > 99 ? "99+" : item.unread}</Text>
+                <Text style={styles.emptyTitle}>{t("no_conversations_yet") || "No conversations yet"}</Text>
+                <Text style={styles.emptySub}>
+                  {t("add_friends_to_message") || "Add friends and say hi to start chatting."}
+                </Text>
+              </View>
+            }
+            renderItem={({ item }) => {
+              const isUnread = item.unread > 0;
+              const accent: "green" | "purple" | "neutral" = isUnread ? "green" : item.online ? "purple" : "neutral";
+              return (
+                <TouchableOpacity
+                  onPress={() => router.push(`/dms/${item.friend.id}`)}
+                  activeOpacity={0.85}
+                  style={{ marginBottom: 10 }}
+                >
+                  <MetallicCard accent={accent} padding={12} radius={FUTURISTIC.radius.md}>
+                    <View style={styles.row}>
+                      <View style={styles.avatarBox}>
+                        <LinearGradient
+                          colors={
+                            item.online
+                              ? ["rgba(34,255,136,0.85)", "rgba(168,85,247,0.55)"]
+                              : ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.04)"]
+                          }
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.avatarRing}
+                        >
+                          <Image
+                            source={{ uri: item.friend.avatar_image || getAvatarUrl(item.friend.avatar) }}
+                            style={styles.avatar}
+                          />
+                        </LinearGradient>
+                        {item.online && <View style={styles.onlineDot} />}
+                      </View>
+
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={styles.rowTop}>
+                          <Text style={styles.nick} numberOfLines={1}>
+                            {item.friend.nickname}
+                          </Text>
+                          {item.last_message && (
+                            <Text style={styles.time}>
+                              {formatTime(item.last_message.created_at)}
+                            </Text>
+                          )}
+                        </View>
+                        <View style={styles.rowBottom}>
+                          <Text
+                            style={[
+                              styles.preview,
+                              isUnread && { color: FUTURISTIC.textPrimary, fontWeight: "800" },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.last_message
+                              ? item.last_message.image
+                                ? "📷 Photo"
+                                : item.last_message.text || "—"
+                              : t("say_hi") || "Say hi!"}
+                          </Text>
+                          {isUnread && (
+                            <View style={styles.badge}>
+                              <Text style={styles.badgeText}>
+                                {item.unread > 99 ? "99+" : item.unread}
+                              </Text>
+                            </View>
+                          )}
+                          {!isUnread && item.online && (
+                            <View style={styles.onlinePill}>
+                              <View style={styles.onlinePillDot} />
+                              <Text style={styles.onlinePillText}>LIVE</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
                     </View>
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
-      )}
-    </SafeAreaView>
+                  </MetallicCard>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 8 },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: COLORS.textPrimary, fontSize: 18, fontWeight: "800", letterSpacing: 1 },
-  subtitle: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  empty: { alignItems: "center", padding: 60, gap: 8 },
-  emptyText: { color: COLORS.textPrimary, fontWeight: "700", fontSize: 16, marginTop: 8 },
-  emptySub: { color: COLORS.textMuted, fontSize: 13 },
-  row: { flexDirection: "row", gap: 12, padding: 12, marginBottom: 8, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, alignItems: "center" },
+  bg: { flex: 1, backgroundColor: FUTURISTIC.bg },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.borderStrong,
+  },
+  kicker: {
+    ...TYPO.micro,
+    color: FUTURISTIC.textMuted,
+  },
+  title: {
+    ...TYPO.h1,
+    color: FUTURISTIC.textPrimary,
+    textShadowColor: "rgba(34,255,136,0.30)",
+    textShadowRadius: 10,
+  },
+  countPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: FUTURISTIC.brandSoft,
+    borderColor: FUTURISTIC.brandEdge,
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  countText: {
+    color: FUTURISTIC.brand,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: { ...TYPO.caption, color: FUTURISTIC.textMuted },
+  // ----- Row -----
+  row: { flexDirection: "row", alignItems: "center" },
   avatarBox: { width: 54, height: 54, position: "relative" },
-  avatar: { width: 50, height: 50, borderRadius: 16, margin: 2 },
-  friendRing: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, borderWidth: 2 },
-  dot: { position: "absolute", bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: COLORS.bg },
+  avatarRing: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    padding: 2,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: FUTURISTIC.surface2,
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: FUTURISTIC.brand,
+    borderWidth: 2,
+    borderColor: FUTURISTIC.bg,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.95,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
   rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  nick: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "700", flex: 1 },
-  time: { color: COLORS.textMuted, fontSize: 11 },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 4, gap: 8 },
-  preview: { color: COLORS.textSecondary, fontSize: 13, flex: 1 },
-  badge: { backgroundColor: COLORS.brand, minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
-  badgeText: { color: COLORS.bg, fontSize: 11, fontWeight: "900" },
+  nick: {
+    color: FUTURISTIC.textPrimary,
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    flex: 1,
+  },
+  time: { color: FUTURISTIC.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 },
+  preview: {
+    color: FUTURISTIC.textSecondary,
+    fontSize: 13,
+    flex: 1,
+    letterSpacing: 0.2,
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: FUTURISTIC.brand,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  badgeText: { color: "#001A0C", fontSize: 11, fontWeight: "900" },
+  onlinePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: FUTURISTIC.accentSoft,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.accentEdge,
+  },
+  onlinePillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: FUTURISTIC.accent,
+  },
+  onlinePillText: {
+    color: FUTURISTIC.accent,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+  // ----- Empty -----
+  empty: { alignItems: "center", padding: 32, marginTop: 24 },
+  emptyIconRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: FUTURISTIC.surface1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.4,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  emptyTitle: {
+    ...TYPO.h2,
+    color: FUTURISTIC.textPrimary,
+    marginTop: 22,
+  },
+  emptySub: {
+    color: FUTURISTIC.textMuted,
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: "center",
+    letterSpacing: 0.3,
+    maxWidth: 260,
+  },
 });

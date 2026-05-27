@@ -17,6 +17,10 @@ import { apiGet, apiPost, API_BASE } from "@/src/api/client";
 import { storage } from "@/src/utils/storage";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useT } from "@/src/context/LanguageContext";
+import { FUTURISTIC, GRADIENTS, TYPO } from "@/src/theme/futuristic";
+import LightBeam from "@/src/components/futuristic/LightBeam";
+import GlowDivider from "@/src/components/futuristic/GlowDivider";
+import { LinearGradient } from "expo-linear-gradient";
 
 interface Friend {
   id: string;
@@ -228,16 +232,24 @@ export default function FriendsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.safe}>
+      <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
+      <LightBeam angle={-20} color="rgba(34,255,136,0.10)" speed={11000} thickness={200} intensity={0.42} />
+      <LightBeam angle={18} color="rgba(168,85,247,0.10)" speed={13000} delay={2400} thickness={180} intensity={0.38} />
+
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t("tab_friends")}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.kicker}>SOCIAL</Text>
+          <Text style={styles.title}>{(t("tab_friends") || "FRIENDS").toUpperCase()}</Text>
+        </View>
         <TouchableOpacity
           testID="open-dms"
           onPress={() => router.push("/dms")}
           style={styles.dmsBtn}
           activeOpacity={0.85}
         >
-          <Ionicons name="chatbubbles" size={20} color={COLORS.brand} />
+          <Ionicons name="chatbubbles" size={20} color={FUTURISTIC.brand} />
           {unreadDms > 0 && (
             <View style={styles.dmBadge}>
               <Text style={styles.dmBadgeText}>
@@ -246,6 +258,10 @@ export default function FriendsScreen() {
             </View>
           )}
         </TouchableOpacity>
+      </View>
+
+      <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
+        <GlowDivider color={FUTURISTIC.brand} speed={5400} />
       </View>
 
       <View style={styles.tabs}>
@@ -358,56 +374,64 @@ export default function FriendsScreen() {
           )}
         </View>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe: { flex: 1, backgroundColor: FUTURISTIC.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
+  kicker: { ...TYPO.micro, color: FUTURISTIC.textMuted },
   dmsBtn: {
-    marginLeft: "auto",
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 12,
-    backgroundColor: COLORS.brandDim,
+    backgroundColor: FUTURISTIC.brandSoft,
     borderWidth: 1,
-    borderColor: COLORS.brand,
+    borderColor: FUTURISTIC.brandEdge,
     position: "relative",
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
   },
   dmBadge: {
     position: "absolute",
     top: -4,
     right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: COLORS.error,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: FUTURISTIC.error,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: COLORS.bg,
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: FUTURISTIC.bg,
+    shadowColor: FUTURISTIC.error,
+    shadowOpacity: 0.85,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
   },
   dmBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900" },
   title: {
-    color: COLORS.textPrimary,
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5,
+    ...TYPO.h1,
+    color: FUTURISTIC.textPrimary,
+    textShadowColor: "rgba(34,255,136,0.30)",
+    textShadowRadius: 10,
   },
   tabs: {
     flexDirection: "row",
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    paddingTop: 4,
   },
   tab: {
     flex: 1,
@@ -419,47 +443,57 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
-  tabActive: { borderBottomColor: COLORS.brand },
+  tabActive: {
+    borderBottomColor: FUTURISTIC.brand,
+  },
   tabText: {
-    color: COLORS.textSecondary,
+    color: FUTURISTIC.textSecondary,
     fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.2,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
   },
   badge: {
-    backgroundColor: COLORS.brand,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    backgroundColor: FUTURISTIC.brand,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 8,
-    minWidth: 16,
+    minWidth: 18,
     alignItems: "center",
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
   },
-  badgeText: { color: COLORS.bg, fontSize: 10, fontWeight: "800" },
+  badgeText: { color: "#001A0C", fontSize: 10, fontWeight: "900" },
   section: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-    marginTop: 16,
+    color: FUTURISTIC.textMuted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginTop: 18,
     marginBottom: 10,
+    textTransform: "uppercase",
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: FUTURISTIC.surface1,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: FUTURISTIC.borderStrong,
     borderRadius: 14,
     padding: 12,
     marginBottom: 8,
   },
   avatarWrap: { position: "relative" },
   av: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: COLORS.surfaceElevated,
+    backgroundColor: FUTURISTIC.surface2,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.borderStrong,
   },
   dot: {
     position: "absolute",
@@ -469,45 +503,51 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: COLORS.surface,
+    borderColor: FUTURISTIC.bg,
   },
-  nick: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "700" },
-  handle: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  nick: { color: FUTURISTIC.textPrimary, fontSize: 15, fontWeight: "800", letterSpacing: 0.3 },
+  handle: { color: FUTURISTIC.textMuted, fontSize: 12, marginTop: 2 },
   iconAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.surfaceElevated,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: FUTURISTIC.surface2,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.borderStrong,
     alignItems: "center",
     justifyContent: "center",
   },
   pendingText: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
+    color: FUTURISTIC.textMuted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.6,
   },
   tag: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
+    color: FUTURISTIC.textMuted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.6,
   },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: COLORS.brand,
+    backgroundColor: FUTURISTIC.brand,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 10,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
   },
-  addBtnText: { color: COLORS.bg, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
+  addBtnText: { color: "#001A0C", fontSize: 12, fontWeight: "900", letterSpacing: 1 },
   empty: { alignItems: "center", padding: 32, marginTop: 12 },
   emptyText: {
-    color: COLORS.textPrimary,
+    color: FUTURISTIC.textPrimary,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
     marginTop: 8,
   },
   emptySub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
