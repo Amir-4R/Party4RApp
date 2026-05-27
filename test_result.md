@@ -261,11 +261,11 @@ backend:
           All four assertions green via /app/backend_test_reverify.py.
   - task: "Phase 5 — Word filter in room chat (moderation.py)"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/moderation.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -354,6 +354,27 @@ backend:
           so the persistence flow itself works. If main agent wants /me
           to expose push_token, add `push_token: Optional[str] = None`
           to UserPublic and pass it through user_to_public().
+      - working: true
+        agent: "testing"
+        comment: |
+          Re-verified after main agent rewrote moderation.py with per-letter
+          LEET char-class + repeat-quantifier approach (no string
+          normalisation). All 7 brief assertions PASS via
+          /app/backend_test_modfilter.py against the public URL.
+
+          Previously failing cases — now PASS:
+            • "F@ck off"       -> "**** off"        bot_flag=True
+            • "fuuuuck this"   -> "******* this"    bot_flag=True (7 stars)
+            • "porn xxx nudes" -> "**** *** *****"  bot_flag=True
+
+          Regression cases — still PASS:
+            • "hello world"    -> "hello world"     bot_flag=False
+            • "fuck this shit" -> "**** this ****"  bot_flag=True
+            • "you BITCH"      -> "you *****"       bot_flag=True
+            • "kos omak"       -> "*** omak"        bot_flag=True
+
+          Chat payload still includes user_id, nickname, avatar, timestamp.
+          No regressions observed.
   - task: "Phase 5 — Push notification token endpoints (notifications.py)"
     implemented: true
     working: true
@@ -480,8 +501,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Phase 5 — Word filter in room chat (moderation.py)"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -651,3 +671,27 @@ agent_communication:
       No other regressions observed. Both Phase 4 tasks are now working:true and
       removed from current_focus. Main agent: please summarise and finish — no
       further backend re-test required for these items.
+
+  - agent: "testing"
+    message: |
+      Phase 5 word-filter RE-VERIFICATION after main agent rewrote
+      moderation.py with per-letter LEET char-class + repeat quantifier
+      (no string normalisation). All 7 review-brief assertions PASS.
+
+      Re-test script: /app/backend_test_modfilter.py (run against
+      https://partyapp-sync.preview.emergentagent.com).
+
+      Previously failing — now PASS:
+        • "F@ck off"       -> "**** off"        bot_flag=True
+        • "fuuuuck this"   -> "******* this"    bot_flag=True (7 stars)
+        • "porn xxx nudes" -> "**** *** *****"  bot_flag=True
+
+      Regression — still PASS:
+        • "hello world"    -> "hello world"     bot_flag=False
+        • "fuck this shit" -> "**** this ****"  bot_flag=True
+        • "you BITCH"      -> "you *****"       bot_flag=True
+        • "kos omak"       -> "*** omak"        bot_flag=True
+
+      Push-token endpoints not re-tested (already green per previous run
+      and per review request scope). Task marked working:true, no current
+      focus left. Main agent: please summarise and finish.
