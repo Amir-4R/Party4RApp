@@ -820,7 +820,8 @@ _BUNDLES = {
     "frontend.zip": "party4r-frontend-eas.zip",
     "full.zip": "party4r-app-full.zip",
     "web-build.zip": "party4r-web-build.zip",
-    "android-gradle.zip": "party4r-android-gradle.zip",  # for direct Gradle/native build
+    "android-gradle.zip": "party4r-android-gradle.zip",
+    "android-prebuilt.zip": "party4r-android-prebuilt.zip",  # already-prebuilt for Termux
 }
 
 
@@ -881,6 +882,11 @@ async def download_web_build():
 @app.get("/api/download/android-gradle.zip")
 async def download_android_gradle_bundle():
     return _serve_bundle("android-gradle.zip")
+
+
+@app.get("/api/download/android-prebuilt.zip")
+async def download_android_prebuilt():
+    return _serve_bundle("android-prebuilt.zip")
 
 
 @app.get("/download/backend.zip")
