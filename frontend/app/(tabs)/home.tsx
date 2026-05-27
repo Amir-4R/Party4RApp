@@ -50,7 +50,6 @@ import { FUTURISTIC, GRADIENTS, SHADOWS, TYPO } from "@/src/theme/futuristic";
 import MetallicCard from "@/src/components/futuristic/MetallicCard";
 import GlowDivider from "@/src/components/futuristic/GlowDivider";
 import LightBeam from "@/src/components/futuristic/LightBeam";
-import NeonButton from "@/src/components/futuristic/NeonButton";
 import { useEffect } from "react";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -102,6 +101,38 @@ function LiveDot({ active }: { active: boolean }) {
         s,
       ]}
     />
+  );
+}
+
+// ----------------------------------------------------------------------------
+// EmptyStateRings — 3 concentric pulsing neon rings for the "no rooms" state
+// ----------------------------------------------------------------------------
+function EmptyStateRings() {
+  const v = useSharedValue(0);
+  useEffect(() => {
+    v.value = withRepeat(
+      withTiming(1, { duration: 2400, easing: Easing.out(Easing.cubic) }),
+      -1,
+      false
+    );
+  }, [v]);
+  const ringStyle = (delay: number) =>
+    useAnimatedStyle(() => {
+      const tt = (v.value + delay) % 1;
+      return {
+        opacity: 1 - tt,
+        transform: [{ scale: 0.7 + tt * 1.3 }],
+      };
+    });
+  return (
+    <View style={styles.emptyRingsWrap}>
+      <Animated.View style={[styles.emptyRing, ringStyle(0)]} />
+      <Animated.View style={[styles.emptyRing, ringStyle(0.33)]} />
+      <Animated.View style={[styles.emptyRing, ringStyle(0.66)]} />
+      <View style={styles.emptyCore}>
+        <Ionicons name="planet-outline" size={40} color={FUTURISTIC.brand} />
+      </View>
+    </View>
   );
 }
 
@@ -289,6 +320,14 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.title}>{(t("public_rooms") || "Public Rooms").toUpperCase()}</Text>
           </View>
+          <TouchableOpacity
+            testID="open-search"
+            onPress={() => router.push("/search")}
+            style={styles.searchBtn}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="search" size={20} color={FUTURISTIC.brand} />
+          </TouchableOpacity>
           <CreateFab onPress={() => router.push("/create-room")} />
         </View>
 
@@ -316,21 +355,12 @@ export default function HomeScreen() {
             }
             ListEmptyComponent={
               <View style={styles.empty} testID="empty-rooms-state">
-                <View style={styles.emptyIconRing}>
-                  <Ionicons name="tv-outline" size={42} color={FUTURISTIC.brand} />
-                </View>
-                <Text style={styles.emptyTitle}>{t("no_rooms") || "No active rooms"}</Text>
+                {/* Pulsing concentric rings — premium empty-state effect */}
+                <EmptyStateRings />
+                <Text style={styles.emptyTitle}>{t("no_rooms") || "No active rooms found"}</Text>
                 <Text style={styles.emptySub}>
-                  {t("be_first") || "Be the first to start a watch party"}
+                  {t("be_first") || "Be the first to start a watch party. Or browse the search to discover more."}
                 </Text>
-                <NeonButton
-                  testID="empty-create-btn"
-                  label={t("create_room") || "Create Room"}
-                  leftIcon="add-circle"
-                  size="lg"
-                  onPress={() => router.push("/create-room")}
-                  style={{ marginTop: 24 }}
-                />
               </View>
             }
           />
@@ -464,17 +494,50 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   // ---------------------- Empty state ----------------------
-  empty: { alignItems: "center", padding: 32, marginTop: 16 },
-  emptyIconRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+  empty: { alignItems: "center", padding: 32, marginTop: 32 },
+  emptyRingsWrap: {
+    width: 180,
+    height: 180,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 22,
+  },
+  emptyRing: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 1.5,
+    borderColor: FUTURISTIC.brand,
+  },
+  emptyCore: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: FUTURISTIC.surface1,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: FUTURISTIC.brandEdge,
-    ...SHADOWS.glowBrand,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.7,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  searchBtn: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    marginRight: 10,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.30,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
   },
   emptyTitle: {
     color: FUTURISTIC.textPrimary,

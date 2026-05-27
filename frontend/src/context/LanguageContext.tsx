@@ -52,6 +52,9 @@ const dict: Record<Lang, Record<string, string>> = {
     playing_video: "Playing video",
     waiting_for_host: "Waiting for host",
     waiting_host: "Waiting for host",
+    // Search screen
+    search_rooms_title: "Search rooms",
+    search_rooms_placeholder: "Search by room name…",
     // Phase 6 — DM Chat
     messages: "Messages",
     no_conversations_yet: "No conversations yet",
@@ -207,6 +210,9 @@ const dict: Record<Lang, Record<string, string>> = {
     playing_video: "يشغّل فيديو",
     waiting_for_host: "بانتظار المضيف",
     waiting_host: "بانتظار المضيف",
+    // Search screen (AR)
+    search_rooms_title: "البحث عن غرف",
+    search_rooms_placeholder: "ابحث باسم الغرفة…",
     new_party: "حفلة جديدة",
     start_watch_party: "ابدأ\nحفلة مشاهدة.",
     room_name: "اسم الغرفة",
