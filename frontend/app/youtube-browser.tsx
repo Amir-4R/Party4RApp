@@ -13,12 +13,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
 import { COLORS } from "@/src/constants/avatars";
 import { apiPost } from "@/src/api/client";
+import { useT } from "@/src/context/LanguageContext";
 
 const YT_SEARCH = (q: string) => `https://m.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 const YT_HOME = "https://m.youtube.com";
 
 export default function YouTubeBrowser() {
   const router = useRouter();
+  const { t, tErr } = useT();
   const { roomId } = useLocalSearchParams<{ roomId?: string }>();
   const wvRef = useRef<WebView>(null);
   const [currentUrl, setCurrentUrl] = useState(YT_HOME);
@@ -55,7 +57,7 @@ export default function YouTubeBrowser() {
         params: { addedVideo: data.video_url, addedVideoId: data.video_id },
       });
     } catch (e: any) {
-      Alert.alert("Couldn't add", e.message || "Try again with a YouTube video URL.");
+      Alert.alert(t("couldnt_add"), tErr(e) || t("couldnt_add_msg"));
     } finally { setAdding(false); }
   };
 
@@ -71,7 +73,7 @@ export default function YouTubeBrowser() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search YouTube..."
+            placeholder={t("yt_browser_search_placeholder")}
             placeholderTextColor={COLORS.textDisabled}
             style={styles.searchInput}
             returnKeyType="search"
@@ -105,9 +107,9 @@ export default function YouTubeBrowser() {
           renderError={() => (
             <View style={styles.error}>
               <Ionicons name="cloud-offline-outline" size={42} color={COLORS.error} />
-              <Text style={styles.errorText}>Couldn't load YouTube</Text>
+              <Text style={styles.errorText}>{t("couldnt_load_youtube")}</Text>
               <TouchableOpacity onPress={refresh} style={styles.retryBtn}>
-                <Text style={styles.retryText}>Retry</Text>
+                <Text style={styles.retryText}>{t("retry")}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -123,7 +125,7 @@ export default function YouTubeBrowser() {
       {roomId && (
         <View style={styles.bottomBar}>
           <Text style={styles.bottomLabel} numberOfLines={1}>
-            {isVideo ? "✓ Video detected" : "Browse a video to add it"}
+            {isVideo ? t("video_detected") : t("browse_video_to_add")}
           </Text>
           <TouchableOpacity
             onPress={addToRoom}
@@ -133,7 +135,7 @@ export default function YouTubeBrowser() {
             {adding ? (
               <ActivityIndicator color={COLORS.bg} size="small" />
             ) : (
-              <Text style={styles.addText}>ADD TO ROOM</Text>
+              <Text style={styles.addText}>{t("add_to_room")}</Text>
             )}
           </TouchableOpacity>
         </View>

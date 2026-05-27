@@ -695,3 +695,50 @@ agent_communication:
       Push-token endpoints not re-tested (already green per previous run
       and per review request scope). Task marked working:true, no current
       focus left. Main agent: please summarise and finish.
+
+
+  - agent: "main"
+    message: |
+      **Phase 7 — Arabic Localization + RTL + Cairo font (Frontend only)**
+
+      Scope of this run (NO backend code touched, no DB schema changes):
+
+      1. Rebuilt /app/frontend/src/context/LanguageContext.tsx with:
+         - Full English + Arabic dictionaries covering every screen
+           (auth, home, search, dms inbox/chat, room, voting, friends,
+           profile, settings, privacy, blocked, legal pages, splash,
+           YouTube browser, create-room).
+         - Cairo font loaded via @expo-google-fonts/cairo (regular, semibold,
+           bold, extra-bold, black). Applied globally to Text.defaultProps
+           when lang === "ar".
+         - tErr(rawError) — translates backend HTTPException detail strings
+           (e.g. "Incorrect username or password", "Cannot DM yourself",
+           "Avatar image too large…") into Arabic. Unknown errors fall
+           through unchanged.
+         - I18nManager.forceRTL on language switch + "restart required"
+           alert in ar.
+         - Western numerals preserved per spec.
+
+      2. Replaced hardcoded English strings with t() across:
+         settings, privacy, blocked, legal/privacy-policy, legal/terms,
+         search, dms, dms/[friendId], (tabs)/friends, (tabs)/profile,
+         (tabs)/home, room/[id], youtube-browser, VotingOverlay, splash
+         (app/index.tsx).
+
+      3. Added RTL chevron flipping to ScreenScaffold back button
+         (chevron-back ↔ chevron-forward based on I18nManager.isRTL).
+
+      4. Installed @expo-google-fonts/cairo via `yarn expo install`.
+
+      Verification done by main agent via Playwright screenshot tool:
+        • Logged in as testuser1/pass1234.
+        • Settings page renders cleanly in English.
+        • Switched to العربية — all visible strings translated, RTL
+          alignment auto-applied (Arabic text right-aligned), and Cairo
+          font visibly rendering. "Restart required" alert flow is
+          present for native; web preview applies direction via CSS.
+
+      NO backend testing required for this phase — only static dictionary
+      additions on the frontend. Awaiting user verification on Termux
+      build before moving to Phase 8 backlog (SMTP).
+

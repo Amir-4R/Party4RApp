@@ -444,7 +444,7 @@ export default function DMChatScreen() {
         key="typing"
         style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
       >
-        <Text style={styles.subtitleTyping}>TYPING</Text>
+        <Text style={styles.subtitleTyping}>{t("typing")}</Text>
         <TypingDots />
       </View>
     );
@@ -466,8 +466,8 @@ export default function DMChatScreen() {
           ]}
         />
         <Text style={styles.subtitle}>
-          {otherOnline ? "ONLINE" : "OFFLINE"}
-          {sharedSeconds && sharedSeconds > 0 ? `  ·  ${formatSharedTime(sharedSeconds)} ${t("shared") || "SHARED"}` : ""}
+          {otherOnline ? t("online_caps") : t("offline_caps")}
+          {sharedSeconds && sharedSeconds > 0 ? `  ·  ${formatSharedTime(sharedSeconds)} ${t("shared")}` : ""}
         </Text>
       </View>
     );

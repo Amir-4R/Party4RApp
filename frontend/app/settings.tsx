@@ -22,7 +22,7 @@ import MetallicCard from "@/src/components/futuristic/MetallicCard";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { t, lang, setLang } = useT();
+  const { t, tErr, lang, setLang } = useT();
   const { themeId, setThemeId } = useTheme();
   const [switching, setSwitching] = useState<null | "en" | "ar">(null);
   const [themeSwitching, setThemeSwitching] = useState<ThemeId | null>(null);
@@ -33,8 +33,8 @@ export default function SettingsScreen() {
     const { needsRestart } = await setLang(l);
     setSwitching(null);
     if (needsRestart) {
-      Alert.alert(t("rtl_restart_title") || "Layout change", t("rtl_restart_msg") || "Please restart to apply the new direction.", [
-        { text: t("rtl_restart_ok") || "OK" },
+      Alert.alert(t("rtl_restart_title"), t("rtl_restart_msg"), [
+        { text: t("rtl_restart_ok") },
       ]);
     }
   };
@@ -47,10 +47,10 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScreenScaffold kicker="ACCOUNT" title={(t("app_settings") || "SETTINGS").toUpperCase()} subtitle={t("settings_subtitle") || "Personalize your Party4R experience"}>
+    <ScreenScaffold kicker={t("settings_account")} title={t("app_settings").toUpperCase()} subtitle={t("settings_subtitle")}>
       <ScrollView contentContainerStyle={{ paddingBottom: 60, paddingTop: 10 }}>
         {/* THEME ----------------------------------------------------------- */}
-        <Section label="THEME">
+        <Section label={t("settings_theme")}>
           <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral">
             {(Object.keys(THEMES) as ThemeId[]).map((id, idx) => {
               const tdef = THEMES[id];
@@ -76,12 +76,12 @@ export default function SettingsScreen() {
                       </Text>
                       <Text style={styles.rowSub}>
                         {id === "neon"
-                          ? "Neon green · Cyber default"
+                          ? t("theme_neon_sub")
                           : id === "midnight"
-                          ? "Blue · Calm dark"
+                          ? t("theme_midnight_sub")
                           : id === "amoled"
-                          ? "Pure black · Battery saver"
-                          : "Purple · High contrast"}
+                          ? t("theme_amoled_sub")
+                          : t("theme_purple_sub")}
                       </Text>
                     </View>
                     {busy ? (
@@ -99,7 +99,7 @@ export default function SettingsScreen() {
         </Section>
 
         {/* LANGUAGE -------------------------------------------------------- */}
-        <Section label={(t("language_section") || "LANGUAGE").toUpperCase()}>
+        <Section label={t("language_section").toUpperCase()}>
           <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral">
             <LangRow code="en" label="English" sub="Default" flag="🇺🇸" active={lang === "en"} busy={switching === "en"} onPress={() => handleSwitch("en")} />
             <View style={styles.divider} />
@@ -108,34 +108,34 @@ export default function SettingsScreen() {
         </Section>
 
         {/* PRIVACY & SAFETY ----------------------------------------------- */}
-        <Section label="PRIVACY & SAFETY">
+        <Section label={t("settings_privacy_safety")}>
           <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="green">
-            <MenuRow icon="shield-checkmark-outline" label="Privacy Controls" sub="Online status, last seen, profile visibility" onPress={() => router.push("/privacy")} />
+            <MenuRow icon="shield-checkmark-outline" label={t("privacy_controls")} sub={t("privacy_controls_sub")} onPress={() => router.push("/privacy")} />
             <View style={styles.divider} />
-            <MenuRow icon="ban-outline" label="Blocked Users" sub="Manage who can't contact you" onPress={() => router.push("/blocked")} />
+            <MenuRow icon="ban-outline" label={t("blocked_users")} sub={t("blocked_users_sub")} onPress={() => router.push("/blocked")} />
             <View style={styles.divider} />
-            <MenuRow icon="document-text-outline" label="Privacy Policy" sub="How we handle your data" onPress={() => router.push("/legal/privacy-policy")} />
+            <MenuRow icon="document-text-outline" label={t("privacy_policy")} sub={t("privacy_policy_sub")} onPress={() => router.push("/legal/privacy-policy")} />
             <View style={styles.divider} />
-            <MenuRow icon="reader-outline" label="Terms of Service" sub="Community guidelines" onPress={() => router.push("/legal/terms")} />
+            <MenuRow icon="reader-outline" label={t("terms_of_service")} sub={t("terms_of_service_sub")} onPress={() => router.push("/legal/terms")} />
           </MetallicCard>
         </Section>
 
         {/* DANGER ZONE ---------------------------------------------------- */}
-        <Section label="DANGER ZONE">
+        <Section label={t("settings_danger_zone")}>
           <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral" style={{ borderColor: FUTURISTIC.error }}>
             <MenuRow
               icon="trash-outline"
-              label="Delete Account"
-              sub="Permanently erase all your data"
+              label={t("delete_account")}
+              sub={t("delete_account_sub")}
               danger
               onPress={() =>
                 Alert.alert(
-                  "Delete Account",
-                  "This permanently deletes your account, friends, rooms, and all data. This cannot be undone.",
+                  t("delete_account"),
+                  t("delete_account_confirm"),
                   [
-                    { text: "Cancel", style: "cancel" },
+                    { text: t("cancel"), style: "cancel" },
                     {
-                      text: "Delete Forever",
+                      text: t("delete_forever"),
                       style: "destructive",
                       onPress: async () => {
                         try {
@@ -145,7 +145,7 @@ export default function SettingsScreen() {
                           await storage.secureRemove("party_auth_token");
                           router.replace("/login");
                         } catch (e: any) {
-                          Alert.alert("Error", e.message || "Failed to delete account");
+                          Alert.alert(t("error"), tErr(e) || t("err_failed_to_delete_account"));
                         }
                       },
                     },
@@ -158,7 +158,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footer}>
           <Ionicons name="construct-outline" size={16} color={FUTURISTIC.textMuted} />
-          <Text style={styles.footerText}>More settings coming soon — notifications, audio…</Text>
+          <Text style={styles.footerText}>{t("more_settings_soon")}</Text>
         </View>
       </ScrollView>
     </ScreenScaffold>

@@ -108,11 +108,11 @@ export default function FriendsScreen() {
   const sendRequest = async (id: string) => {
     try {
       await authedFetch(`/friends/request/${id}`, { method: "POST" });
-      Alert.alert("Sent", "Friend request sent");
+      Alert.alert(t("sent"), t("friend_request_sent"));
       await load();
       runSearch();
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed");
+      Alert.alert(t("error"), e.message || t("failed"));
     }
   };
 
@@ -127,10 +127,10 @@ export default function FriendsScreen() {
   };
 
   const removeFriend = (id: string, name: string) => {
-    Alert.alert("Remove friend?", `Unfriend ${name}?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("remove_friend_q"), t("unfriend_msg", { name }), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Remove",
+        text: t("remove"),
         style: "destructive",
         onPress: async () => {
           await authedFetch(`/friends/${id}`, { method: "DELETE" });
@@ -196,8 +196,8 @@ export default function FriendsScreen() {
 
   const renderSearchRow = (item: Friend) => {
     let action;
-    if (isFriend(item.id)) action = <Text style={styles.tag}>{t("friend_label")}</Text>;
-    else if (isOutgoing(item.id)) action = <Text style={styles.tag}>{t("sent")}</Text>;
+    if (isFriend(item.id)) action = <Text style={styles.tag}>{t("friend_caps")}</Text>;
+    else if (isOutgoing(item.id)) action = <Text style={styles.tag}>{t("sent_caps")}</Text>;
     else if (isIncoming(item.id))
       action = (
         <TouchableOpacity
@@ -240,8 +240,8 @@ export default function FriendsScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.kicker}>SOCIAL</Text>
-          <Text style={styles.title}>{(t("tab_friends") || "FRIENDS").toUpperCase()}</Text>
+          <Text style={styles.kicker}>{t("kicker_social")}</Text>
+          <Text style={styles.title}>{t("tab_friends").toUpperCase()}</Text>
         </View>
         <TouchableOpacity
           testID="open-dms"

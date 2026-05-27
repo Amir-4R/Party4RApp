@@ -50,6 +50,7 @@ import { useRouter } from "expo-router";
 import { useAudioPlayer } from "expo-audio";
 import { useAuth } from "@/src/context/AuthContext";
 import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
+import { useT } from "@/src/context/LanguageContext";
 
 // ----- Constants -----
 const SPLASH_DURATION = 2400; // ms — total visible time
@@ -208,6 +209,7 @@ function PulseDot({ delay = 0 }: { delay?: number }) {
 export default function SplashScreen() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { t } = useT();
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const fade = useSharedValue(0);          // overall fade-in
   const exit = useSharedValue(0);          // fade-out before redirect
@@ -328,9 +330,9 @@ export default function SplashScreen() {
             <PulseDot delay={180} />
             <PulseDot delay={360} />
           </View>
-          <Text style={styles.loaderText}>INITIALIZING SYNC ENGINE</Text>
+          <Text style={styles.loaderText}>{t("initializing")}</Text>
           <LoaderBar />
-          <Text style={styles.versionText}>v 1.0</Text>
+          <Text style={styles.versionText}>{t("version_label")}</Text>
         </Animated.View>
       </Animated.View>
     </View>

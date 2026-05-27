@@ -15,7 +15,7 @@
 //   </ScreenScaffold>
 
 import React, { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { I18nManager, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -78,7 +78,7 @@ export default function ScreenScaffold({
             onPress={() => router.back()}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="chevron-back" size={24} color={FUTURISTIC.textPrimary} />
+            <Ionicons name={I18nManager.isRTL ? "chevron-forward" : "chevron-back"} size={24} color={FUTURISTIC.textPrimary} />
           </Pressable>
           <View style={{ flex: 1 }}>
             {kicker ? <Text style={styles.kicker}>{kicker}</Text> : null}

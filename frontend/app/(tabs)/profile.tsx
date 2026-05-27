@@ -95,11 +95,11 @@ export default function ProfileScreen() {
     }
     if (!granted) {
       Alert.alert(
-        "Gallery access needed",
-        "Allow gallery access to upload your photo.",
+        t("gallery_access_needed"),
+        t("gallery_access_msg_profile"),
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
+          { text: t("cancel"), style: "cancel" },
+          { text: t("open_settings"), onPress: () => Linking.openSettings() },
         ]
       );
       return;
@@ -115,7 +115,7 @@ export default function ProfileScreen() {
     const a = res.assets[0];
     const dataUri = `data:${a.mimeType || "image/jpeg"};base64,${a.base64}`;
     if (dataUri.length > 700_000) {
-      Alert.alert("Image too large", "Pick an image under ~500KB.");
+      Alert.alert(t("image_too_large"), t("pick_under_500kb"));
       return;
     }
     setBusy(true);
@@ -254,7 +254,7 @@ export default function ProfileScreen() {
                 testID="bio-input"
                 value={bioDraft}
                 onChangeText={setBioDraft}
-                placeholder="A few words about you..."
+                placeholder={t("bio_placeholder")}
                 placeholderTextColor={COLORS.textDisabled}
                 multiline
                 maxLength={280}

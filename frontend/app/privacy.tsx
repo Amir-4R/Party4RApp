@@ -1,4 +1,4 @@
-// /app/frontend/app/privacy.tsx — Phase 6 futuristic redesign.
+// /app/frontend/app/privacy.tsx — Phase 7 fully localized.
 // Privacy controls: who sees online, last seen, profile, shared time.
 
 import React, { useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import { apiGet, apiPatch } from "@/src/api/client";
 import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
 import ScreenScaffold from "@/src/components/futuristic/ScreenScaffold";
 import MetallicCard from "@/src/components/futuristic/MetallicCard";
+import { useT } from "@/src/context/LanguageContext";
 
 type Visibility = "everyone" | "friends" | "nobody";
 interface Privacy {
@@ -24,22 +25,29 @@ interface Privacy {
   shared_time_visibility: Visibility;
 }
 
-const ROWS: { key: keyof Privacy; label: string; sub: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: "online_visibility", label: "Online Status", sub: "Who can see when you're online", icon: "radio-button-on" },
-  { key: "last_seen_visibility", label: "Last Seen", sub: "Who can see when you were last active", icon: "time-outline" },
-  { key: "profile_visibility", label: "Profile", sub: "Who can view your profile", icon: "person-circle-outline" },
-  { key: "shared_time_visibility", label: "Shared Time", sub: "Who can see hours spent co-watching", icon: "hourglass-outline" },
-];
-
-const OPTIONS: { v: Visibility; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { v: "everyone", label: "Everyone", icon: "globe-outline" },
-  { v: "friends", label: "Friends only", icon: "people-outline" },
-  { v: "nobody", label: "Nobody", icon: "lock-closed-outline" },
-];
-
 export default function PrivacyScreen() {
+  const { t } = useT();
   const [p, setP] = useState<Privacy | null>(null);
   const [busyKey, setBusyKey] = useState<keyof Privacy | null>(null);
+
+  // Rows + options are defined inside the component so they're re-translated
+  // every time the language changes.
+  const ROWS: {
+    key: keyof Privacy;
+    label: string;
+    sub: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }[] = [
+    { key: "online_visibility", label: t("privacy_online_status"), sub: t("privacy_online_status_sub"), icon: "radio-button-on" },
+    { key: "last_seen_visibility", label: t("privacy_last_seen"), sub: t("privacy_last_seen_sub"), icon: "time-outline" },
+    { key: "profile_visibility", label: t("privacy_profile"), sub: t("privacy_profile_sub"), icon: "person-circle-outline" },
+    { key: "shared_time_visibility", label: t("privacy_shared_time"), sub: t("privacy_shared_time_sub"), icon: "hourglass-outline" },
+  ];
+  const OPTIONS: { v: Visibility; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { v: "everyone", label: t("visibility_everyone"), icon: "globe-outline" },
+    { v: "friends", label: t("visibility_friends"), icon: "people-outline" },
+    { v: "nobody", label: t("visibility_nobody"), icon: "lock-closed-outline" },
+  ];
 
   useEffect(() => {
     apiGet<Privacy>("/users/privacy")
@@ -66,7 +74,7 @@ export default function PrivacyScreen() {
   };
 
   return (
-    <ScreenScaffold kicker="VISIBILITY" title="PRIVACY" subtitle="Control what others can see about you">
+    <ScreenScaffold kicker={t("kicker_visibility")} title={t("privacy_title")} subtitle={t("privacy_subtitle")}>
       {!p ? (
         <ActivityIndicator color={FUTURISTIC.brand} style={{ marginTop: 40 }} />
       ) : (

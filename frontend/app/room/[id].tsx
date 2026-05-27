@@ -188,7 +188,7 @@ export default function RoomScreen() {
   const [votingMode, setVotingMode] = useState<"allowed" | "owner_only">("allowed");
   const [voteToast, setVoteToast] = useState<string | null>(null);
   const consumedAddedVideoRef = useRef<string | null>(null);
-  const { t } = useT();
+  const { t, tErr } = useT();
 
   const videoId = extractYouTubeId(videoUrl || "");
   const fullscreen = isLandscape || forceFullscreen;
@@ -521,7 +521,7 @@ export default function RoomScreen() {
       await apiPatch(`/rooms/${id}/settings`, { voting_mode: next });
       setVotingMode(next);
     } catch (e: any) {
-      Alert.alert("Failed", e.message || "Could not update setting");
+      Alert.alert(t("failed"), tErr(e) || t("err_could_not_update_setting"));
     }
   };
 
@@ -535,7 +535,7 @@ export default function RoomScreen() {
       );
       setSearchResults(res.items || []);
     } catch (e: any) {
-      Alert.alert("Search failed", e.message || "Try again");
+      Alert.alert(t("search_failed"), tErr(e) || t("try_again"));
     } finally {
       setSearching(false);
     }
@@ -550,11 +550,11 @@ export default function RoomScreen() {
     }
     if (!granted) {
       Alert.alert(
-        "Gallery access needed",
-        "Share photos in chat by allowing access in Settings.",
+        t("gallery_access_needed"),
+        t("gallery_access_msg_chat"),
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => Linking.openSettings() },
+          { text: t("cancel"), style: "cancel" },
+          { text: t("open_settings"), onPress: () => Linking.openSettings() },
         ]
       );
       return;
@@ -569,7 +569,7 @@ export default function RoomScreen() {
     const a = res.assets[0];
     const dataUri = `data:${a.mimeType || "image/jpeg"};base64,${a.base64}`;
     if (dataUri.length > 700_000) {
-      Alert.alert("Image too large", "Pick an image under ~500KB.");
+      Alert.alert(t("image_too_large"), t("pick_under_500kb"));
       return;
     }
     wsRef.current?.send(JSON.stringify({ type: "chat", text: "", image: dataUri }));
@@ -579,10 +579,10 @@ export default function RoomScreen() {
     if (!isHost || targetId === user?.id) return;
     const target = members.find((m) => m.id === targetId);
     if (!target) return;
-    Alert.alert("Transfer Leadership", `Make ${target.nickname} the host?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("transfer_leadership"), t("make_host_q", { name: target.nickname }), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Transfer",
+        text: t("transfer"),
         onPress: () =>
           wsRef.current?.send(JSON.stringify({ type: "transfer_host", to: targetId })),
       },

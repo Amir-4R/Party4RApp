@@ -338,7 +338,7 @@ export default function HomeScreen() {
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={FUTURISTIC.brand} />
-            <Text style={styles.loadingText}>SYNCING ROOMS…</Text>
+            <Text style={styles.loadingText}>{t("syncing_rooms")}</Text>
           </View>
         ) : (
           <FlatList

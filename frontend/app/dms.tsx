@@ -73,8 +73,8 @@ export default function DMInboxScreen() {
             <Ionicons name="chevron-back" size={24} color={FUTURISTIC.textPrimary} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 6 }}>
-            <Text style={styles.kicker}>DIRECT</Text>
-            <Text style={styles.title}>{(t("messages") || "MESSAGES").toUpperCase()}</Text>
+            <Text style={styles.kicker}>{t("kicker_direct")}</Text>
+            <Text style={styles.title}>{t("messages").toUpperCase()}</Text>
           </View>
           <View style={styles.countPill}>
             <Ionicons name="chatbubbles" size={12} color={FUTURISTIC.brand} />
@@ -89,7 +89,7 @@ export default function DMInboxScreen() {
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={FUTURISTIC.brand} />
-            <Text style={styles.loadingText}>LOADING CONVERSATIONS…</Text>
+            <Text style={styles.loadingText}>{t("loading_conversations")}</Text>
           </View>
         ) : (
           <FlatList
@@ -173,7 +173,7 @@ export default function DMInboxScreen() {
                           {!isUnread && item.online && (
                             <View style={styles.onlinePill}>
                               <View style={styles.onlinePillDot} />
-                              <Text style={styles.onlinePillText}>LIVE</Text>
+                              <Text style={styles.onlinePillText}>{t("live_caps")}</Text>
                             </View>
                           )}
                         </View>

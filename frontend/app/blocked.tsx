@@ -1,4 +1,4 @@
-// /app/frontend/app/blocked.tsx — Phase 6 futuristic redesign.
+// /app/frontend/app/blocked.tsx — Phase 7 fully localized.
 // Lists blocked users with metallic rows and a neon "UNBLOCK" pill.
 
 import React, { useEffect, useState } from "react";
@@ -19,6 +19,7 @@ import { apiGet, apiPost } from "@/src/api/client";
 import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
 import ScreenScaffold from "@/src/components/futuristic/ScreenScaffold";
 import MetallicCard from "@/src/components/futuristic/MetallicCard";
+import { useT } from "@/src/context/LanguageContext";
 
 interface Blocked {
   id: string;
@@ -29,6 +30,7 @@ interface Blocked {
 }
 
 export default function BlockedScreen() {
+  const { t } = useT();
   const [list, setList] = useState<Blocked[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,10 +48,10 @@ export default function BlockedScreen() {
   }, []);
 
   const unblock = (u: Blocked) => {
-    Alert.alert("Unblock", `Unblock ${u.nickname}? They will be able to message you again.`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("unblock_title"), t("unblock_msg", { name: u.nickname }), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Unblock",
+        text: t("unblock_title"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -61,8 +63,13 @@ export default function BlockedScreen() {
     ]);
   };
 
+  const subtitle =
+    list.length === 1
+      ? t("blocked_subtitle_one", { n: list.length })
+      : t("blocked_subtitle_many", { n: list.length });
+
   return (
-    <ScreenScaffold kicker="SAFETY" title="BLOCKED" subtitle={`${list.length} ${list.length === 1 ? "user" : "users"} blocked`}>
+    <ScreenScaffold kicker={t("kicker_safety")} title={t("blocked_title")} subtitle={subtitle}>
       {loading ? (
         <ActivityIndicator color={FUTURISTIC.brand} style={{ marginTop: 60 }} />
       ) : (
@@ -75,8 +82,8 @@ export default function BlockedScreen() {
               <View style={styles.emptyRing}>
                 <Ionicons name="shield-checkmark-outline" size={42} color={FUTURISTIC.brand} />
               </View>
-              <Text style={styles.emptyTitle}>No Blocked Users</Text>
-              <Text style={styles.emptySub}>You haven't blocked anyone yet.</Text>
+              <Text style={styles.emptyTitle}>{t("no_blocked_title")}</Text>
+              <Text style={styles.emptySub}>{t("no_blocked_sub")}</Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -96,7 +103,7 @@ export default function BlockedScreen() {
                     <Text style={styles.user} numberOfLines={1}>@{item.username}</Text>
                   </View>
                   <TouchableOpacity onPress={() => unblock(item)} style={styles.unblockBtn} activeOpacity={0.85}>
-                    <Text style={styles.unblockText}>UNBLOCK</Text>
+                    <Text style={styles.unblockText}>{t("unblock_btn")}</Text>
                   </TouchableOpacity>
                 </View>
               </MetallicCard>
@@ -127,7 +134,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   unblockText: { color: FUTURISTIC.brand, fontWeight: "900", letterSpacing: 1.4, fontSize: 11 },
-  // Empty state
   empty: { alignItems: "center", padding: 40, gap: 8 },
   emptyRing: {
     width: 96,

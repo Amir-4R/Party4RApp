@@ -25,6 +25,7 @@ import Animated, {
 import { BlurView } from "expo-blur";
 import { Platform } from "react-native";
 import { FUTURISTIC, SHADOWS, TYPO } from "@/src/theme/futuristic";
+import { useT } from "@/src/context/LanguageContext";
 
 export interface ActiveVote {
   id: string;
@@ -57,6 +58,7 @@ export default function VotingOverlay({
   onCast,
   onCancel,
 }: Props) {
+  const { t } = useT();
   const [remaining, setRemaining] = useState(vote.remaining_seconds);
   const translateY = useSharedValue(-200);
   const opacity = useSharedValue(0);
@@ -143,10 +145,10 @@ export default function VotingOverlay({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>
-                {vote.kind === "skip" ? "VOTE TO SKIP" : "VOTE — PLAY NEXT"}
+                {vote.kind === "skip" ? t("vote_to_skip") : t("vote_play_next")}
               </Text>
               {isInitiator && (
-                <Text style={styles.youStarted}>YOU STARTED THIS VOTE</Text>
+                <Text style={styles.youStarted}>{t("you_started_vote")}</Text>
               )}
             </View>
             <View
@@ -169,7 +171,7 @@ export default function VotingOverlay({
                   isUrgent && { color: FUTURISTIC.error },
                 ]}
               >
-                {remaining}s
+                {remaining}{t("seconds_short")}
               </Text>
             </View>
           </View>
@@ -209,16 +211,16 @@ export default function VotingOverlay({
                 <Text style={[styles.statValue, { color: FUTURISTIC.brand }]}>
                   {vote.yes}
                 </Text>
-                <Text style={styles.statKey}> yes</Text>
+                <Text style={styles.statKey}> {t("yes_label")}</Text>
               </Text>
               <Text style={styles.statLabel}>
                 <Text style={[styles.statValue, { color: FUTURISTIC.error }]}>
                   {vote.no}
                 </Text>
-                <Text style={styles.statKey}> no</Text>
+                <Text style={styles.statKey}> {t("no_label")}</Text>
               </Text>
               <Text style={styles.statLabel}>
-                <Text style={styles.statKey}>need </Text>
+                <Text style={styles.statKey}>{t("need_label")} </Text>
                 <Text style={[styles.statValue, { color: FUTURISTIC.textPrimary }]}>
                   {vote.required}/{vote.member_count}
                 </Text>
@@ -230,14 +232,14 @@ export default function VotingOverlay({
           <View style={styles.actions}>
             <ActionBtn
               variant="yes"
-              label="YES"
+              label={t("vote_yes")}
               icon="checkmark-circle"
               disabled={myVote === true}
               onPress={() => onCast(true)}
             />
             <ActionBtn
               variant="no"
-              label="NO"
+              label={t("vote_no")}
               icon="close-circle"
               disabled={myVote === false}
               onPress={() => onCast(false)}

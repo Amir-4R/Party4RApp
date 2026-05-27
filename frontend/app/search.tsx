@@ -252,8 +252,8 @@ export default function SearchScreen() {
             <Ionicons name="chevron-back" size={24} color={FUTURISTIC.textPrimary} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>DISCOVER</Text>
-            <Text style={styles.title}>{(t("search_rooms_title") || "SEARCH ROOMS").toUpperCase()}</Text>
+            <Text style={styles.kicker}>{t("kicker_discover")}</Text>
+            <Text style={styles.title}>{t("search_rooms_title").toUpperCase()}</Text>
           </View>
         </View>
 
@@ -320,7 +320,7 @@ export default function SearchScreen() {
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={FUTURISTIC.brand} />
-            <Text style={styles.loadingText}>SYNCING ROOMS…</Text>
+            <Text style={styles.loadingText}>{t("syncing_rooms")}</Text>
           </View>
         ) : debouncedQuery ? (
           // ---------------- Search results ----------------
@@ -332,10 +332,10 @@ export default function SearchScreen() {
             ListHeaderComponent={
               <View style={styles.resultHeader}>
                 <Text style={styles.resultCount}>
-                  {results.length} {results.length === 1 ? "match" : "matches"}
+                  {results.length} {results.length === 1 ? t("match_one") : t("match_many")}
                 </Text>
                 <Text style={styles.queryEcho} numberOfLines={1}>
-                  for "{debouncedQuery}"
+                  {t("for_query")} "{debouncedQuery}"
                 </Text>
               </View>
             }
@@ -344,8 +344,8 @@ export default function SearchScreen() {
                 <View style={styles.emptyRing}>
                   <Ionicons name="search-outline" size={36} color={FUTURISTIC.brand} />
                 </View>
-                <Text style={styles.emptyTitle}>No exact matches</Text>
-                <Text style={styles.emptySub}>Try a shorter or fuzzier query.</Text>
+                <Text style={styles.emptyTitle}>{t("no_exact_matches")}</Text>
+                <Text style={styles.emptySub}>{t("try_shorter_query")}</Text>
               </View>
             }
             renderItem={({ item }) => (
@@ -354,7 +354,7 @@ export default function SearchScreen() {
             ListFooterComponent={
               recommended.length > 0 ? (
                 <View style={{ marginTop: 24 }}>
-                  <SectionHead label="RECOMMENDED FOR YOU" icon="sparkles" />
+                  <SectionHead label={t("recommended_for_you")} icon="sparkles" />
                   {recommended.map((r) => (
                     <RoomRow key={r.id} room={r} onPress={openRoom} highlightQuery={debouncedQuery} />
                   ))}
@@ -372,10 +372,10 @@ export default function SearchScreen() {
               <View style={{ marginBottom: 18 }}>
                 <View style={styles.sectionHead}>
                   <Ionicons name="time-outline" size={14} color={FUTURISTIC.textMuted} />
-                  <Text style={styles.sectionHeadLabel}>RECENT</Text>
+                  <Text style={styles.sectionHeadLabel}>{t("recent")}</Text>
                   <View style={{ flex: 1 }} />
                   <TouchableOpacity onPress={clearHistory} activeOpacity={0.7}>
-                    <Text style={styles.clearLink}>CLEAR</Text>
+                    <Text style={styles.clearLink}>{t("clear")}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.pillsWrap}>
@@ -396,7 +396,7 @@ export default function SearchScreen() {
 
             {trending.length > 0 ? (
               <>
-                <SectionHead label="TRENDING NOW" icon="flame" />
+                <SectionHead label={t("trending_now")} icon="flame" />
                 {trending.map((r) => (
                   <RoomRow key={r.id} room={r} onPress={openRoom} />
                 ))}
@@ -406,10 +406,8 @@ export default function SearchScreen() {
                 <View style={styles.emptyRing}>
                   <Ionicons name="globe-outline" size={36} color={FUTURISTIC.brand} />
                 </View>
-                <Text style={styles.emptyTitle}>No public rooms yet</Text>
-                <Text style={styles.emptySub}>
-                  Be the first to host a room from the home screen.
-                </Text>
+                <Text style={styles.emptyTitle}>{t("no_public_rooms_yet")}</Text>
+                <Text style={styles.emptySub}>{t("be_first_host")}</Text>
               </View>
             )}
           </ScrollView>
@@ -435,6 +433,7 @@ function SectionHead({ label, icon }: { label: string; icon: keyof typeof Ionico
 // RoomRow — single result card. Highlights the matched substring in the name.
 // ============================================================================
 function RoomRow({ room, onPress, highlightQuery }: { room: Room; onPress: (r: Room) => void; highlightQuery?: string }) {
+  const { t } = useT();
   const active = room.member_count > 0;
   return (
     <TouchableOpacity onPress={() => onPress(room)} activeOpacity={0.85} style={{ marginBottom: 10 }}>
@@ -461,7 +460,7 @@ function RoomRow({ room, onPress, highlightQuery }: { room: Room; onPress: (r: R
               numberOfLines={1}
             />
             <Text style={styles.host} numberOfLines={1}>
-              by {room.host_nickname}
+              {t("by_label")} {room.host_nickname}
             </Text>
           </View>
 
