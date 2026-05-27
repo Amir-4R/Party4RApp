@@ -1,19 +1,34 @@
-// /app/frontend/app/blocked.tsx — Phase 2 Blocked users list
+// /app/frontend/app/blocked.tsx — Phase 6 futuristic redesign.
+// Lists blocked users with metallic rows and a neon "UNBLOCK" pill.
+
 import React, { useEffect, useState } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Image, Alert,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Image,
+  Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
+import { LinearGradient } from "expo-linear-gradient";
+import { getAvatarUrl } from "@/src/constants/avatars";
 import { apiGet, apiPost } from "@/src/api/client";
+import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
+import ScreenScaffold from "@/src/components/futuristic/ScreenScaffold";
+import MetallicCard from "@/src/components/futuristic/MetallicCard";
 
-interface Blocked { id: string; username: string; nickname: string; avatar: string; avatar_image?: string }
+interface Blocked {
+  id: string;
+  username: string;
+  nickname: string;
+  avatar: string;
+  avatar_image?: string;
+}
 
 export default function BlockedScreen() {
-  const router = useRouter();
   const [list, setList] = useState<Blocked[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,9 +37,13 @@ export default function BlockedScreen() {
     try {
       const d = await apiGet<{ blocked: Blocked[] }>("/users/blocked");
       setList(d.blocked);
-    } catch {} finally { setLoading(false); }
+    } catch {} finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const unblock = (u: Blocked) => {
     Alert.alert("Unblock", `Unblock ${u.nickname}? They will be able to message you again.`, [
@@ -33,72 +52,97 @@ export default function BlockedScreen() {
         text: "Unblock",
         style: "destructive",
         onPress: async () => {
-          try { await apiPost(`/users/unblock/${u.id}`); await load(); } catch {}
+          try {
+            await apiPost(`/users/unblock/${u.id}`);
+            await load();
+          } catch {}
         },
       },
     ]);
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={26} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>BLOCKED USERS</Text>
-          <Text style={styles.subtitle}>{list.length} blocked</Text>
-        </View>
-      </View>
-
+    <ScreenScaffold kicker="SAFETY" title="BLOCKED" subtitle={`${list.length} ${list.length === 1 ? "user" : "users"} blocked`}>
       {loading ? (
-        <ActivityIndicator color={COLORS.brand} style={{ marginTop: 60 }} />
+        <ActivityIndicator color={FUTURISTIC.brand} style={{ marginTop: 60 }} />
       ) : (
         <FlatList
           data={list}
           keyExtractor={(i) => i.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="shield-checkmark-outline" size={48} color={COLORS.textMuted} />
-              <Text style={styles.emptyText}>No blocked users</Text>
+              <View style={styles.emptyRing}>
+                <Ionicons name="shield-checkmark-outline" size={42} color={FUTURISTIC.brand} />
+              </View>
+              <Text style={styles.emptyTitle}>No Blocked Users</Text>
               <Text style={styles.emptySub}>You haven't blocked anyone yet.</Text>
             </View>
           }
           renderItem={({ item }) => (
-            <View style={styles.row}>
-              <Image
-                source={{ uri: item.avatar_image || getAvatarUrl(item.avatar) }}
-                style={styles.avatar}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.nick}>{item.nickname}</Text>
-                <Text style={styles.user}>@{item.username}</Text>
-              </View>
-              <TouchableOpacity onPress={() => unblock(item)} style={styles.unblockBtn}>
-                <Text style={styles.unblockText}>UNBLOCK</Text>
-              </TouchableOpacity>
+            <View style={{ marginBottom: 10 }}>
+              <MetallicCard padding={12} radius={FUTURISTIC.radius.md} accent="neutral">
+                <View style={styles.row}>
+                  <LinearGradient
+                    colors={["rgba(255,255,255,0.18)", "rgba(255,255,255,0.04)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.avatarRing}
+                  >
+                    <Image source={{ uri: item.avatar_image || getAvatarUrl(item.avatar) }} style={styles.avatar} />
+                  </LinearGradient>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.nick} numberOfLines={1}>{item.nickname}</Text>
+                    <Text style={styles.user} numberOfLines={1}>@{item.username}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => unblock(item)} style={styles.unblockBtn} activeOpacity={0.85}>
+                    <Text style={styles.unblockText}>UNBLOCK</Text>
+                  </TouchableOpacity>
+                </View>
+              </MetallicCard>
             </View>
           )}
         />
       )}
-    </SafeAreaView>
+    </ScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 8 },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: COLORS.textPrimary, fontSize: 18, fontWeight: "800", letterSpacing: 1 },
-  subtitle: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  empty: { alignItems: "center", padding: 48, gap: 8 },
-  emptyText: { color: COLORS.textPrimary, fontWeight: "700", fontSize: 16, marginTop: 8 },
-  emptySub: { color: COLORS.textMuted, fontSize: 13 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, marginBottom: 10, backgroundColor: COLORS.surface, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
-  avatar: { width: 46, height: 46, borderRadius: 14 },
-  nick: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "700" },
-  user: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
-  unblockBtn: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: COLORS.brandDim, borderRadius: 12, borderWidth: 1, borderColor: COLORS.brand },
-  unblockText: { color: COLORS.brand, fontWeight: "800", letterSpacing: 1, fontSize: 11 },
+  row: { flexDirection: "row", alignItems: "center" },
+  avatarRing: { width: 50, height: 50, borderRadius: 14, padding: 2 },
+  avatar: { width: 46, height: 46, borderRadius: 12, backgroundColor: FUTURISTIC.surface2 },
+  nick: { color: FUTURISTIC.textPrimary, fontSize: 15, fontWeight: "800", letterSpacing: 0.3 },
+  user: { color: FUTURISTIC.textMuted, fontSize: 12, marginTop: 2 },
+  unblockBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: FUTURISTIC.brandSoft,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  unblockText: { color: FUTURISTIC.brand, fontWeight: "900", letterSpacing: 1.4, fontSize: 11 },
+  // Empty state
+  empty: { alignItems: "center", padding: 40, gap: 8 },
+  emptyRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: FUTURISTIC.surface1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  emptyTitle: { ...TYPO.h2, color: FUTURISTIC.textPrimary, marginTop: 18 },
+  emptySub: { color: FUTURISTIC.textMuted, fontSize: 13, textAlign: "center" },
 });

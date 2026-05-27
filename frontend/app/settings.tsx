@@ -1,6 +1,5 @@
-// /app/frontend/app/settings.tsx
-// Dedicated app settings screen. For now: language toggle (English / Arabic).
-// Designed to host future preferences (notifications, theme, privacy, etc.).
+// /app/frontend/app/settings.tsx — Phase 6 futuristic redesign.
+// Houses: theme, language, privacy/safety links, legal links, danger zone.
 
 import React, { useState } from "react";
 import {
@@ -12,18 +11,19 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "@/src/constants/avatars";
 import { useT } from "@/src/context/LanguageContext";
 import { useTheme } from "@/src/context/ThemeContext";
 import { THEMES, ThemeId } from "@/src/constants/themes";
+import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
+import ScreenScaffold from "@/src/components/futuristic/ScreenScaffold";
+import MetallicCard from "@/src/components/futuristic/MetallicCard";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { t, lang, setLang } = useT();
-  const { theme, themeId, setThemeId } = useTheme();
+  const { themeId, setThemeId } = useTheme();
   const [switching, setSwitching] = useState<null | "en" | "ar">(null);
   const [themeSwitching, setThemeSwitching] = useState<ThemeId | null>(null);
 
@@ -33,8 +33,8 @@ export default function SettingsScreen() {
     const { needsRestart } = await setLang(l);
     setSwitching(null);
     if (needsRestart) {
-      Alert.alert(t("rtl_restart_title"), t("rtl_restart_msg"), [
-        { text: t("rtl_restart_ok") },
+      Alert.alert(t("rtl_restart_title") || "Layout change", t("rtl_restart_msg") || "Please restart to apply the new direction.", [
+        { text: t("rtl_restart_ok") || "OK" },
       ]);
     }
   };
@@ -46,62 +46,12 @@ export default function SettingsScreen() {
     setThemeSwitching(null);
   };
 
-  const renderLangRow = (
-    code: "en" | "ar",
-    label: string,
-    sub: string,
-    flag: string
-  ) => {
-    const active = lang === code;
-    const busy = switching === code;
-    return (
-      <TouchableOpacity
-        key={code}
-        testID={`lang-${code}`}
-        onPress={() => handleSwitch(code)}
-        activeOpacity={0.85}
-        style={[styles.langRow, active && styles.langRowActive]}
-      >
-        <Text style={styles.flag}>{flag}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.langName, active && { color: COLORS.brand }]}>
-            {label}
-          </Text>
-          <Text style={styles.langSub}>{sub}</Text>
-        </View>
-        {busy ? (
-          <ActivityIndicator color={COLORS.brand} />
-        ) : active ? (
-          <Ionicons name="checkmark-circle" size={22} color={COLORS.brand} />
-        ) : (
-          <View style={styles.radio} />
-        )}
-      </TouchableOpacity>
-    );
-  };
-
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          testID="settings-back"
-          onPress={() => router.back()}
-          style={styles.iconBtn}
-        >
-          <Ionicons name="chevron-back" size={26} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{t("app_settings")}</Text>
-          <Text style={styles.subtitle}>{t("settings_subtitle")}</Text>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Theme section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>THEME</Text>
-          <View style={styles.card}>
+    <ScreenScaffold kicker="ACCOUNT" title={(t("app_settings") || "SETTINGS").toUpperCase()} subtitle={t("settings_subtitle") || "Personalize your Party4R experience"}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 60, paddingTop: 10 }}>
+        {/* THEME ----------------------------------------------------------- */}
+        <Section label="THEME">
+          <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral">
             {(Object.keys(THEMES) as ThemeId[]).map((id, idx) => {
               const tdef = THEMES[id];
               const active = themeId === id;
@@ -113,22 +63,25 @@ export default function SettingsScreen() {
                     testID={`theme-${id}`}
                     onPress={() => handleTheme(id)}
                     activeOpacity={0.85}
-                    style={[styles.themeRow, active && styles.langRowActive]}
+                    style={[styles.row, active && styles.rowActive]}
                   >
-                    <View style={styles.themePreview}>
+                    <View style={styles.themeSwatches}>
                       <View style={[styles.swatch, { backgroundColor: tdef.bg }]} />
-                      <View style={[styles.swatch, { backgroundColor: tdef.brand, borderWidth: 1, borderColor: tdef.brand }]} />
+                      <View style={[styles.swatch, { backgroundColor: tdef.brand }]} />
                       <View style={[styles.swatch, { backgroundColor: tdef.accent }]} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.themeName, active && { color: tdef.brand }]}>
+                      <Text style={[styles.rowLabel, active && { color: tdef.brand }]}>
                         {tdef.name}
                       </Text>
-                      <Text style={styles.langSub}>
-                        {id === "neon" ? "Neon green · Cyber default" :
-                          id === "midnight" ? "Blue · Calm dark" :
-                          id === "amoled" ? "Pure black · Battery saver" :
-                          "Purple-dominant · High contrast"}
+                      <Text style={styles.rowSub}>
+                        {id === "neon"
+                          ? "Neon green · Cyber default"
+                          : id === "midnight"
+                          ? "Blue · Calm dark"
+                          : id === "amoled"
+                          ? "Pure black · Battery saver"
+                          : "Purple · High contrast"}
                       </Text>
                     </View>
                     {busy ? (
@@ -142,23 +95,21 @@ export default function SettingsScreen() {
                 </React.Fragment>
               );
             })}
-          </View>
-        </View>
+          </MetallicCard>
+        </Section>
 
-        {/* Language section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t("language_section")}</Text>
-          <View style={styles.card}>
-            {renderLangRow("en", "English", "Default", "🇺🇸")}
+        {/* LANGUAGE -------------------------------------------------------- */}
+        <Section label={(t("language_section") || "LANGUAGE").toUpperCase()}>
+          <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral">
+            <LangRow code="en" label="English" sub="Default" flag="🇺🇸" active={lang === "en"} busy={switching === "en"} onPress={() => handleSwitch("en")} />
             <View style={styles.divider} />
-            {renderLangRow("ar", "العربية", "Arabic", "🇾🇪")}
-          </View>
-        </View>
+            <LangRow code="ar" label="العربية" sub="Arabic" flag="🇾🇪" active={lang === "ar"} busy={switching === "ar"} onPress={() => handleSwitch("ar")} />
+          </MetallicCard>
+        </Section>
 
-        {/* Privacy & Safety section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PRIVACY & SAFETY</Text>
-          <View style={styles.card}>
+        {/* PRIVACY & SAFETY ----------------------------------------------- */}
+        <Section label="PRIVACY & SAFETY">
+          <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="green">
             <MenuRow icon="shield-checkmark-outline" label="Privacy Controls" sub="Online status, last seen, profile visibility" onPress={() => router.push("/privacy")} />
             <View style={styles.divider} />
             <MenuRow icon="ban-outline" label="Blocked Users" sub="Manage who can't contact you" onPress={() => router.push("/blocked")} />
@@ -166,19 +117,18 @@ export default function SettingsScreen() {
             <MenuRow icon="document-text-outline" label="Privacy Policy" sub="How we handle your data" onPress={() => router.push("/legal/privacy-policy")} />
             <View style={styles.divider} />
             <MenuRow icon="reader-outline" label="Terms of Service" sub="Community guidelines" onPress={() => router.push("/legal/terms")} />
-          </View>
-        </View>
+          </MetallicCard>
+        </Section>
 
-        {/* Account section (destructive) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>ACCOUNT</Text>
-          <View style={[styles.card, { borderColor: COLORS.error }]}>
+        {/* DANGER ZONE ---------------------------------------------------- */}
+        <Section label="DANGER ZONE">
+          <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral" style={{ borderColor: FUTURISTIC.error }}>
             <MenuRow
               icon="trash-outline"
               label="Delete Account"
               sub="Permanently erase all your data"
               danger
-              onPress={() => {
+              onPress={() =>
                 Alert.alert(
                   "Delete Account",
                   "This permanently deletes your account, friends, rooms, and all data. This cannot be undone.",
@@ -200,134 +150,105 @@ export default function SettingsScreen() {
                       },
                     },
                   ]
-                );
-              }}
+                )
+              }
             />
-          </View>
-        </View>
+          </MetallicCard>
+        </Section>
 
-        {/* Placeholder for future sections (kept simple, no fake links) */}
         <View style={styles.footer}>
-          <Ionicons
-            name="construct-outline"
-            size={18}
-            color={COLORS.textSecondary}
-          />
-          <Text style={styles.footerText}>
-            More settings coming soon — notifications, theme, privacy…
-          </Text>
+          <Ionicons name="construct-outline" size={16} color={FUTURISTIC.textMuted} />
+          <Text style={styles.footerText}>More settings coming soon — notifications, audio…</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenScaffold>
   );
 }
 
-function MenuRow({
-  icon, label, sub, onPress, danger,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  sub: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
+// ============================================================================
+// Helpers
+// ============================================================================
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.menuRow}>
-      <Ionicons name={icon} size={22} color={danger ? COLORS.error : COLORS.brand} />
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function LangRow({ code, label, sub, flag, active, busy, onPress }: { code: string; label: string; sub: string; flag: string; active: boolean; busy: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity testID={`lang-${code}`} onPress={onPress} activeOpacity={0.85} style={[styles.row, active && styles.rowActive]}>
+      <Text style={styles.flag}>{flag}</Text>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.menuLabel, danger && { color: COLORS.error }]}>{label}</Text>
-        <Text style={styles.menuSub}>{sub}</Text>
+        <Text style={[styles.rowLabel, active && { color: FUTURISTIC.brand }]}>{label}</Text>
+        <Text style={styles.rowSub}>{sub}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+      {busy ? <ActivityIndicator color={FUTURISTIC.brand} /> : active ? <Ionicons name="checkmark-circle" size={22} color={FUTURISTIC.brand} /> : <View style={styles.radio} />}
+    </TouchableOpacity>
+  );
+}
+
+function MenuRow({ icon, label, sub, onPress, danger }: { icon: keyof typeof Ionicons.glyphMap; label: string; sub: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.row}>
+      <View style={[styles.iconBubble, danger && { backgroundColor: FUTURISTIC.errorSoft, borderColor: FUTURISTIC.error }]}>
+        <Ionicons name={icon} size={18} color={danger ? FUTURISTIC.error : FUTURISTIC.brand} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, danger && { color: FUTURISTIC.error }]}>{label}</Text>
+        <Text style={styles.rowSub}>{sub}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={FUTURISTIC.textMuted} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    gap: 8,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    color: COLORS.textPrimary,
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-  subtitle: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  section: { paddingHorizontal: 20, marginTop: 22 },
-  sectionLabel: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-    marginBottom: 10,
-  },
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: "hidden",
-  },
-  langRow: {
+  section: { paddingHorizontal: 20, marginTop: 24 },
+  sectionLabel: { ...TYPO.caption, color: FUTURISTIC.textMuted, marginBottom: 10 },
+  row: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 14,
-    backgroundColor: COLORS.surface,
   },
-  langRowActive: { backgroundColor: COLORS.brandDim },
-  flag: { fontSize: 26 },
-  langName: {
-    color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  langSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  rowActive: { backgroundColor: FUTURISTIC.brandSoft },
+  rowLabel: { color: FUTURISTIC.textPrimary, fontSize: 15, fontWeight: "800", letterSpacing: 0.3 },
+  rowSub: { color: FUTURISTIC.textMuted, fontSize: 12, marginTop: 3, letterSpacing: 0.2 },
+  flag: { fontSize: 24 },
   radio: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: COLORS.border,
+    borderColor: FUTURISTIC.borderStrong,
   },
-  themeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 14,
-    backgroundColor: COLORS.surface,
-  },
-  themePreview: {
-    flexDirection: "row",
-    gap: 4,
-  },
+  themeSwatches: { flexDirection: "row", gap: 3 },
   swatch: {
-    width: 18,
+    width: 14,
     height: 28,
-    borderRadius: 5,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
   },
-  themeName: {
-    color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: "700",
+  iconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: FUTURISTIC.brandSoft,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  divider: { height: 1, backgroundColor: COLORS.border, marginLeft: 60 },
+  divider: {
+    height: 1,
+    backgroundColor: FUTURISTIC.borderSoft,
+    marginLeft: 62,
+  },
   footer: {
     flexDirection: "row",
     alignItems: "center",
@@ -336,9 +257,10 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   footerText: {
-    color: COLORS.textSecondary,
+    color: FUTURISTIC.textMuted,
     fontSize: 12,
     fontStyle: "italic",
     flex: 1,
+    letterSpacing: 0.2,
   },
 });

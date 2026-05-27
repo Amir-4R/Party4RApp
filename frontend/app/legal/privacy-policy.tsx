@@ -1,72 +1,72 @@
-// /app/frontend/app/legal/privacy-policy.tsx — Phase 2
+// /app/frontend/app/legal/privacy-policy.tsx — Phase 6 futuristic redesign.
+// Long-form Privacy Policy page using the same metallic section pattern.
+
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "@/src/constants/avatars";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { FUTURISTIC, TYPO } from "@/src/theme/futuristic";
+import ScreenScaffold from "@/src/components/futuristic/ScreenScaffold";
+import MetallicCard from "@/src/components/futuristic/MetallicCard";
 
-export default function PrivacyPolicy() {
-  const router = useRouter();
+const SECTIONS = [
+  {
+    title: "1. What We Collect",
+    body: "• Account: username, nickname, password (hashed), avatar choice\n• Chats / DMs: text + base64 images you send (auto-deleted after 30/60 days)\n• Rooms: name, host, members, last video URL\n• Reports: reporter ID, target ID, reason (90-day retention)\n• Honor points: integer score per user\n• Privacy settings: your visibility choices",
+  },
+  {
+    title: "2. Data Minimization (TTL)",
+    body: "We delete data automatically when no longer needed:\n• Chats — 30 days\n• Direct messages — 60 days\n• Reports — 90 days\n• Rooms — deleted when empty for 24 hours",
+  },
+  {
+    title: "3. What We Don't Collect",
+    body: "• Email addresses (unless you contact support)\n• Phone numbers\n• Location data\n• Browsing history outside our app\n• Contacts / address books\n• Payment info (the app is free)",
+  },
+  {
+    title: "4. Who Can See What",
+    body: "You fully control your visibility from Settings → Privacy:\n• Online status — everyone / friends / nobody\n• Last seen — everyone / friends / nobody\n• Profile — everyone / friends / nobody\n• Shared time — everyone / friends / nobody",
+  },
+  {
+    title: "5. Account Deletion",
+    body: "You can permanently delete your account from Settings → Account → Delete Account. This wipes all your data immediately. No recovery is possible.",
+  },
+  {
+    title: "6. Children",
+    body: "Party4RApp is not for users under 13. If we learn an account belongs to a child under 13 we will delete it.",
+  },
+  {
+    title: "7. Contact",
+    body: "Privacy questions: yemenamer20@gmail.com",
+  },
+];
+
+export default function PrivacyPolicyScreen() {
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={26} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.title}>PRIVACY POLICY</Text>
-      </View>
+    <ScreenScaffold kicker="LEGAL" title="PRIVACY POLICY" subtitle="Effective 2026 · Minimum age 13" reducedAmbient>
       <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.h1}>Privacy Policy — Party4RApp</Text>
-        <Text style={styles.p}>Effective: 2026</Text>
-
-        <Text style={styles.h2}>1. What we collect</Text>
-        <Text style={styles.p}>
-          • Username, nickname, password hash (bcrypt — never plaintext){"\n"}
-          • Profile customizations (avatar id, optional bio, banner, badges){"\n"}
-          • Aggregated room participation time (used only for "Total hours"){"\n"}
-          • Friend graph (your friend list and pending requests){"\n"}
-          • Optional uploaded avatar image (base64, max ~500KB){"\n"}
-          • Last-seen timestamp (only when you have the app open){"\n"}
-        </Text>
-        <Text style={styles.h2}>2. What we DON'T collect</Text>
-        <Text style={styles.p}>
-          • Device IDs, IMEI, advertising IDs{"\n"}
-          • Location data{"\n"}
-          • Contacts / phonebook{"\n"}
-          • Background activity{"\n"}
-          • Analytics on your messages or browsing
-        </Text>
-        <Text style={styles.h2}>3. Auto-deletion</Text>
-        <Text style={styles.p}>
-          • Chat messages are auto-deleted after 30 days.{"\n"}
-          • Reports are auto-deleted after 90 days.{"\n"}
-          • Rooms are deleted when the last member leaves.
-        </Text>
-        <Text style={styles.h2}>4. Your rights</Text>
-        <Text style={styles.p}>
-          • Delete your account at any time (Settings → Delete Account).{"\n"}
-          • Export your data via support email.{"\n"}
-          • Control who sees you via Privacy Settings.{"\n"}
-          • Block any user instantly.
-        </Text>
-        <Text style={styles.h2}>5. Contact</Text>
-        <Text style={styles.p}>
-          For privacy questions or data requests: yemenamer20@gmail.com
-        </Text>
-        <View style={{ height: 60 }} />
+        <Text style={styles.intro}>We collect the minimum amount of data needed to make Party4R work, and we delete it as soon as we can.</Text>
+        {SECTIONS.map((s, i) => (
+          <View key={i} style={{ marginTop: 14 }}>
+            <MetallicCard padding={16} radius={FUTURISTIC.radius.md} accent={i === 0 ? "green" : i === SECTIONS.length - 1 ? "purple" : "neutral"}>
+              <Text style={styles.h2}>{s.title}</Text>
+              <Text style={styles.p}>{s.body}</Text>
+            </MetallicCard>
+          </View>
+        ))}
+        <View style={{ height: 70 }} />
       </ScrollView>
-    </SafeAreaView>
+    </ScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  header: { flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 8 },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: COLORS.textPrimary, fontSize: 18, fontWeight: "800", letterSpacing: 1 },
-  body: { padding: 22 },
-  h1: { color: COLORS.textPrimary, fontSize: 22, fontWeight: "900", marginBottom: 6 },
-  h2: { color: COLORS.brand, fontSize: 14, fontWeight: "800", letterSpacing: 1, marginTop: 22, marginBottom: 8 },
-  p: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 22 },
+  body: { padding: 18, paddingTop: 8 },
+  intro: {
+    color: FUTURISTIC.textSecondary,
+    fontSize: 14,
+    lineHeight: 22,
+    letterSpacing: 0.2,
+    paddingHorizontal: 4,
+    marginTop: 6,
+  },
+  h2: { ...TYPO.h2, color: FUTURISTIC.brand, marginBottom: 8 },
+  p: { color: FUTURISTIC.textSecondary, fontSize: 14, lineHeight: 22, letterSpacing: 0.15 },
 });
