@@ -34,10 +34,11 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as ImagePicker from "expo-image-picker";
 import { storage } from "@/src/utils/storage";
-import { apiGet, TOKEN_KEY, getWsUrl } from "@/src/api/client";
+import { apiGet, apiPatch, TOKEN_KEY, getWsUrl } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
 import { useT } from "@/src/context/LanguageContext";
+import VotingOverlay, { ActiveVote } from "@/src/components/VotingOverlay";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -138,7 +139,8 @@ window.addEventListener('message', handleMessage);
 // RoomScreen Component
 // ---------------------------------------------------------------------------
 export default function RoomScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; addedVideo?: string; addedVideoId?: string }>();
+  const { id } = params;
   const router = useRouter();
   const { user } = useAuth();
   const { width, height } = useWindowDimensions();
@@ -177,6 +179,12 @@ export default function RoomScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [videoVolume, setVideoVolume] = useState(100); // 0..100
+  // Phase 4 — Voting state
+  const [activeVote, setActiveVote] = useState<ActiveVote | null>(null);
+  const [myVote, setMyVote] = useState<boolean | null>(null);
+  const [votingMode, setVotingMode] = useState<"allowed" | "owner_only">("allowed");
+  const [voteToast, setVoteToast] = useState<string | null>(null);
+  const consumedAddedVideoRef = useRef<string | null>(null);
   const { t } = useT();
 
   const videoId = extractYouTubeId(videoUrl || "");
@@ -271,9 +279,30 @@ export default function RoomScreen() {
             );
           }
           break;
+        case "vote_state":
+          if (data.vote) {
+            setActiveVote(data.vote as ActiveVote);
+          }
+          break;
+        case "vote_result":
+          setActiveVote(null);
+          setMyVote(null);
+          if (data.cancelled) {
+            setVoteToast(t("vote_cancelled") || "Vote cancelled");
+          } else if (data.passed) {
+            if (data.kind === "skip") {
+              setVoteToast(t("vote_skipped") || "Skipped!");
+            } else if (data.kind === "next") {
+              setVoteToast(t("vote_next_passed") || "Playing next…");
+            }
+          } else {
+            setVoteToast(t("vote_failed") || "Vote did not pass");
+          }
+          setTimeout(() => setVoteToast(null), 2500);
+          break;
       }
     },
-    [isHost, user?.id]
+    [isHost, user?.id, t]
   );
 
   // -------------------------------------------------------------------------
@@ -416,6 +445,83 @@ export default function RoomScreen() {
     changeVideo(u.startsWith("http") ? u : `https://${u}`);
   };
 
+  // -------------------------------------------------------------------------
+  // Phase 4 — Voting helpers
+  // -------------------------------------------------------------------------
+  const startVote = useCallback(
+    (kind: "skip" | "next", video_url?: string, title?: string) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (activeVote) {
+        Alert.alert(t("vote_in_progress") || "Vote already running", "Wait for it to finish first.");
+        return;
+      }
+      const payload: any = { type: "vote_start", kind };
+      if (video_url) payload.video_url = video_url;
+      if (title) payload.title = title;
+      ws.send(JSON.stringify(payload));
+      setMyVote(true); // initiator auto-yes
+    },
+    [activeVote, t]
+  );
+
+  const castVote = useCallback(
+    (yes: boolean) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN || !activeVote) return;
+      ws.send(JSON.stringify({ type: "vote_cast", yes }));
+      setMyVote(yes);
+    },
+    [activeVote]
+  );
+
+  const cancelVote = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "vote_cancel" }));
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Phase 4 — Consume `addedVideo` returned from /youtube-browser
+  // Host => apply immediately. Non-host => start a "vote-next" vote.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const av = params.addedVideo;
+    if (!av) return;
+    if (consumedAddedVideoRef.current === av) return;
+    consumedAddedVideoRef.current = av;
+    if (isHost) {
+      changeVideo(av);
+    } else {
+      startVote("next", av);
+    }
+    // Clear the params so we don't re-trigger on focus
+    try {
+      router.setParams({ addedVideo: undefined, addedVideoId: undefined } as any);
+    } catch {}
+  }, [params.addedVideo, isHost, startVote, router]);
+
+  // -------------------------------------------------------------------------
+  // Phase 4 — Fetch current room voting_mode (host needs it to toggle settings)
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!id) return;
+    apiGet<any>(`/rooms/${id}`).then((r) => {
+      if (r && r.voting_mode) setVotingMode(r.voting_mode);
+    }).catch(() => {});
+  }, [id]);
+
+  const toggleVotingMode = async () => {
+    if (!isHost) return;
+    const next = votingMode === "allowed" ? "owner_only" : "allowed";
+    try {
+      await apiPatch(`/rooms/${id}/settings`, { voting_mode: next });
+      setVotingMode(next);
+    } catch (e: any) {
+      Alert.alert("Failed", e.message || "Could not update setting");
+    }
+  };
+
   const runSearch = async () => {
     const q = searchQuery.trim();
     if (!q) return;
@@ -519,6 +625,17 @@ export default function RoomScreen() {
         style={{ flex: 1, backgroundColor: COLORS.bg }}
         edges={fullscreen ? [] : ["top"]}
       >
+        {/* Phase 4 — Active vote overlay (floats over everything) */}
+        {activeVote && user?.id && (
+          <VotingOverlay
+            vote={activeVote}
+            myUserId={user.id}
+            myVote={myVote}
+            isHost={isHost}
+            onCast={castVote}
+            onCancel={cancelVote}
+          />
+        )}
         {/* Header */}
         {!fullscreen && (
           <View style={styles.header}>
@@ -641,18 +758,53 @@ export default function RoomScreen() {
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.chatPanel}
           >
-            {isHost && (
-              <View style={styles.hostBar}>
+            {/* Action bar: visible to everyone (host vs guest buttons differ) */}
+            <View style={styles.hostBar}>
+              {isHost && (
                 <TouchableOpacity
                   testID="open-yt-search"
                   onPress={() => setShowSearch(true)}
                   style={styles.setVideoBtn}
                 >
                   <Ionicons name="logo-youtube" size={18} color={COLORS.brand} />
-                  <Text style={styles.setVideoText}>
-                    {videoUrl ? "Change Video" : "Search YouTube"}
+                  <Text style={styles.setVideoText} numberOfLines={1}>
+                    {videoUrl ? t("change_video") || "Change" : t("search_youtube") || "Search YT"}
                   </Text>
                 </TouchableOpacity>
+              )}
+              {/* Anyone (host or guest, when guests allowed) can browse YT */}
+              {(isHost || votingMode === "allowed") && (
+                <TouchableOpacity
+                  testID="open-yt-browser"
+                  onPress={() => router.push({ pathname: "/youtube-browser", params: { roomId: id } })}
+                  style={styles.browseBtn}
+                >
+                  <Ionicons name="globe-outline" size={18} color={COLORS.accent} />
+                  <Text style={styles.browseBtnText} numberOfLines={1}>
+                    {isHost ? (t("browse_yt") || "Browse YT") : (t("suggest_video") || "Suggest")}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {/* Vote-skip — anyone when video is playing, no active vote */}
+              {!!videoId && !activeVote && (isHost || votingMode === "allowed") && (
+                <TouchableOpacity
+                  testID="vote-skip"
+                  onPress={() => startVote("skip")}
+                  style={styles.skipBtn}
+                >
+                  <Ionicons name="play-skip-forward" size={18} color={COLORS.warning} />
+                  <Text style={styles.skipBtnText} numberOfLines={1}>
+                    {t("vote_skip") || "Vote Skip"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Vote toast (transient feedback after a vote resolves) */}
+            {voteToast && (
+              <View style={styles.voteToast}>
+                <Ionicons name="megaphone-outline" size={16} color={COLORS.brand} />
+                <Text style={styles.voteToastText}>{voteToast}</Text>
               </View>
             )}
 
@@ -1004,6 +1156,49 @@ export default function RoomScreen() {
                     : t("video_volume_hint") || "Controls the YouTube playback volume in this room."}
                 </Text>
               </View>
+
+              {/* Phase 4 — Voting policy (host only) */}
+              {isHost && (
+                <View>
+                  <View style={styles.sliderHead}>
+                    <Ionicons name="megaphone" size={18} color={COLORS.accent} />
+                    <Text style={styles.sliderLabel}>{t("voting_policy") || "Voting Policy"}</Text>
+                  </View>
+                  <View style={styles.modeRow}>
+                    <TouchableOpacity
+                      testID="voting-mode-allowed"
+                      onPress={() => votingMode !== "allowed" && toggleVotingMode()}
+                      style={[
+                        styles.modeBtn,
+                        votingMode === "allowed" && { borderColor: COLORS.brand, backgroundColor: COLORS.brandDim },
+                      ]}
+                    >
+                      <Ionicons name="people-outline" size={16} color={votingMode === "allowed" ? COLORS.brand : COLORS.textSecondary} />
+                      <Text style={[styles.modeBtnText, votingMode === "allowed" && { color: COLORS.brand }]}>
+                        {t("everyone_can_vote") || "Anyone can vote"}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      testID="voting-mode-owner_only"
+                      onPress={() => votingMode !== "owner_only" && toggleVotingMode()}
+                      style={[
+                        styles.modeBtn,
+                        votingMode === "owner_only" && { borderColor: COLORS.accent, backgroundColor: COLORS.accentDim },
+                      ]}
+                    >
+                      <Ionicons name="lock-closed-outline" size={16} color={votingMode === "owner_only" ? COLORS.accent : COLORS.textSecondary} />
+                      <Text style={[styles.modeBtnText, votingMode === "owner_only" && { color: COLORS.accent }]}>
+                        {t("host_only_votes") || "Host only"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.hintLine}>
+                    {votingMode === "allowed"
+                      ? (t("voting_allowed_hint") || "Guests can start skip/next votes (majority wins).")
+                      : (t("voting_owner_only_hint") || "Only you (the host) can start votes.")}
+                  </Text>
+                </View>
+              )}
             </View>
           </SafeAreaView>
         </Modal>
@@ -1143,6 +1338,9 @@ const styles = StyleSheet.create({
   // Chat
   chatPanel: { flex: 1, backgroundColor: COLORS.bg },
   hostBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
@@ -1152,21 +1350,87 @@ const styles = StyleSheet.create({
   setVideoBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     backgroundColor: COLORS.brandDim,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
-    alignSelf: "flex-start",
     borderWidth: 1,
     borderColor: COLORS.brand,
   },
   setVideoText: {
     color: COLORS.brand,
-    fontWeight: "700",
-    fontSize: 13,
+    fontWeight: "800",
+    fontSize: 12,
     letterSpacing: 0.5,
+    maxWidth: 110,
   },
+  browseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.accentDim,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  browseBtnText: {
+    color: COLORS.accent,
+    fontWeight: "800",
+    fontSize: 12,
+    letterSpacing: 0.5,
+    maxWidth: 110,
+  },
+  skipBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+    backgroundColor: "rgba(255, 184, 0, 0.12)",
+  },
+  skipBtnText: {
+    color: COLORS.warning,
+    fontWeight: "800",
+    fontSize: 12,
+    letterSpacing: 0.5,
+    maxWidth: 110,
+  },
+  voteToast: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.brandDim,
+    borderWidth: 1,
+    borderColor: COLORS.brand,
+    borderRadius: 10,
+    alignSelf: "flex-start",
+  },
+  voteToastText: { color: COLORS.brand, fontWeight: "800", fontSize: 12, letterSpacing: 0.5 },
+  modeRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  modeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  modeBtnText: { color: COLORS.textSecondary, fontWeight: "800", fontSize: 12, letterSpacing: 0.5 },
   msgRow: { gap: 8, marginBottom: 10, alignItems: "flex-end" },
   msgAvatar: {
     width: 28,

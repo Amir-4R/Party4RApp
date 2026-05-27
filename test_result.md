@@ -169,6 +169,77 @@ backend:
       - working: true
         agent: "testing"
         comment: "GET /api/users/{peer_id}/shared_time as testuser1 returned {seconds:4, hidden:false} after co-watch. After peer set shared_time_visibility='nobody', the same call returned {seconds:0, hidden:true}. Restoring to 'friends' worked. GET /api/users/privacy returned all four visibility fields as expected."
+  - task: "Phase 4 — Vote start/cast/cancel WS flow + voting_mode policy"
+    implemented: true
+    working: false
+    file: "/app/backend/rooms_voting.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Pre-existing module — Phase 4 frontend was just wired. Needs end-to-end retest with the new client behavior."
+      - working: false
+        agent: "testing"
+        comment: |
+          Voting WS flow verified end-to-end against the public URL — most of it works:
+          PASS  vote_start (skip) by peer broadcasts vote_state to BOTH peers with
+                kind=skip, initiator=<peer_id>, yes=1, no=0, required=2, member_count=2,
+                expires_at present.
+          PASS  vote_cast yes by host -> vote_result {passed:true, kind:"skip"} on both
+                sides (also broadcasts intermediate vote_state).
+          PASS  vote_start (next) by peer with video_url+title -> vote_state broadcast,
+                host vote_cast yes -> vote_result {passed:true, kind:"next", video_url}
+                AND db.rooms.video_url IS updated to the new URL.
+          PASS  voting_mode=owner_only: peer vote_start is silently ignored (no
+                vote_state broadcast), host vote_start works normally.
+          PASS  vote_cancel by host -> vote_result {passed:false, kind:"skip",
+                cancelled:true} broadcast.
+          FAIL  CRITICAL: After a successful "skip" vote, the host's video_url is NOT
+                cleared by the backend. Review spec required clearing it. server.py
+                lines 750-752 only broadcast {type:"vote_result",passed:true,kind:"skip"}
+                — there is NO db.rooms.update_one({...}, {$set:{video_url:None}}) and
+                no playback "change_video" broadcast.  GET /api/rooms/{id} after the
+                skip vote passed still returns the original video_url
+                "https://youtube.com/watch?v=dQw4w9WgXcQ".  If the frontend depends on
+                the backend clearing the video, the skip flow will not actually skip
+                anything.
+          Note on field names: rooms_voting.VoteState.public() emits keys named
+          `initiator`, `yes`, `no` (NOT `initiator_id`, `yes_votes`, `no_votes` as the
+          review brief described). Frontend must consume these keys.
+  - task: "Phase 4 — PATCH /api/rooms/{id}/settings voting_mode + GET /api/youtube/extract"
+    implemented: true
+    working: false
+    file: "/app/backend/rooms_voting.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Host PATCH voting_mode to allowed/owner_only. YouTube extract used by /youtube-browser for video metadata."
+      - working: false
+        agent: "testing"
+        comment: |
+          PATCH /api/rooms/{id}/settings — ALL PASS:
+            PASS host PATCH {voting_mode:"owner_only"} -> 200 with
+                 {id, name, voting_mode:"owner_only"}.
+            PASS peer PATCH -> 403 "Only the room owner can update settings".
+            PASS host PATCH back to {voting_mode:"allowed"} -> 200.
+
+          /api/youtube/extract — CRITICAL METHOD MISMATCH:
+            FAIL GET /api/youtube/extract?url=... returns 405 Method Not Allowed for
+                 every URL (valid YouTube URL, youtu.be short URL, AND invalid URL).
+            rooms_voting.py line 184 declares the route as @api.post("/youtube/extract")
+            with a JSON body model (YouTubeExtract.url), NOT a GET with query string.
+            The review brief and (per the task title) the frontend expect GET ?url=.
+            POST /api/youtube/extract  with body {"url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+            DOES return 200 with {video_id:"dQw4w9WgXcQ", video_url, embed_url,
+            thumbnail:"https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"} — so the
+            extraction logic itself works, only the HTTP method/signature is wrong.
+            Fix: add a GET overload (or change to GET) that accepts ?url= as a query
+            parameter and reuses extract_video_id().
 
 frontend:
   - task: "Messages icon + unread badge in Friends tab header"
@@ -193,6 +264,17 @@ frontend:
       - working: "NA"
         agent: "main"
         comment: "DM chat subtitle now shows 'online/offline · Xh Ym shared' when the privacy gate allows it. Uses /api/users/{id}/shared_time. Empty/hidden values fall back to plain online/offline label."
+  - task: "Phase 4 — Room voting overlay + Browse YT + Vote Skip + voting policy"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/room/[id].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Wired Phase 4 into the room screen: imported VotingOverlay component, added vote_state/vote_result WS handlers, helper funcs startVote/castVote/cancelVote, host bar now has Browse YT (purple) + Vote Skip (amber) buttons in addition to the existing Change/Search YT (green) button (host only). Returning from /youtube-browser with addedVideo param: host triggers changeVideo immediately, non-host triggers a vote-next. Settings modal gained a host-only Voting Policy toggle (allowed vs owner_only) calling PATCH /api/rooms/{id}/settings. Vote-state events render VotingOverlay (yes/no progress bar, countdown, cancel by initiator/host). Vote-result events show a transient neon toast. Added i18n keys (EN + AR) for all new strings."
 
 metadata:
   created_by: "main_agent"
@@ -202,10 +284,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "DM REST endpoints (list, history, send, edit, delete, read, typing)"
-    - "DM WebSocket /api/ws/dms?token= for realtime fanout"
-    - "Shared-time tracking on room WS disconnect"
-    - "GET /api/users/{user_id}/shared_time endpoint with privacy gate"
+    - "Phase 4 — Vote start/cast/cancel WS flow + voting_mode policy"
+    - "Phase 4 — PATCH /api/rooms/{id}/settings voting_mode + GET /api/youtube/extract"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -247,22 +327,40 @@ agent_communication:
       Use the existing pre-seeded testuser1 plus one freshly-created test peer.
   - agent: "testing"
     message: |
-      Phase 3 backend testing complete — ALL 28 assertions passed against the public URL
-      (https://partyapp-sync.preview.emergentagent.com). Test script: /app/backend_test.py.
+      Phase 4 backend testing complete — 2 CRITICAL backend issues found, the rest passes.
 
-      Highlights:
-      • DM REST: send/list/history/read/typing/edit/delete all return expected shapes.
-        Conversations row has last_message, unread=0 for sender, unread=1 for receiver.
-      • Block guard returns 403 'You blocked this user'. After unblock, friend-only
-        guard correctly returns 403 'Only friends can DM' (block removes friendship).
-      • DM WebSocket: both peers receive dm_new on REST send. Closing peer WS produces
-        presence {online:false} on testuser1 WS within ~2s. Online-presence event also
-        observed on connect.
-      • Shared time: after ~4s co-watch (both connected to /api/ws/rooms/{room_id}) and
-        peer disconnect, GET /api/users/{peer_id}/shared_time returns {seconds:4,
-        hidden:false}. Privacy 'nobody' returns {seconds:0, hidden:true}. Privacy
-        'friends' restored cleanly.
-      • Sanity: db.pair_time has exactly 1 doc with pair key
-        '<sortedA>:<sortedB>', user_ids sorted, seconds=4 (>0).
+      Test script: /app/backend_test.py (run against https://partyapp-sync.preview.emergentagent.com).
 
-      No failures, no minor issues to report. Main agent can summarise and finish.
+      WHAT PASSES (12 assertions):
+      • PATCH /api/rooms/{id}/settings — host can set voting_mode to "owner_only" /
+        "allowed", non-host gets 403. Response shape {id,name,voting_mode}.
+      • Voting WS skip flow — peer's vote_start broadcasts vote_state {kind,
+        initiator,yes:1,no:0,required:2,member_count:2,expires_at} to BOTH peers.
+        Host vote_cast yes broadcasts vote_result {passed:true, kind:"skip"}.
+      • Voting WS next flow — peer vote_start with video_url+title, host vote_cast
+        yes -> vote_result {passed:true, kind:"next", video_url}. db.rooms.video_url
+        DOES update to the new "https://youtu.be/jNQXAC9IVRw".
+      • Voting policy owner_only — peer vote_start is silently dropped (no vote_state
+        broadcast), host vote_start works.
+      • vote_cancel by host -> vote_result {cancelled:true, passed:false}.
+
+      CRITICAL ISSUES — needs main agent fix:
+
+      1) /api/youtube/extract is POST, not GET.
+         The route in rooms_voting.py:184 is @api.post(...) accepting a JSON body
+         {url:str}. GET /api/youtube/extract?url=... returns 405 Method Not Allowed
+         for valid and invalid URLs. POST with body works and returns
+         {video_id,video_url,embed_url,thumbnail}. Add a GET handler (or convert)
+         that accepts ?url= query string and reuses extract_video_id().
+
+      2) Skip vote does NOT clear the room's video_url.
+         server.py lines 750-752: when a "skip" vote passes, only
+         {type:"vote_result",passed:true,kind:"skip"} is broadcast. There is NO
+         db.rooms.update_one(...,{$set:{video_url:None}}) and no playback change_video
+         broadcast. After a successful skip, GET /api/rooms/{id} still returns the
+         original video_url. If the spec requires the backend to clear/advance the
+         video, this needs to be added — otherwise the frontend must do it host-side.
+
+      Heads-up on field naming: rooms_voting.VoteState.public() emits {initiator,yes,no}
+      (not {initiator_id,yes_votes,no_votes} as written in the brief). Make sure the
+      frontend reads `vote.initiator`, `vote.yes`, `vote.no`.
