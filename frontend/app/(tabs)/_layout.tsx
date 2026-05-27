@@ -1,38 +1,75 @@
-// Floating glass-blur bottom tab bar — Phase 1 Mega Update
-// =========================================================
-// Uses expo-blur for the frosted-glass effect, sits above the system
-// gesture bar, has neon-green active state with subtle glow.
+// /app/frontend/app/(tabs)/_layout.tsx
+//
+// Futuristic floating glass tab bar.
+// • Sits 16pt above the bottom safe-area inset.
+// • Glass blur background + chrome metallic top edge.
+// • Active tab: pill with iridescent gradient border + soft brand glow.
+// • Inactive: muted icon, no chrome.
 
 import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View, StyleSheet, Platform } from "react-native";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@/src/context/ThemeContext";
 import { useT } from "@/src/context/LanguageContext";
+import { FUTURISTIC } from "@/src/theme/futuristic";
 
 function FloatingTabBackground() {
-  const { theme } = useTheme();
   return (
-    <BlurView
-      intensity={Platform.OS === "android" ? 30 : 50}
-      tint="dark"
-      style={[
-        StyleSheet.absoluteFill,
-        {
-          backgroundColor: theme.navBg,
-          borderTopColor: theme.borderAccent,
-          borderTopWidth: StyleSheet.hairlineWidth,
-        },
-      ]}
-    />
+    <View style={StyleSheet.absoluteFill}>
+      {/* Glass blur layer */}
+      {Platform.OS === "web" ? (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(8, 9, 18, 0.78)" },
+          ]}
+        />
+      ) : (
+        <BlurView
+          intensity={Platform.OS === "android" ? 32 : 55}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      {/* Tint wash so the brand identity stays even on light backdrops */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "rgba(10, 12, 22, 0.55)" },
+        ]}
+      />
+      {/* Chrome top edge — 1px iridescent gradient */}
+      <LinearGradient
+        colors={[
+          "transparent",
+          "rgba(255,255,255,0.30)",
+          "rgba(34,255,136,0.40)",
+          "rgba(168,85,247,0.40)",
+          "rgba(255,255,255,0.30)",
+          "transparent",
+        ]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.topEdge}
+        pointerEvents="none"
+      />
+      {/* Subtle inner glow at the bottom */}
+      <LinearGradient
+        colors={["transparent", "rgba(34,255,136,0.06)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+    </View>
   );
 }
 
 export default function TabsLayout() {
   const { t } = useT();
-  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 8);
 
@@ -48,23 +85,24 @@ export default function TabsLayout() {
           backgroundColor: "transparent",
           borderTopColor: "transparent",
           borderTopWidth: 0,
-          height: 64 + bottomInset,
+          height: 72 + bottomInset,
           paddingTop: 10,
           paddingBottom: bottomInset,
-          // Subtle outer neon-glow on Android (no effect on iOS, no harm)
-          elevation: 20,
-          shadowColor: theme.brand,
-          shadowOpacity: 0.18,
-          shadowRadius: 24,
+          elevation: 24,
+          shadowColor: FUTURISTIC.brand,
+          shadowOpacity: 0.22,
+          shadowRadius: 28,
+          shadowOffset: { width: 0, height: -6 },
         },
         tabBarBackground: () => <FloatingTabBackground />,
-        tabBarActiveTintColor: theme.brand,
-        tabBarInactiveTintColor: theme.textMuted,
+        tabBarActiveTintColor: FUTURISTIC.brand,
+        tabBarInactiveTintColor: FUTURISTIC.textMuted,
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "800",
-          letterSpacing: 1.4,
+          fontSize: 9,
+          fontWeight: "900",
+          letterSpacing: 2.0,
           marginTop: 2,
+          textTransform: "uppercase",
         },
         tabBarItemStyle: { paddingTop: 4 },
       }}
@@ -73,8 +111,8 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: t("tab_rooms"),
-          tabBarIcon: ({ color, focused, size }) => (
-            <TabIcon focused={focused} color={color} size={size} name="tv-outline" activeName="tv" />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} name="tv-outline" activeName="tv" />
           ),
         }}
       />
@@ -82,8 +120,8 @@ export default function TabsLayout() {
         name="friends"
         options={{
           title: t("tab_friends"),
-          tabBarIcon: ({ color, focused, size }) => (
-            <TabIcon focused={focused} color={color} size={size} name="people-outline" activeName="people" />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} name="people-outline" activeName="people" />
           ),
         }}
       />
@@ -91,8 +129,12 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: t("tab_profile"),
-          tabBarIcon: ({ color, focused, size }) => (
-            <TabIcon focused={focused} color={color} size={size} name="person-circle-outline" activeName="person-circle" />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name="person-circle-outline"
+              activeName="person-circle"
+            />
           ),
         }}
       />
@@ -102,52 +144,84 @@ export default function TabsLayout() {
 
 function TabIcon({
   focused,
-  color,
-  size,
   name,
   activeName,
 }: {
   focused: boolean;
-  color: string;
-  size: number;
   name: keyof typeof Ionicons.glyphMap;
   activeName: keyof typeof Ionicons.glyphMap;
 }) {
-  const { theme } = useTheme();
   return (
     <View style={styles.iconWrap}>
       {focused && (
-        <View
-          style={[
-            styles.activePill,
-            { backgroundColor: theme.brandDim, borderColor: theme.brand },
-          ]}
-        />
+        <>
+          {/* Outer soft glow */}
+          <View style={styles.activeGlow} />
+          {/* Iridescent metallic pill border */}
+          <LinearGradient
+            colors={[
+              "rgba(255,255,255,0.45)",
+              "rgba(34,255,136,0.55)",
+              "rgba(168,85,247,0.35)",
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.activePillEdge}
+          >
+            <View style={styles.activePillFill} />
+          </LinearGradient>
+        </>
       )}
       <Ionicons
         name={focused ? activeName : name}
-        size={size}
-        color={color}
+        size={focused ? 22 : 20}
+        color={focused ? FUTURISTIC.brand : FUTURISTIC.textMuted}
+        style={focused ? { zIndex: 2 } : undefined}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  topEdge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+  },
   iconWrap: {
     alignItems: "center",
     justifyContent: "center",
-    height: 28,
-    width: 56,
+    height: 32,
+    width: 60,
     position: "relative",
   },
-  activePill: {
+  activeGlow: {
     position: "absolute",
-    top: -6,
-    left: 0,
-    right: 0,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
+    top: -8,
+    left: 4,
+    right: 4,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(34,255,136,0.18)",
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.95,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  activePillEdge: {
+    position: "absolute",
+    top: -4,
+    left: 6,
+    right: 6,
+    height: 36,
+    borderRadius: 18,
+    padding: 1,
+  },
+  activePillFill: {
+    flex: 1,
+    backgroundColor: "rgba(8, 9, 18, 0.85)",
+    borderRadius: 17,
   },
 });
