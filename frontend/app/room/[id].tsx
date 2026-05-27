@@ -39,6 +39,9 @@ import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
 import { useT } from "@/src/context/LanguageContext";
 import VotingOverlay, { ActiveVote } from "@/src/components/VotingOverlay";
+import { FUTURISTIC, GRADIENTS } from "@/src/theme/futuristic";
+import LightBeam from "@/src/components/futuristic/LightBeam";
+import GlowDivider from "@/src/components/futuristic/GlowDivider";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -625,6 +628,27 @@ export default function RoomScreen() {
         style={{ flex: 1, backgroundColor: COLORS.bg }}
         edges={fullscreen ? [] : ["top"]}
       >
+        {/* Phase 6 — ambient cyber-metallic lighting (subtle, only when not fullscreen) */}
+        {!fullscreen && (
+          <>
+            <LightBeam
+              angle={-22}
+              color="rgba(34,255,136,0.10)"
+              speed={11000}
+              delay={0}
+              thickness={180}
+              intensity={0.45}
+            />
+            <LightBeam
+              angle={20}
+              color="rgba(168,85,247,0.10)"
+              speed={13000}
+              delay={2500}
+              thickness={160}
+              intensity={0.40}
+            />
+          </>
+        )}
         {/* Phase 4 — Active vote overlay (floats over everything) */}
         {activeVote && user?.id && (
           <VotingOverlay
@@ -799,6 +823,13 @@ export default function RoomScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Animated shimmer divider under the action bar */}
+            <GlowDivider
+              color={activeVote ? FUTURISTIC.brand : "rgba(255,255,255,0.10)"}
+              speed={activeVote ? 2800 : 6500}
+              shimmerWidthPct={20}
+            />
 
             {/* Vote toast (transient feedback after a vote resolves) */}
             {voteToast && (
@@ -1444,58 +1475,83 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginLeft: 4,
   },
-  msgBubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
-  msgBubbleMine: { backgroundColor: COLORS.brand, borderBottomRightRadius: 4 },
-  msgBubbleOther: {
-    backgroundColor: COLORS.surfaceElevated,
-    borderBottomLeftRadius: 4,
+  msgBubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  msgText: { fontSize: 14, lineHeight: 20 },
+  msgBubbleMine: {
+    backgroundColor: FUTURISTIC.brand,
+    borderBottomRightRadius: 4,
+    borderColor: FUTURISTIC.brandEdge,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  msgBubbleOther: {
+    backgroundColor: FUTURISTIC.surface1,
+    borderBottomLeftRadius: 4,
+    borderColor: FUTURISTIC.borderSoft,
+  },
+  msgText: { fontSize: 14, lineHeight: 20, letterSpacing: 0.15 },
   msgImage: {
     width: 200,
     height: 200,
     borderRadius: 14,
-    backgroundColor: COLORS.surfaceElevated,
+    backgroundColor: FUTURISTIC.surface1,
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.borderSoft,
   },
   chatEmpty: { alignItems: "center", padding: 40 },
-  chatEmptyText: { color: COLORS.textSecondary, fontSize: 14 },
+  chatEmptyText: {
+    color: FUTURISTIC.textMuted,
+    fontSize: 13,
+    letterSpacing: 0.4,
+    fontWeight: "500",
+  },
   composer: {
     flexDirection: "row",
     padding: 12,
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.bg,
+    borderTopColor: FUTURISTIC.borderSoft,
+    backgroundColor: "rgba(8, 9, 18, 0.85)",
   },
   attachBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.surface,
+    backgroundColor: FUTURISTIC.surface1,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: FUTURISTIC.borderStrong,
     alignItems: "center",
     justifyContent: "center",
   },
   composerInput: {
     flex: 1,
-    backgroundColor: COLORS.surface,
+    backgroundColor: FUTURISTIC.surface1,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: FUTURISTIC.borderStrong,
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: Platform.OS === "ios" ? 10 : 8,
-    color: COLORS.textPrimary,
+    color: FUTURISTIC.textPrimary,
     fontSize: 15,
   },
   sendBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.brand,
+    backgroundColor: FUTURISTIC.brand,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
   },
   connecting: {
     position: "absolute",

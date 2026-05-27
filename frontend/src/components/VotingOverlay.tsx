@@ -1,13 +1,30 @@
-// /app/frontend/src/components/VotingOverlay.tsx — Phase 4 voting UI
-// A self-contained overlay shown over the room when a vote is active.
-// The host integrates it by:
-//   - listening for `vote_state` and `vote_result` WS messages
-//   - rendering <VotingOverlay activeVote={...} onCast={...} onCancel={...} />
+// /app/frontend/src/components/VotingOverlay.tsx
+//
+// Phase 4 voting UI — redesigned for the futuristic cyber-metallic theme.
+// Self-contained overlay shown over the room while a vote is active.
+//
+// Visual notes:
+//  - Glass blur backdrop with chrome iridescent top edge.
+//  - Animated progress bar with neon-green fill + soft glow.
+//  - YES button uses NeonButton (primary brand), NO button uses NeonButton (danger).
+//  - Letter-spaced caps headers for "VOTE TO SKIP" / "VOTE — PLAY NEXT".
+//  - Slide-in from top + subtle scale settle.
 
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "@/src/constants/avatars";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { BlurView } from "expo-blur";
+import { Platform } from "react-native";
+import { FUTURISTIC, SHADOWS, TYPO } from "@/src/theme/futuristic";
 
 export interface ActiveVote {
   id: string;
@@ -32,112 +49,415 @@ interface Props {
   onCancel: () => void;
 }
 
-export default function VotingOverlay({ vote, myUserId, myVote, isHost, onCast, onCancel }: Props) {
+export default function VotingOverlay({
+  vote,
+  myUserId,
+  myVote,
+  isHost,
+  onCast,
+  onCancel,
+}: Props) {
   const [remaining, setRemaining] = useState(vote.remaining_seconds);
-  const slide = useRef(new Animated.Value(0)).current;
+  const translateY = useSharedValue(-200);
+  const opacity = useSharedValue(0);
+  const progressW = useSharedValue(0);
 
+  // ---- Animations on mount + on each new vote ID ----
+  useEffect(() => {
+    translateY.value = withSequence(
+      withTiming(-200, { duration: 0 }),
+      withSpring(0, { damping: 16, stiffness: 130 })
+    );
+    opacity.value = withTiming(1, { duration: 320 });
+  }, [vote.id, translateY, opacity]);
+
+  // ---- Animate progress bar fill on yes/required change ----
+  useEffect(() => {
+    const ratio = Math.max(0, Math.min(1, vote.yes / Math.max(1, vote.required)));
+    progressW.value = withTiming(ratio, { duration: 400, easing: Easing.out(Easing.cubic) });
+  }, [vote.yes, vote.required, progressW]);
+
+  // ---- Countdown timer ----
   useEffect(() => {
     setRemaining(vote.remaining_seconds);
-  }, [vote.remaining_seconds, vote.id]);
-
-  useEffect(() => {
-    Animated.spring(slide, { toValue: 1, useNativeDriver: true, friction: 8 }).start();
-    const t = setInterval(() => setRemaining(r => Math.max(0, r - 1)), 1000);
+    const t = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
     return () => clearInterval(t);
-  }, [vote.id, slide]);
+  }, [vote.id, vote.remaining_seconds]);
 
   const canCancel = isHost || vote.initiator === myUserId;
-  const progress = Math.min(1, vote.yes / vote.required);
   const isInitiator = vote.initiator === myUserId;
+  const isUrgent = remaining <= 5;
+
+  // ---- Animated styles ----
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${progressW.value * 100}%`,
+  }));
 
   return (
-    <Animated.View
-      style={[
-        styles.wrap,
-        {
-          transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [-160, 0] }) }],
-          opacity: slide,
-        },
-      ]}
-    >
-      <View style={styles.headerRow}>
-        <Ionicons
-          name={vote.kind === "skip" ? "play-skip-forward" : "play-circle"}
-          size={20}
-          color={COLORS.brand}
-        />
-        <Text style={styles.title}>
-          {vote.kind === "skip" ? "VOTE TO SKIP" : "VOTE — PLAY NEXT VIDEO"}
-        </Text>
-        <Text style={styles.timer}>{remaining}s</Text>
-      </View>
-
-      {vote.title && (
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {vote.title}
-        </Text>
-      )}
-
-      <View style={styles.barBg}>
-        <View style={[styles.barFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={styles.statsRow}>
-        <Text style={styles.stat}>
-          <Text style={{ color: COLORS.brand, fontWeight: "900" }}>{vote.yes}</Text>
-          {"  yes"}
-        </Text>
-        <Text style={styles.stat}>
-          <Text style={{ color: COLORS.error, fontWeight: "900" }}>{vote.no}</Text>
-          {"  no"}
-        </Text>
-        <Text style={styles.stat}>
-          need <Text style={{ color: COLORS.textPrimary, fontWeight: "900" }}>{vote.required}</Text> / {vote.member_count}
-        </Text>
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          onPress={() => onCast(true)}
-          disabled={myVote === true}
-          style={[styles.btn, styles.btnYes, myVote === true && styles.btnCast]}
-        >
-          <Ionicons name="checkmark" size={18} color={COLORS.bg} />
-          <Text style={styles.btnYesText}>YES</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => onCast(false)}
-          disabled={myVote === false}
-          style={[styles.btn, styles.btnNo, myVote === false && { opacity: 0.5 }]}
-        >
-          <Ionicons name="close" size={18} color={COLORS.error} />
-          <Text style={styles.btnNoText}>NO</Text>
-        </TouchableOpacity>
-        {canCancel && (
-          <TouchableOpacity onPress={onCancel} style={styles.cancelBtn}>
-            <Ionicons name="trash-outline" size={16} color={COLORS.textMuted} />
-          </TouchableOpacity>
+    <Animated.View style={[styles.wrap, containerStyle]} pointerEvents="box-none">
+      {/* Glass blur backdrop */}
+      <View style={styles.glassWrap}>
+        {Platform.OS === "web" ? (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: "rgba(10, 12, 22, 0.92)" },
+            ]}
+          />
+        ) : (
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         )}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(15, 17, 30, 0.78)" },
+          ]}
+        />
+        {/* Iridescent metallic border (chrome + brand + accent + chrome) */}
+        <LinearGradient
+          colors={[
+            "rgba(255,255,255,0.35)",
+            "rgba(34,255,136,0.55)",
+            "rgba(168,85,247,0.55)",
+            "rgba(255,255,255,0.35)",
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.borderRing}
+          pointerEvents="none"
+        />
+
+        <View style={styles.inner}>
+          {/* Header: icon + title + countdown */}
+          <View style={styles.headerRow}>
+            <View style={styles.kindIconWrap}>
+              <Ionicons
+                name={vote.kind === "skip" ? "play-skip-forward" : "musical-notes"}
+                size={18}
+                color={FUTURISTIC.brand}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>
+                {vote.kind === "skip" ? "VOTE TO SKIP" : "VOTE — PLAY NEXT"}
+              </Text>
+              {isInitiator && (
+                <Text style={styles.youStarted}>YOU STARTED THIS VOTE</Text>
+              )}
+            </View>
+            <View
+              style={[
+                styles.timerPill,
+                isUrgent && {
+                  borderColor: FUTURISTIC.error,
+                  backgroundColor: "rgba(255,61,113,0.16)",
+                },
+              ]}
+            >
+              <Ionicons
+                name="time-outline"
+                size={12}
+                color={isUrgent ? FUTURISTIC.error : FUTURISTIC.brand}
+              />
+              <Text
+                style={[
+                  styles.timerText,
+                  isUrgent && { color: FUTURISTIC.error },
+                ]}
+              >
+                {remaining}s
+              </Text>
+            </View>
+          </View>
+
+          {/* Video title (only for "next" votes) */}
+          {vote.title ? (
+            <View style={styles.titleRow}>
+              <Ionicons name="play" size={11} color={FUTURISTIC.textMuted} />
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {vote.title}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Progress bar — animated fill with neon glow */}
+          <View style={styles.barWrap}>
+            <View style={styles.barTrack}>
+              <Animated.View style={[styles.barFillWrap, fillStyle]}>
+                <LinearGradient
+                  colors={["#26FF93", "#10C66D", "#26FF93"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.barFill}
+                />
+              </Animated.View>
+              {/* tick marks for required threshold */}
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.requiredTick,
+                  { left: `${(vote.required / Math.max(1, vote.member_count)) * 100}%` },
+                ]}
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <Text style={styles.statLabel}>
+                <Text style={[styles.statValue, { color: FUTURISTIC.brand }]}>
+                  {vote.yes}
+                </Text>
+                <Text style={styles.statKey}> yes</Text>
+              </Text>
+              <Text style={styles.statLabel}>
+                <Text style={[styles.statValue, { color: FUTURISTIC.error }]}>
+                  {vote.no}
+                </Text>
+                <Text style={styles.statKey}> no</Text>
+              </Text>
+              <Text style={styles.statLabel}>
+                <Text style={styles.statKey}>need </Text>
+                <Text style={[styles.statValue, { color: FUTURISTIC.textPrimary }]}>
+                  {vote.required}/{vote.member_count}
+                </Text>
+              </Text>
+            </View>
+          </View>
+
+          {/* Actions */}
+          <View style={styles.actions}>
+            <ActionBtn
+              variant="yes"
+              label="YES"
+              icon="checkmark-circle"
+              disabled={myVote === true}
+              onPress={() => onCast(true)}
+            />
+            <ActionBtn
+              variant="no"
+              label="NO"
+              icon="close-circle"
+              disabled={myVote === false}
+              onPress={() => onCast(false)}
+            />
+            {canCancel && (
+              <TouchableOpacity
+                onPress={onCancel}
+                style={styles.cancelBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Cancel vote"
+              >
+                <Ionicons name="trash-outline" size={16} color={FUTURISTIC.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
     </Animated.View>
   );
 }
 
+// ---------------------------------------------------------------------------
+// ActionBtn — local mini-button for YES / NO (small enough to not need the
+// big NeonButton component; this is hand-tuned for the vote bar layout).
+// ---------------------------------------------------------------------------
+function ActionBtn({
+  variant,
+  label,
+  icon,
+  disabled,
+  onPress,
+}: {
+  variant: "yes" | "no";
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const pressed = useSharedValue(0);
+  const isYes = variant === "yes";
+  const fg = isYes ? "#001A0C" : "#FFFFFF";
+  const edge = isYes
+    ? (["rgba(255,255,255,0.55)", "rgba(34,255,136,0.55)"] as const)
+    : (["rgba(255,255,255,0.45)", "rgba(255,61,113,0.55)"] as const);
+  const fill = isYes
+    ? (["#26FF93", "#10C66D"] as const)
+    : (["#FF5A85", "#D81E54"] as const);
+  const scale = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - pressed.value * 0.05 }],
+    opacity: disabled ? 0.45 : 1,
+  }));
+  return (
+    <Animated.View style={[{ flex: 1 }, scale]}>
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled}
+        onPressIn={() => (pressed.value = withTiming(1, { duration: 90 }))}
+        onPressOut={() => (pressed.value = withTiming(0, { duration: 140 }))}
+        activeOpacity={0.9}
+      >
+        <LinearGradient
+          colors={edge as unknown as string[]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ padding: 1, borderRadius: 12 }}
+        >
+          <LinearGradient
+            colors={fill as unknown as string[]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.actionInner}
+          >
+            <Ionicons name={icon} size={16} color={fg} />
+            <Text style={[styles.actionLabel, { color: fg }]}>{label}</Text>
+          </LinearGradient>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
-  wrap: { position: "absolute", top: 8, left: 8, right: 8, zIndex: 100, padding: 12, gap: 8, backgroundColor: "rgba(20,20,31,0.96)", borderWidth: 1, borderColor: COLORS.brand, borderRadius: 16, shadowColor: COLORS.brand, shadowOpacity: 0.4, shadowRadius: 16 },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { color: COLORS.brand, fontWeight: "900", letterSpacing: 1, fontSize: 13, flex: 1 },
-  timer: { color: COLORS.textPrimary, fontWeight: "900", fontSize: 13 },
-  subtitle: { color: COLORS.textSecondary, fontSize: 12 },
-  barBg: { height: 8, backgroundColor: COLORS.border, borderRadius: 4, overflow: "hidden" },
-  barFill: { height: 8, backgroundColor: COLORS.brand },
-  statsRow: { flexDirection: "row", justifyContent: "space-between" },
-  stat: { color: COLORS.textSecondary, fontSize: 12 },
-  actions: { flexDirection: "row", gap: 8, marginTop: 4 },
-  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, gap: 6, flex: 1 },
-  btnYes: { backgroundColor: COLORS.brand },
-  btnYesText: { color: COLORS.bg, fontWeight: "900", letterSpacing: 1 },
-  btnNo: { borderWidth: 1.5, borderColor: COLORS.error },
-  btnNoText: { color: COLORS.error, fontWeight: "900", letterSpacing: 1 },
-  btnCast: { opacity: 0.6 },
-  cancelBtn: { width: 40, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border, borderRadius: 10 },
+  wrap: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    zIndex: 100,
+    ...SHADOWS.sheet,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.4,
+  },
+  glassWrap: {
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "rgba(10,12,22,0.55)",
+  },
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 18,
+    opacity: 0.6,
+  },
+  inner: { padding: 14, margin: 1, borderRadius: 17 },
+  // ----- Header -----
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  kindIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: FUTURISTIC.brandSoft,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: {
+    ...TYPO.caption,
+    color: FUTURISTIC.brand,
+    textShadowColor: FUTURISTIC.brandGlow,
+    textShadowRadius: 6,
+  },
+  youStarted: {
+    color: FUTURISTIC.textMuted,
+    fontSize: 8,
+    letterSpacing: 1.8,
+    marginTop: 2,
+    fontWeight: "700",
+  },
+  timerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    backgroundColor: FUTURISTIC.brandSoft,
+  },
+  timerText: {
+    color: FUTURISTIC.brand,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
+  // ----- Title row (next vote) -----
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  subtitle: {
+    color: FUTURISTIC.textSecondary,
+    fontSize: 12,
+    flex: 1,
+    fontStyle: "italic",
+  },
+  // ----- Progress bar -----
+  barWrap: { marginTop: 12, gap: 6 },
+  barTrack: {
+    height: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 5,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  barFillWrap: {
+    height: "100%",
+    borderRadius: 5,
+    overflow: "hidden",
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  barFill: { flex: 1 },
+  requiredTick: {
+    position: "absolute",
+    top: -2,
+    bottom: -2,
+    width: 2,
+    backgroundColor: "rgba(255,255,255,0.50)",
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+  },
+  statLabel: { color: FUTURISTIC.textMuted, fontSize: 11 },
+  statKey: { color: FUTURISTIC.textMuted, fontWeight: "600" },
+  statValue: { fontWeight: "900", letterSpacing: 0.4 },
+  // ----- Actions -----
+  actions: { flexDirection: "row", gap: 8, marginTop: 12 },
+  actionInner: {
+    height: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 11,
+    paddingHorizontal: 12,
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    textShadowColor: "rgba(0,0,0,0.25)",
+    textShadowRadius: 2,
+  },
+  cancelBtn: {
+    width: 44,
+    height: 40,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: FUTURISTIC.border,
+    backgroundColor: FUTURISTIC.surface2,
+  },
 });
