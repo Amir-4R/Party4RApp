@@ -819,7 +819,8 @@ _BUNDLES = {
     "render-flat.zip": "party4r-render-flat.zip",
     "frontend.zip": "party4r-frontend-eas.zip",
     "full.zip": "party4r-app-full.zip",
-    "web-build.zip": "party4r-web-build.zip",     # static web bundle for Capacitor / PWABuilder
+    "web-build.zip": "party4r-web-build.zip",
+    "android-gradle.zip": "party4r-android-gradle.zip",  # for direct Gradle/native build
 }
 
 
@@ -875,6 +876,11 @@ async def download_main_py():
 @app.get("/api/download/web-build.zip")
 async def download_web_build():
     return _serve_bundle("web-build.zip")
+
+
+@app.get("/api/download/android-gradle.zip")
+async def download_android_gradle_bundle():
+    return _serve_bundle("android-gradle.zip")
 
 
 @app.get("/download/backend.zip")
