@@ -1,4 +1,3 @@
-"""
 Party4RApp â€” FastAPI Backend
 ============================
 Co-watching rooms + real-time WebSocket sync + friend system + YouTube search.
