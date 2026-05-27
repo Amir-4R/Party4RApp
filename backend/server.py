@@ -805,13 +805,21 @@ async def health():
 # Safe to leave in place — it serves a static file, no DB access.
 # ---------------------------------------------------------------------------
 from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+# Mount the static web export under /api/web/ so it can be tested in any browser
+# AND used as the source URL for PWABuilder.com (ingress only forwards /api/*).
+_WEB_BUILD = "/app/dist/web-build"
+if os.path.exists(_WEB_BUILD):
+    app.mount("/api/web", StaticFiles(directory=_WEB_BUILD, html=True), name="web-export")
 
 _DIST_DIR = "/app/dist"
 _BUNDLES = {
-    "backend.zip": "party4r-backend-render.zip",   # backend + render.yaml (nested /backend/)
-    "render-flat.zip": "party4r-render-flat.zip",  # FLAT layout for direct GitHub upload
-    "frontend.zip": "party4r-frontend-eas.zip",    # Expo project + EAS config + APK guide
-    "full.zip": "party4r-app-full.zip",            # everything in one archive
+    "backend.zip": "party4r-backend-render.zip",
+    "render-flat.zip": "party4r-render-flat.zip",
+    "frontend.zip": "party4r-frontend-eas.zip",
+    "full.zip": "party4r-app-full.zip",
+    "web-build.zip": "party4r-web-build.zip",     # static web bundle for Capacitor / PWABuilder
 }
 
 
@@ -862,6 +870,11 @@ async def download_main_py():
         media_type="text/plain; charset=utf-8",
         filename="main.py",
     )
+
+
+@app.get("/api/download/web-build.zip")
+async def download_web_build():
+    return _serve_bundle("web-build.zip")
 
 
 @app.get("/download/backend.zip")
