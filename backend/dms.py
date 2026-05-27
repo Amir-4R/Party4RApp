@@ -147,7 +147,12 @@ async def _ensure_can_message(db, sender: dict, target_id: str):
 # --------------------------------------------------------------------------
 # Routes
 # --------------------------------------------------------------------------
-def register_routes(api: APIRouter, db: AsyncIOMotorDatabase, get_current_user):
+def register_routes(
+    api: APIRouter,
+    db: AsyncIOMotorDatabase,
+    get_current_user,
+    push_callback=None,
+):
 
     @api.get("/dms")
     async def list_conversations(current: dict = Depends(get_current_user)):
@@ -236,6 +241,14 @@ def register_routes(api: APIRouter, db: AsyncIOMotorDatabase, get_current_user):
         # Push to both sides via WS if online
         await dm_manager.send_to(friend_id, {"type": "dm_new", "message": pub})
         await dm_manager.send_to(current["id"], {"type": "dm_new", "message": pub})
+        # Phase 5 — fire an Expo push to the recipient (client handler
+        # suppresses delivery while app is in foreground).
+        if push_callback:
+            try:
+                preview = text or ("📷 Photo" if image else "")
+                await push_callback(db, current, friend_id, preview)
+            except Exception:
+                pass
         return pub
 
     @api.patch("/dms/{message_id}")

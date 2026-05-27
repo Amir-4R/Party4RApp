@@ -259,6 +259,184 @@ backend:
           PASS  POST /api/youtube/extract regression — still returns 200 with same
                 payload shape.
           All four assertions green via /app/backend_test_reverify.py.
+  - task: "Phase 5 — Word filter in room chat (moderation.py)"
+    implemented: true
+    working: false
+    file: "/app/backend/moderation.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Soft-censor only, room chat only. Created /app/backend/moderation.py
+          with global hardcoded BANNED_WORDS set (EN profanity + Arabic
+          transliterations + spam terms like 'porn', 'xxx', 'nudes').
+          Length-preserving regex replacement (e.g. 'fuck' becomes '****').
+          Leet substitutions handled (f@ck, sh!t, n1gger).
+          Repeated-char collapse handled (fuuuuck -> fuuck -> matched fuck).
+          Hooked into the chat WS handler in server.py: text passes through
+          censor_text() before broadcast; payload gets bot_flag=true when
+          modified (front-end may surface this later but it's optional).
+          DMs are intentionally NOT filtered (per user choice 2a).
+      - working: false
+        agent: "testing"
+        comment: |
+          Phase 5 word-filter verified against the public URL via WS chat
+          (/api/ws/rooms/{room_id}). 4 of 7 brief cases PASS, 3 FAIL with
+          real implementation bugs in moderation.py. Test script:
+          /app/backend_test_phase5.py.
+
+          PASS:
+            • "hello world" -> "hello world", no bot_flag.
+            • "fuck this shit" -> "**** this ****", bot_flag=True.
+            • "you BITCH" -> "you *****" (length-preserving, case-insensitive),
+              bot_flag=True.
+            • "kos omak" -> "*** omak", bot_flag=True (Arabic translit).
+            • Chat payload always includes user_id, nickname, avatar, timestamp.
+
+          FAIL (3 brief cases — all are real bugs in moderation.py logic):
+
+          1) "F@ck off" -> got "F@ck off" (UNCHANGED, bot_flag=False).
+             Expected "**** off", bot_flag=True.
+             ROOT CAUSE: moderation.py _LEET_MAP maps '@' -> 'a'. So
+             "f@ck" normalises to "fack" (not "fuck"), which is not in
+             BANNED_WORDS. The brief's expected behaviour treats '@'
+             as 'u' in profanity contexts (a common leet variant).
+             Suggested fix: either add a second leet pass that
+             tries '@' -> 'u', or add literal "f@ck" / "fack" to the
+             banned set, or expand the matching loop to try multiple
+             leet substitutions per character.
+
+          2) "fuuuuck this" -> got "fuuuuck this" (UNCHANGED, bot_flag=False).
+             Expected first word censored to stars.
+             ROOT CAUSE: _normalise() does
+                 re.sub(r"(.)\1{2,}", r"\1\1", s)
+             which collapses 3+ repeats to exactly 2 — so "fuuuuck"
+             becomes "fuuck", and "fuuck" is NOT in BANNED_WORDS (only
+             "fuck" is). The comment in the code claims this collapse
+             then matches "fuck", but the math doesn't work.
+             Suggested fix: collapse 2+ repeats to 1 (i.e.
+             r"(.)\1+" -> r"\1") OR add a separate pass that also
+             tries a single-char-collapse before matching.
+
+          3) "porn xxx nudes" -> got "**** xxx*****s" (bot_flag=True but
+             wrong replacement).
+             Expected "**** *** *****" (all three censored, lengths
+             preserved).
+             ROOT CAUSE: _normalise() runs the repeated-char collapse
+             BEFORE matching, which changes the string length ("xxx" -> "xx",
+             a 1-char shrink). The matching code in censor_text() then
+             lifts regex spans from the normalised string back onto the
+             ORIGINAL string using the same indices, but those indices
+             no longer line up because normalisation is NOT length-
+             preserving when repeated-char collapse fires. So
+             "xxx" disappears from the match list AND the "nudes" match's
+             start/end are off-by-one when applied to the original,
+             producing the garbled "xxx*****s".
+             The docstring of censor_text() asserts "normalisation is
+             length-preserving" but that assertion is broken by the
+             re.sub collapse step in _normalise().
+             Suggested fix: either (a) skip the repeated-char collapse in
+             _normalise() and instead match a regex that allows internal
+             repeats per char (e.g. compile each banned word as
+             "f+u+c+k+" and use that to detect spans on the original
+             string), or (b) collapse the ORIGINAL string before matching
+             AND track a mapping from normalised index -> original index
+             so spans can be lifted back correctly.
+
+          Also noted (not a brief-listed failure, just informational):
+          /api/auth/me does NOT include the push_token field (UserPublic
+          model doesn't expose it). The brief allows either /me OR DB
+          verification — DB verification was performed separately and
+          confirms push_token is set after POST and unset after DELETE,
+          so the persistence flow itself works. If main agent wants /me
+          to expose push_token, add `push_token: Optional[str] = None`
+          to UserPublic and pass it through user_to_public().
+  - task: "Phase 5 — Push notification token endpoints (notifications.py)"
+    implemented: true
+    working: true
+    file: "/app/backend/notifications.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          New module exposing:
+            POST   /api/push/token  { token }   -> validate ExponentPushToken[..]
+                                                   / ExpoPushToken[..] format and
+                                                   save it on the user doc.
+            DELETE /api/push/token              -> $unset push_token on logout.
+          Helper send_dm_push(db, sender, recipient_id, message_text) is wired
+          into /app/backend/dms.py send_dm route via the new optional
+          push_callback parameter on register_routes. Fires-and-forgets to
+          https://exp.host/--/api/v2/push/send with title=sender.nickname,
+          body=preview (max 120 chars), data={kind:'dm', from_id, from_nickname},
+          channelId='dms', priority='high', badge=1. Image-only DMs get body
+          '📷 Photo'. Network errors are swallowed (best-effort).
+      - working: true
+        agent: "testing"
+        comment: |
+          Push token endpoints + DM-with-push integration fully verified.
+          Test script: /app/backend_test_phase5.py + a separate DB read
+          to confirm persistence.
+
+          POST /api/push/token:
+            • ExponentPushToken[xxxx-yyyy-zzzz-aaaa] -> 200 {ok:true},
+              db.users.{testuser1}.push_token == that token (verified via
+              Motor query).
+            • invalid-format-token -> 400 {detail:"Invalid Expo push token
+              format"}.
+            • ExpoPushToken[abc-def-ghi] -> 200 {ok:true} (both Exponent and
+              Expo prefixes accepted, per _is_expo_token in notifications.py).
+
+          DELETE /api/push/token:
+            • -> 200 {ok:true}; subsequent db.users.find_one(...) shows
+              push_token field is NOT present ($unset worked).
+
+          DM send-with-push (dms.py + notifications.py):
+            • Fresh peer signed up (avatar_cat), peer requested friend
+              testuser1, testuser1 accepted.
+            • Peer set push_token to ExponentPushToken[FAKE-FOR-TEST].
+            • testuser1 POST /api/dms/{peer_id} {"text":"hi there"} -> 201
+              with full message body. Backend logs show the Expo push
+              endpoint actually returned 200 OK for the fake token
+              (Expo accepts then fails later via receipts) — point is the
+              DM endpoint did NOT raise.
+            • testuser1 (no push token set on self) POST /api/dms/{peer_id}
+              "no token test" with peer also having no token -> 201 (server
+              correctly skips push when recipient.push_token is absent —
+              notifications.py:115 early-return).
+            • Image-only DM (1x1 PNG data URI) -> 201; push body would be
+              '📷 Photo' per dms.py:248. Backend log confirms a second
+              Expo POST fired for this case.
+            • GET /api/auth/me after all the above -> 200, no regression.
+
+          One note for the main agent: /api/auth/me does NOT expose the
+          push_token field (UserPublic model has no such field). The brief
+          allowed DB verification as an alternative, which passes, so this
+          is not a failure. If the client UI ever needs to read its own
+          push_token via /me, add `push_token: Optional[str] = None` to
+          UserPublic and pass it through user_to_public() in server.py.
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          New module exposing:
+            POST   /api/push/token  { token }   -> validate ExponentPushToken[..]
+                                                   / ExpoPushToken[..] format and
+                                                   save it on the user doc.
+            DELETE /api/push/token              -> $unset push_token on logout.
+          Helper send_dm_push(db, sender, recipient_id, message_text) is wired
+          into /app/backend/dms.py send_dm route via the new optional
+          push_callback parameter on register_routes. Fires-and-forgets to
+          https://exp.host/--/api/v2/push/send with title=sender.nickname,
+          body=preview (max 120 chars), data={kind:'dm', from_id, from_nickname},
+          channelId='dms', priority='high', badge=1. Image-only DMs get body
+          '📷 Photo'. Network errors are swallowed (best-effort).
 
 frontend:
   - task: "Messages icon + unread badge in Friends tab header"
@@ -302,7 +480,8 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Phase 5 — Word filter in room chat (moderation.py)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -359,6 +538,66 @@ agent_communication:
         DOES update to the new "https://youtu.be/jNQXAC9IVRw".
       • Voting policy owner_only — peer vote_start is silently dropped (no vote_state
         broadcast), host vote_start works.
+  - agent: "testing"
+    message: |
+      Phase 5 backend testing complete. Test script: /app/backend_test_phase5.py
+      (run against https://partyapp-sync.preview.emergentagent.com). Summary:
+      18 / 22 assertions pass.
+
+      WORD FILTER (moderation.py) — 3 REAL BUGS, working=false:
+        PASS "hello world" clean.
+        PASS "fuck this shit" -> "**** this ****", bot_flag=True.
+        PASS "you BITCH" -> "you *****", bot_flag=True.
+        PASS "kos omak" -> "*** omak", bot_flag=True.
+        FAIL "F@ck off" -> got "F@ck off" UNCHANGED. _LEET_MAP maps
+             '@' -> 'a', so "f@ck" -> "fack" which isn't in BANNED_WORDS.
+             Fix: map '@' -> 'u' as well, or add multi-substitution pass,
+             or add "f@ck"/"fack" literally to the banned set.
+        FAIL "fuuuuck this" -> got "fuuuuck this" UNCHANGED.
+             _normalise collapses 3+ repeats to 2 chars, so "fuuuuck" ->
+             "fuuck", which doesn't match "fuck". Fix: collapse to 1 char
+             (r"(.)\1+" -> r"\1") or add a separate single-collapse pass.
+        FAIL "porn xxx nudes" -> got "**** xxx*****s". The repeated-char
+             collapse in _normalise changes string LENGTH ("xxx"->"xx"),
+             which breaks the "length-preserving" assumption used by
+             censor_text to lift normalised regex spans onto the original
+             text. Result: "xxx" not censored AND "nudes" replacement is
+             off-by-one (shifted to "*****s" instead of "*****").
+             Fix options: (a) ditch repeated-char collapse in _normalise
+             and match each banned word as a regex like "f+u+c+k+" against
+             the original directly; (b) build an index-mapping
+             (normalised_idx -> original_idx) so spans can be lifted back
+             correctly when collapse fires.
+
+      PUSH TOKEN endpoints (notifications.py) — ALL PASS, working=true:
+        PASS POST ExponentPushToken[...] -> 200, DB shows push_token set.
+        PASS POST "invalid-format-token" -> 400.
+        PASS POST ExpoPushToken[...] -> 200 (both prefixes accepted).
+        PASS DELETE -> 200, DB shows push_token unset.
+
+      DM WITH PUSH integration (dms.py + notifications.py) — ALL PASS:
+        PASS DM with text to peer (peer has FAKE expo token) -> 201.
+             DM endpoint did NOT raise — push errors swallowed. (Backend
+             log shows Expo's HTTPS endpoint actually returned 200 for
+             the fake token; receipts later would reject, which is fine.)
+        PASS DM when recipient has no push_token -> 201 (server short-
+             circuits, no Expo call).
+        PASS Image-only DM -> 201; push body would be "📷 Photo".
+        PASS GET /api/auth/me sanity after all changes.
+
+      Heads-up: GET /api/auth/me does NOT expose push_token (UserPublic
+      schema doesn't include it). Brief allowed DB verification as an
+      alternative — DB shows the value persists correctly. If the client
+      ever needs to read its own push_token via /me, add
+      `push_token: Optional[str] = None` to UserPublic in server.py.
+
+      Action for main agent:
+        1. Fix the 3 moderation.py word-filter bugs above (most critical
+           is the _normalise length-preserving regression — currently
+           it produces objectively wrong/garbled output).
+        2. Re-trigger testing for the word filter only; push + DM-push
+           are working and no longer in current_focus.
+
       • vote_cancel by host -> vote_result {cancelled:true, passed:false}.
 
       CRITICAL ISSUES — needs main agent fix:

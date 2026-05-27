@@ -688,6 +688,10 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                     continue
                 if not text and not image:
                     continue
+                # Phase 5 — Word filter (soft censor only)
+                bot_warning = False
+                if text:
+                    text, bot_warning = censor_text(text)
                 payload = {
                     "type": "chat",
                     "text": text[:500] if text else "",
@@ -698,6 +702,8 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 }
                 if image:
                     payload["image"] = image
+                if bot_warning:
+                    payload["bot_flag"] = True
                 await manager.broadcast(room_id, payload)
             elif mtype == "playback":
                 # Only current host can issue playback commands
@@ -921,6 +927,11 @@ from rooms_voting import (
     get_active as _vote_active,
     end_vote as _vote_end,
 )  # noqa: E402
+from moderation import censor_text  # noqa: E402 — Phase 5 word filter
+from notifications import (
+    register_routes as _register_push,
+    send_dm_push as _send_dm_push,
+)  # noqa: E402 — Phase 5 push notifications
 
 # We create a NEW router for phase 2 then include it (works because we include after)
 _phase2_router = APIRouter(prefix="/api")
@@ -929,7 +940,7 @@ app.include_router(_phase2_router)
 
 # Phase 3 — Direct Messages
 _dms_router = APIRouter(prefix="/api")
-_register_dms(_dms_router, db, get_current_user)
+_register_dms(_dms_router, db, get_current_user, push_callback=_send_dm_push)
 app.include_router(_dms_router)
 _register_dms_ws(app, db, get_user_by_id, decode_token)
 
@@ -937,6 +948,11 @@ _register_dms_ws(app, db, get_user_by_id, decode_token)
 _voting_router = APIRouter(prefix="/api")
 _register_voting(_voting_router, db, get_current_user)
 app.include_router(_voting_router)
+
+# Phase 5 — Push notification token routes
+_push_router = APIRouter(prefix="/api")
+_register_push(_push_router, db, get_current_user)
+app.include_router(_push_router)
 
 
 @app.on_event("startup")

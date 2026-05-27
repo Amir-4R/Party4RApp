@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { storage } from "@/src/utils/storage";
 import { apiGet, apiPost, TOKEN_KEY } from "@/src/api/client";
+import { initPushNotifications, clearPushToken } from "@/src/utils/pushNotifications";
 
 export interface User {
   id: string;
@@ -40,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const me = await apiGet<User>("/auth/me");
           setUser(me);
+          // Phase 5 — re-register push (token may have rotated since last open).
+          initPushNotifications().catch(() => {});
         } catch {
           await storage.secureRemove(TOKEN_KEY);
           setToken(null);
@@ -53,6 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await storage.secureSet(TOKEN_KEY, t);
     setToken(t);
     setUser(u);
+    // Phase 5 — register for Expo push (DMs only). Fires-and-forgets.
+    initPushNotifications().catch(() => {});
   };
 
   const signup: AuthContextValue["signup"] = async (username, password, nickname, avatar) => {
@@ -74,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Phase 5 — best-effort token clear before token is wiped locally.
+    await clearPushToken();
     await storage.secureRemove(TOKEN_KEY);
     setToken(null);
     setUser(null);
