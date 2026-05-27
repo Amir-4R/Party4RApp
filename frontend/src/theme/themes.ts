@@ -510,17 +510,33 @@ export const THEMES: Record<string, ThemeTokens> = {
     brand: "#D4DBE5",
   }),
 
-  // ── Light / White ────────────────────────────────────────────────────────
-  "pure-white": mk({
-    id: "pure-white",
-    name: "Pure White",
-    description: "Soft white · Light mode · Minimal",
+  // ── Light / White (architectural note) ──────────────────────────────────
+  // A true light-mode "Pure White" theme would need every screen's
+  // StyleSheet to be reactive (text colors are currently captured at
+  // module load). We instead ship "Frost White" — a chrome-white brand on
+  // a near-black bg — which delivers the same "white" personality without
+  // breaking contrast on dark-first screens.
+  "frost-white": mk({
+    id: "frost-white",
+    name: "Frost White",
+    description: "Chrome white · Subzero · Crisp",
     family: "white",
-    mode: "light",
-    bg: "#F4F4F8",
-    surfaceTint: "#FFFFFF",
-    brand: "#0B0B12",
-    accent: "#4B5563",
+    bg: "#070708",
+    surfaceTint: "#0D0D10",
+    brand: "#F8FAFC",
+    accent: "#CBD5E1",
+    textSecondary: "#D1D5DB",
+  }),
+
+  // ── Mint / Aqua family ───────────────────────────────────────────────────
+  "mint-aqua": mk({
+    id: "mint-aqua",
+    name: "Mint Aqua",
+    description: "Mint aqua · Fresh cool",
+    family: "green",
+    bg: "#04130F",
+    surfaceTint: "#08221C",
+    brand: "#34D399",
   }),
 };
 
