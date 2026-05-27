@@ -409,8 +409,15 @@ def register_routes(api: APIRouter, db: AsyncIOMotorDatabase, get_current_user):
             )
         }
         for r in rows:
-            r["reporter"] = users.get(r["reporter_id"])
-            r["target"] = users.get(r["target_id"])
+            reporter = users.get(r["reporter_id"])
+            target = users.get(r["target_id"])
+            # Default honor for users who have never had a delta applied.
+            if reporter is not None:
+                reporter.setdefault("honor", HONOR_START)
+            if target is not None:
+                target.setdefault("honor", HONOR_START)
+            r["reporter"] = reporter
+            r["target"] = target
             r.pop("created_at_dt", None)  # not JSON-serializable
         return {"reports": rows, "count": len(rows)}
 
