@@ -742,3 +742,57 @@ agent_communication:
       additions on the frontend. Awaiting user verification on Termux
       build before moving to Phase 8 backlog (SMTP).
 
+
+
+  - agent: "main"
+    message: |
+      **Phase 8.5 — Theme Library Expansion (Frontend only, no backend touched)**
+
+      Scope:
+        1. Rewrote /app/frontend/src/theme/themes.ts to host 25 themes (was
+           10). New themes are PURE-COLOR identities — the brand carries the
+           visual personality and the accent defaults to a lightened shade
+           of the brand to preserve a clean monochromatic look.
+
+           FEATURED (4, unchanged):
+             neon, midnight, amoled, cyber-purple
+
+           EXTRAS (21, new + curated):
+             emerald, toxic-lime,
+             electric-blue, deep-ocean, royal-blue, sapphire,
+             cyan-core, arctic,
+             neon-red, crimson, ruby-red,
+             orange-pulse, dark-bronze,
+             pink-neon, rose-glow,
+             plasma-violet, ultra-violet, royal,
+             gold, titanium-silver, pure-white (light-mode)
+
+        2. Added FEATURED_IDS and EXTRA_IDS exports to support the
+           Settings UI split.
+
+        3. Added mode: "dark" | "light" to ThemeTokens so pure-white can
+           render properly. shadeLayer() darkens for light themes; text
+           defaults flip to dark.
+
+        4. Rewrote /app/frontend/app/settings.tsx:
+           - Featured 4 cards stay exactly as before.
+           - Added collapsible "MORE THEMES" panel: header w/ palette icon,
+             count badge, animated chevron (rotates 0->90deg, native-driver).
+           - Body: search input (useDeferredValue) + 2-col grid of memoized
+             ThemeCard previews. Each card has a circular brand->accent disc
+             with check bubble + glow border when selected.
+           - LayoutAnimation drives expand/collapse on iOS+Android.
+           - Performance: React.memo on ThemeCard, useMemo on filtered list,
+             featured cards never re-render during search.
+
+        5. Added i18n keys (EN + AR): more_themes, theme_library,
+           themes_count_one/many, search_themes, no_themes_found.
+
+      Verified visually via Playwright:
+        - Collapsed -> 4 featured + "MORE THEMES (21 themes)" header.
+        - Expanded -> grid renders all 21 pure-color discs.
+        - Search "red" -> filters to Neon Red / Crimson / Ruby Red.
+        - Tapping Plasma Violet -> instant global re-theme, every surface,
+          border, glow, language section recolors.
+
+      No backend testing required.
