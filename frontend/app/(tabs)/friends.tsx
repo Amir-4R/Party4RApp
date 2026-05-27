@@ -11,9 +11,8 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { apiGet, apiPost, API_BASE } from "@/src/api/client";
 import { storage } from "@/src/utils/storage";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
@@ -52,6 +51,7 @@ function avatarOf(u: Friend): string {
 
 export default function FriendsScreen() {
   const { t } = useT();
+  const router = useRouter();
   const [tab, setTab] = useState<"friends" | "search">("friends");
   const [data, setData] = useState<FriendsData>({
     friends: [],
@@ -59,6 +59,7 @@ export default function FriendsScreen() {
     outgoing: [],
   });
   const [loading, setLoading] = useState(true);
+  const [unreadDms, setUnreadDms] = useState(0);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Friend[]>([]);
@@ -68,6 +69,14 @@ export default function FriendsScreen() {
     try {
       const d = await apiGet<FriendsData>("/friends");
       setData(d);
+    } catch {}
+    try {
+      const dms = await apiGet<{ conversations: { unread: number }[] }>("/dms");
+      const total = (dms.conversations || []).reduce(
+        (s, c) => s + (c.unread || 0),
+        0
+      );
+      setUnreadDms(total);
     } catch {}
     setLoading(false);
   }, []);
@@ -225,9 +234,17 @@ export default function FriendsScreen() {
         <TouchableOpacity
           testID="open-dms"
           onPress={() => router.push("/dms")}
-          style={{ marginLeft: "auto", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: COLORS.brandDim, borderWidth: 1, borderColor: COLORS.brand }}
+          style={styles.dmsBtn}
+          activeOpacity={0.85}
         >
           <Ionicons name="chatbubbles" size={20} color={COLORS.brand} />
+          {unreadDms > 0 && (
+            <View style={styles.dmBadge}>
+              <Text style={styles.dmBadgeText}>
+                {unreadDms > 99 ? "99+" : unreadDms}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -347,7 +364,39 @@ export default function FriendsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
-  header: { paddingHorizontal: 20, paddingVertical: 12 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  dmsBtn: {
+    marginLeft: "auto",
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: COLORS.brandDim,
+    borderWidth: 1,
+    borderColor: COLORS.brand,
+    position: "relative",
+  },
+  dmBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.error,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.bg,
+  },
+  dmBadgeText: { color: "#fff", fontSize: 10, fontWeight: "900" },
   title: {
     color: COLORS.textPrimary,
     fontSize: 28,

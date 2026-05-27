@@ -103,94 +103,109 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Add a clean package of UX features to the existing Party4RApp:
-  1. In-Room Volume Control Center: overlay panel inside the room with a slider for YouTube video volume.
-  2. In-Room Friends Shortcut: button inside the room to quickly view the Friends Hub (list, search, requests) without leaving.
-  3. Exit Confirmation Dialog: when "Leave Room" is pressed, show a center popup "Are you sure you want to leave?" with Yes/No choices.
-  4. Arabic language support: a Settings gear icon at the top-right of the Profile screen that opens a dedicated Settings menu containing a working English/Arabic toggle (room for future settings).
-  5. (CANCELLED by user) — Voice chat / microphone push-to-talk is dropped entirely.
+  Phase 3 (Direct Messaging + Shared Time) of the Party4RApp Mega-Update.
+  Goals for THIS iteration:
+  1. Wire the Direct Messaging inbox icon into the Friends tab header (chat-bubble button
+     with unread-count badge, routes to /dms).
+  2. Track co-watching shared-time between friends and surface it in the DM chat header
+     ("3h 12m shared"). Stored per-pair, NOT per session.
+  3. Privacy-gate shared time via PrivacySettings.shared_time_visibility (everyone/friends/nobody).
+  4. Keep all existing DM endpoints (history, send, edit, delete, read, typing, WS) working.
+
+backend:
+  - task: "DM REST endpoints (list, history, send, edit, delete, read, typing)"
+    implemented: true
+    working: true
+    file: "/app/backend/dms.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Phase 3 DMs were implemented in the prior session. Routes are friend-only, block-aware. Read receipts and typing relay over WS. 60-day TTL. Needs end-to-end retesting now that we wired the frontend entry point."
+      - working: true
+        agent: "testing"
+        comment: "Full DM REST flow verified end-to-end against prod URL. POST /dms returns 201 with id/from_id/to_id/text/created_at; GET /dms returns conversations with unread=0 for sender and unread=1 for receiver; GET /dms/{friend_id} returns history with the 'hello' text; POST /dms/{id}/read returns ok:true marked=1; POST /dms/{id}/typing returns ok:true; PATCH /dms/{message_id} sets edited:true and updates text; DELETE /dms/{message_id} returns ok:true. Block path returns 403 'You blocked this user'; after unblock the friend-only guard correctly returns 403 'Only friends can DM'."
+  - task: "DM WebSocket /api/ws/dms?token= for realtime fanout"
+    implemented: true
+    working: true
+    file: "/app/backend/dms.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Per-user single connection (newer displaces older). Pushes dm_new/dm_edit/dm_delete/dm_read/dm_typing/presence events. Should verify connect, send, receive."
+      - working: true
+        agent: "testing"
+        comment: "WS /api/ws/dms?token= verified. Both testuser1 and peer WS connections received dm_new with the full message payload when REST POST /dms was invoked. Peer disconnect produced a presence event {user_id:peer_id, online:false} on testuser1's WS within ~2s. Presence-online event also observed on connect."
+  - task: "Shared-time tracking on room WS disconnect"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added RoomManager.get_peer_overlaps and pair_time upsert in the WS finally{} block. Pair key = sorted user IDs joined by ':'. Tracks overlap seconds for everyone still in the room when this user leaves."
+      - working: true
+        agent: "testing"
+        comment: "Both users connected to /api/ws/rooms/{room_id} concurrently for ~4s; peer disconnected first. pair_time collection has exactly 1 document with pair key = sorted(testuser1_id, peer_id) joined by ':' and seconds=4 (>=2 as required), user_ids array sorted, last_room_id set."
+  - task: "GET /api/users/{user_id}/shared_time endpoint with privacy gate"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Returns {seconds, hidden}. Respects target user's shared_time_visibility privacy field (everyone/friends/nobody). Self-view always sees full value."
+      - working: true
+        agent: "testing"
+        comment: "GET /api/users/{peer_id}/shared_time as testuser1 returned {seconds:4, hidden:false} after co-watch. After peer set shared_time_visibility='nobody', the same call returned {seconds:0, hidden:true}. Restoring to 'friends' worked. GET /api/users/privacy returned all four visibility fields as expected."
 
 frontend:
-  - task: "Settings gear icon on Profile -> Settings screen with Language toggle (EN/AR)"
+  - task: "Messages icon + unread badge in Friends tab header"
     implemented: true
     working: "NA"
-    file: "/app/frontend/app/(tabs)/profile.tsx, /app/frontend/app/settings.tsx, /app/frontend/src/context/LanguageContext.tsx"
+    file: "/app/frontend/app/(tabs)/friends.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added floating gear icon (testID profile-settings-gear) at top-right of profile screen that navigates to /settings. Settings screen has an EN/AR language toggle; on switch persists choice and triggers I18nManager.forceRTL with a 'restart required' alert when needed."
-  - task: "In-room header — Settings + Friends shortcut buttons"
+        comment: "Fixed missing useRouter() call (router was undefined), made header a flex row, added neon chat-bubble button (testID='open-dms') routing to /dms, and added a red unread-count badge fed from /api/dms.conversations[].unread."
+  - task: "Shared-time line in DM chat header"
     implemented: true
     working: "NA"
-    file: "/app/frontend/app/room/[id].tsx"
+    file: "/app/frontend/app/dms/[friendId].tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added two new header buttons (testIDs room-settings-open, room-friends-open) next to fullscreen. The gear icon switches to volume-mute (red) when video volume is 0. Mic/voice UI completely removed."
-  - task: "Video Volume control (YouTube IFrame postMessage)"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/app/room/[id].tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Settings modal exposes a 0/20/40/60/80/100 stepper. Each change injects player.setVolume + player.mute/unMute via injectJavaScript. Voice volume section was removed per user cancellation."
-  - task: "In-Room Friends Modal"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/app/room/[id].tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Header people icon opens a pageSheet modal that fetches /api/friends and lists incoming + friend rows without leaving the room."
-  - task: "Leave Room confirmation alert"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/app/room/[id].tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Leaving the room now opens a translated Alert with Stay/Leave buttons. Closes the WS only after confirm."
-  - task: "App-wide English/Arabic translations across tabs, home, profile, room"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/src/context/LanguageContext.tsx + screens"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Tabs labels, home greeting/title/empty state, profile section labels, room header/status/composer/empty state and exit alert are all driven through t()."
+        comment: "DM chat subtitle now shows 'online/offline · Xh Ym shared' when the privacy gate allows it. Uses /api/users/{id}/shared_time. Empty/hidden values fall back to plain online/offline label."
 
 metadata:
   created_by: "main_agent"
-  version: "2.0"
-  test_sequence: 1
-  run_ui: true
+  version: "3.0"
+  test_sequence: 2
+  run_ui: false
 
 test_plan:
   current_focus:
-    - "Settings gear icon on Profile -> Settings screen with Language toggle (EN/AR)"
-    - "In-room header — Settings + Friends shortcut buttons"
-    - "Video Volume control (YouTube IFrame postMessage)"
-    - "In-Room Friends Modal"
-    - "Leave Room confirmation alert"
+    - "DM REST endpoints (list, history, send, edit, delete, read, typing)"
+    - "DM WebSocket /api/ws/dms?token= for realtime fanout"
+    - "Shared-time tracking on room WS disconnect"
+    - "GET /api/users/{user_id}/shared_time endpoint with privacy gate"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -198,12 +213,56 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Implemented the new UX package WITHOUT voice/mic (cancelled by user). Highlights:
-      • Profile screen gains a floating gear icon (top-right) → /settings.
-      • Settings screen has a clean EN/AR language toggle with a restart-required alert when RTL flips.
-      • Room header now exposes Settings (gear) + Friends (people) buttons + existing fullscreen + back.
-      • Settings modal in room: 0–100 video volume stepper that drives the YouTube iframe via postMessage.
-      • Friends modal in room reuses /api/friends (no new endpoints required).
-      • Leave confirmation uses a translated Stay/Leave Alert before disconnecting the WS.
-      • New i18n keys added; LanguageContext now persists choice and toggles I18nManager.forceRTL.
-      Test credentials: testuser1 / pass1234. No backend changes were made in this iteration.
+      Phase 3 wrap-up changes for Party4RApp.
+
+      Please test the backend pieces below. Credentials: testuser1 / pass1234 (from
+      /app/memory/test_credentials.md). Backend base URL = process.env.EXPO_BACKEND_URL/api.
+
+      FOCUS:
+      1. DM REST flow:
+         - Create a second user via POST /api/auth/signup, friend testuser1, accept.
+         - As testuser1, POST /api/dms/{other_id}  { text:"hi" } → 201 + message obj
+         - GET /api/dms → conversations array with last_message + unread fields
+         - GET /api/dms/{other_id} → history array
+         - POST /api/dms/{other_id}/read → ok + marked count
+         - PATCH /api/dms/{message_id} body { text:"edited" }
+         - DELETE /api/dms/{message_id}
+         - POST /api/dms/{other_id}/typing
+         - Block path: POST /api/users/block/{other_id} then verify DM is 403.
+         - Friend gate: try DM-ing a non-friend → 403.
+
+      2. DM WebSocket:
+         - Connect wss://<host>/api/ws/dms?token=<jwt> as both users.
+         - Send a DM REST and confirm both sides receive dm_new event.
+         - Confirm presence events fire on connect / disconnect.
+
+      3. Shared time:
+         - Both users join the same room via WS /api/ws/rooms/{room_id}?token=<jwt>.
+         - Stay ~3 seconds, then have one user disconnect.
+         - GET /api/users/{other_id}/shared_time as the remaining user → seconds > 0.
+         - Toggle privacy: PATCH /api/users/privacy {shared_time_visibility:"nobody"}
+           then have the OTHER user GET /api/users/{me}/shared_time → hidden:true,
+           seconds:0.
+
+      Use the existing pre-seeded testuser1 plus one freshly-created test peer.
+  - agent: "testing"
+    message: |
+      Phase 3 backend testing complete — ALL 28 assertions passed against the public URL
+      (https://partyapp-sync.preview.emergentagent.com). Test script: /app/backend_test.py.
+
+      Highlights:
+      • DM REST: send/list/history/read/typing/edit/delete all return expected shapes.
+        Conversations row has last_message, unread=0 for sender, unread=1 for receiver.
+      • Block guard returns 403 'You blocked this user'. After unblock, friend-only
+        guard correctly returns 403 'Only friends can DM' (block removes friendship).
+      • DM WebSocket: both peers receive dm_new on REST send. Closing peer WS produces
+        presence {online:false} on testuser1 WS within ~2s. Online-presence event also
+        observed on connect.
+      • Shared time: after ~4s co-watch (both connected to /api/ws/rooms/{room_id}) and
+        peer disconnect, GET /api/users/{peer_id}/shared_time returns {seconds:4,
+        hidden:false}. Privacy 'nobody' returns {seconds:0, hidden:true}. Privacy
+        'friends' restored cleanly.
+      • Sanity: db.pair_time has exactly 1 doc with pair key
+        '<sortedA>:<sortedB>', user_ids sorted, seconds=4 (>0).
+
+      No failures, no minor issues to report. Main agent can summarise and finish.

@@ -27,6 +27,13 @@ interface DM {
 
 interface Friend { id: string; nickname: string; avatar: string; avatar_image?: string }
 
+function formatSharedTime(s: number): string {
+  if (!s || s < 60) return "<1m";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h === 0 ? `${m}m` : `${h}h ${m}m`;
+}
+
 export default function DMChatScreen() {
   const { friendId } = useLocalSearchParams<{ friendId: string }>();
   const router = useRouter();
@@ -38,6 +45,7 @@ export default function DMChatScreen() {
   const [sending, setSending] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherOnline, setOtherOnline] = useState(false);
+  const [sharedSeconds, setSharedSeconds] = useState<number | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<FlatList>(null);
@@ -51,13 +59,15 @@ export default function DMChatScreen() {
     if (!friendId) return;
     (async () => {
       try {
-        const [history, friends] = await Promise.all([
+        const [history, friends, shared] = await Promise.all([
           apiGet<{ messages: DM[] }>(`/dms/${friendId}`),
           apiGet<{ friends: Friend[] }>("/friends"),
+          apiGet<{ seconds: number; hidden: boolean }>(`/users/${friendId}/shared_time`).catch(() => ({ seconds: 0, hidden: true })),
         ]);
         setMessages(history.messages);
         const f = (friends.friends || []).find((x: any) => x.id === friendId);
         if (f) setFriend(f);
+        if (shared && !shared.hidden) setSharedSeconds(shared.seconds || 0);
         // Mark as read
         apiPost(`/dms/${friendId}/read`).catch(() => {});
       } catch (e) {} finally { setLoading(false); }
@@ -174,8 +184,16 @@ export default function DMChatScreen() {
             <Image source={{ uri: friend.avatar_image || getAvatarUrl(friend.avatar) }} style={styles.headerAvatar} />
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>{friend.nickname}</Text>
-              <Text style={styles.subtitle}>
-                {otherTyping ? "typing…" : otherOnline ? "online" : "offline"}
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {otherTyping
+                  ? "typing…"
+                  : otherOnline
+                    ? (sharedSeconds && sharedSeconds > 0
+                        ? `online · ${formatSharedTime(sharedSeconds)} shared`
+                        : "online")
+                    : (sharedSeconds && sharedSeconds > 0
+                        ? `offline · ${formatSharedTime(sharedSeconds)} shared`
+                        : "offline")}
               </Text>
             </View>
           </>

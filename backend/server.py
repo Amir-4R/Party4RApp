@@ -248,6 +248,30 @@ class RoomManager:
             return 0
         return max(0, int(_t.time() - start))
 
+    def get_peer_overlaps(self, room_id: str, user_id: str) -> list:
+        """Return [(peer_id, overlap_seconds), ...] for all OTHER members
+        currently in the room at the time this user leaves.
+
+        Overlap = now - max(my_connect_time, peer_connect_time)
+        Used to track shared-time between pairs of friends co-watching.
+        """
+        import time as _t
+        now = _t.time()
+        my_start = self.connect_time.get((room_id, user_id))
+        if my_start is None:
+            return []
+        peers = []
+        for peer_id in list(self.rooms.get(room_id, {}).keys()):
+            if peer_id == user_id:
+                continue
+            peer_start = self.connect_time.get((room_id, peer_id))
+            if peer_start is None:
+                continue
+            overlap = max(0, int(now - max(my_start, peer_start)))
+            if overlap > 0:
+                peers.append((peer_id, overlap))
+        return peers
+
     def disconnect(self, room_id: str, user_id: str) -> bool:
         """Returns True if room became empty and should be destroyed."""
         empty = False
@@ -777,6 +801,8 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
     finally:
         was_host = manager.get_host(room_id) == user["id"]
         mark_offline(user["id"])
+        # Track shared-time with currently-connected peers (Phase 3)
+        peer_overlaps = manager.get_peer_overlaps(room_id, user["id"])
         # Track session duration for analytics
         session_secs = manager.pop_session_seconds(room_id, user["id"])
         if session_secs > 0:
@@ -786,6 +812,29 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 )
             except Exception:
                 pass
+        # Persist pair-level shared seconds (upsert per pair)
+        for peer_id, overlap_seconds in peer_overlaps:
+            if overlap_seconds <= 0:
+                continue
+            try:
+                pair_key = ":".join(sorted([user["id"], peer_id]))
+                await db.pair_time.update_one(
+                    {"pair": pair_key},
+                    {
+                        "$inc": {"seconds": int(overlap_seconds)},
+                        "$set": {
+                            "last_room_id": room_id,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                        "$setOnInsert": {
+                            "pair": pair_key,
+                            "user_ids": sorted([user["id"], peer_id]),
+                        },
+                    },
+                    upsert=True,
+                )
+            except Exception as e:
+                logger.warning("pair_time upsert failed: %s", e)
         empty = manager.disconnect(room_id, user["id"])
         if empty:
             await db.rooms.delete_one({"id": room_id})
@@ -812,6 +861,38 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
 
 
 app.include_router(api)
+
+# ============================================================================
+# Phase 3 — Shared Time (pair-level co-watching minutes)
+# ============================================================================
+@app.get("/api/users/{user_id}/shared_time")
+async def get_shared_time(user_id: str, current: dict = Depends(get_current_user)):
+    """Return total seconds the current user has co-watched with `user_id`.
+
+    Privacy gate: respects the target user's `shared_time_visibility` field
+    from PrivacySettings (everyone | friends | nobody).
+    """
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "privacy": 1, "friends": 1})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if user_id != current["id"]:
+        vis = (target.get("privacy") or {}).get("shared_time_visibility", "friends")
+        if vis == "nobody":
+            return {"seconds": 0, "hidden": True}
+        if vis == "friends" and user_id not in (current.get("friends") or []):
+            return {"seconds": 0, "hidden": True}
+    pair_key = ":".join(sorted([current["id"], user_id]))
+    row = await db.pair_time.find_one({"pair": pair_key}, {"_id": 0, "seconds": 1})
+    return {"seconds": int((row or {}).get("seconds", 0)), "hidden": False}
+
+
+@app.on_event("startup")
+async def _pair_time_indexes():
+    try:
+        await db.pair_time.create_index("pair", unique=True, name="pair_unique")
+        await db.pair_time.create_index("user_ids", name="pair_user_ids")
+    except Exception as e:
+        logger.warning("pair_time index creation skipped: %s", e)
 
 # ============================================================================
 # Phase 2 (Mega Update) — Privacy, Safety, Moderation routes
