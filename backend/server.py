@@ -702,6 +702,44 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 if target and target in manager.rooms.get(room_id, {}):
                     manager.set_host(room_id, target)
                     await manager.broadcast(room_id, {"type": "host_changed", "host_id": target})
+            elif mtype == "vote_start":
+                room_doc = await db.rooms.find_one({"id": room_id}, {"_id": 0, "voting_mode": 1})
+                mode = (room_doc or {}).get("voting_mode", "allowed")
+                if mode == "owner_only" and manager.get_host(room_id) != user["id"]:
+                    continue
+                kind = data.get("kind")
+                if kind not in ("skip", "next"):
+                    continue
+                v = _vote_start(
+                    room_id, kind, user["id"], manager.member_count(room_id),
+                    video_id=data.get("video_id"),
+                    video_url=data.get("video_url"),
+                    title=data.get("title"),
+                )
+                if v:
+                    await manager.broadcast(room_id, {"type": "vote_state", "vote": v.public()})
+            elif mtype == "vote_cast":
+                v = _vote_cast(room_id, user["id"], bool(data.get("yes", False)))
+                if not v:
+                    continue
+                await manager.broadcast(room_id, {"type": "vote_state", "vote": v.public()})
+                if v.passed():
+                    if v.kind == "skip":
+                        await manager.broadcast(room_id, {"type": "vote_result", "passed": True, "kind": "skip"})
+                    elif v.kind == "next" and (v.video_url or v.video_id):
+                        url = v.video_url or f"https://www.youtube.com/watch?v={v.video_id}"
+                        await db.rooms.update_one({"id": room_id}, {"$set": {"video_url": url}})
+                        await manager.broadcast(room_id, {
+                            "type": "playback", "event": "change_video",
+                            "video_url": url, "host_id": user["id"],
+                        })
+                        await manager.broadcast(room_id, {"type": "vote_result", "passed": True, "kind": "next", "video_url": url})
+                    _vote_end(room_id)
+            elif mtype == "vote_cancel":
+                v = _vote_active(room_id)
+                if v and (v.initiator == user["id"] or manager.get_host(room_id) == user["id"]):
+                    _vote_end(room_id)
+                    await manager.broadcast(room_id, {"type": "vote_result", "passed": False, "kind": v.kind, "cancelled": True})
             elif mtype == "state_request":
                 # New joiner asks for current playback state — forward to host
                 host_ws = manager.rooms.get(room_id, {}).get(room["host_id"])
@@ -786,6 +824,13 @@ from dms import (
     register_ws as _register_dms_ws,
     ensure_indexes as _ensure_dms_indexes,
 )  # noqa: E402
+from rooms_voting import (
+    register_routes as _register_voting,
+    start_vote as _vote_start,
+    cast_vote as _vote_cast,
+    get_active as _vote_active,
+    end_vote as _vote_end,
+)  # noqa: E402
 
 # We create a NEW router for phase 2 then include it (works because we include after)
 _phase2_router = APIRouter(prefix="/api")
@@ -797,6 +842,11 @@ _dms_router = APIRouter(prefix="/api")
 _register_dms(_dms_router, db, get_current_user)
 app.include_router(_dms_router)
 _register_dms_ws(app, db, get_user_by_id, decode_token)
+
+# Phase 4 — Room voting + settings
+_voting_router = APIRouter(prefix="/api")
+_register_voting(_voting_router, db, get_current_user)
+app.include_router(_voting_router)
 
 
 @app.on_event("startup")
