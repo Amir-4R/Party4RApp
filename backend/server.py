@@ -749,13 +749,22 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 await manager.broadcast(room_id, {"type": "vote_state", "vote": v.public()})
                 if v.passed():
                     if v.kind == "skip":
+                        # Clear the room's current video and broadcast a change_video
+                        # so all clients actually drop to "No video" state.
+                        await db.rooms.update_one(
+                            {"id": room_id}, {"$set": {"video_url": None}}
+                        )
+                        await manager.broadcast(room_id, {
+                            "type": "playback", "event": "change_video",
+                            "video_url": None, "host_id": manager.get_host(room_id),
+                        })
                         await manager.broadcast(room_id, {"type": "vote_result", "passed": True, "kind": "skip"})
                     elif v.kind == "next" and (v.video_url or v.video_id):
                         url = v.video_url or f"https://www.youtube.com/watch?v={v.video_id}"
                         await db.rooms.update_one({"id": room_id}, {"$set": {"video_url": url}})
                         await manager.broadcast(room_id, {
                             "type": "playback", "event": "change_video",
-                            "video_url": url, "host_id": user["id"],
+                            "video_url": url, "host_id": manager.get_host(room_id),
                         })
                         await manager.broadcast(room_id, {"type": "vote_result", "passed": True, "kind": "next", "video_url": url})
                     _vote_end(room_id)

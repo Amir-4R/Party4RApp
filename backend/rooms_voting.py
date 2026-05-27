@@ -193,3 +193,16 @@ def register_routes(api: APIRouter, db: AsyncIOMotorDatabase, get_current_user):
             "embed_url": f"https://www.youtube.com/embed/{vid}",
             "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
         }
+
+    @api.get("/youtube/extract")
+    async def youtube_extract_get(url: str, current: dict = Depends(get_current_user)):
+        """GET alias for /youtube/extract — accepts `?url=` query param."""
+        vid = extract_video_id(url)
+        if not vid:
+            raise HTTPException(400, "No YouTube video ID found in URL")
+        return {
+            "video_id": vid,
+            "video_url": f"https://www.youtube.com/watch?v={vid}",
+            "embed_url": f"https://www.youtube.com/embed/{vid}",
+            "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+        }

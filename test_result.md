@@ -171,9 +171,9 @@ backend:
         comment: "GET /api/users/{peer_id}/shared_time as testuser1 returned {seconds:4, hidden:false} after co-watch. After peer set shared_time_visibility='nobody', the same call returned {seconds:0, hidden:true}. Restoring to 'friends' worked. GET /api/users/privacy returned all four visibility fields as expected."
   - task: "Phase 4 — Vote start/cast/cancel WS flow + voting_mode policy"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/rooms_voting.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -208,11 +208,25 @@ backend:
           Note on field names: rooms_voting.VoteState.public() emits keys named
           `initiator`, `yes`, `no` (NOT `initiator_id`, `yes_votes`, `no_votes` as the
           review brief described). Frontend must consume these keys.
+      - working: true
+        agent: "testing"
+        comment: |
+          Re-verified after main agent fix (server.py lines 750-761). Skip-vote now
+          correctly:
+          PASS  Both peers receive {type:"playback", event:"change_video",
+                video_url:null, host_id:<host>} immediately after the skip vote passes.
+          PASS  Both peers also receive {type:"vote_result", passed:true, kind:"skip"}.
+          PASS  GET /api/rooms/{room_id} (called while WS still connected) returns
+                video_url: null (db.rooms.update_one with $set:{video_url:None} fired).
+          Reproduced via /app/backend_test_reverify.py against the public URL.
+          Note: rooms are deleted from db when the last WS disconnects (server.py:849
+          rooms.delete_one), so any HTTP verification of room.video_url must happen
+          before all clients leave.
   - task: "Phase 4 — PATCH /api/rooms/{id}/settings voting_mode + GET /api/youtube/extract"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/rooms_voting.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -230,16 +244,21 @@ backend:
 
           /api/youtube/extract — CRITICAL METHOD MISMATCH:
             FAIL GET /api/youtube/extract?url=... returns 405 Method Not Allowed for
-                 every URL (valid YouTube URL, youtu.be short URL, AND invalid URL).
-            rooms_voting.py line 184 declares the route as @api.post("/youtube/extract")
-            with a JSON body model (YouTubeExtract.url), NOT a GET with query string.
-            The review brief and (per the task title) the frontend expect GET ?url=.
-            POST /api/youtube/extract  with body {"url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
-            DOES return 200 with {video_id:"dQw4w9WgXcQ", video_url, embed_url,
-            thumbnail:"https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"} — so the
-            extraction logic itself works, only the HTTP method/signature is wrong.
-            Fix: add a GET overload (or change to GET) that accepts ?url= as a query
-            parameter and reuses extract_video_id().
+                 every URL. POST works fine.
+      - working: true
+        agent: "testing"
+        comment: |
+          Re-verified after main agent added GET handler in rooms_voting.py:197-208.
+          PASS  GET /api/youtube/extract?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ
+                -> 200 with {video_id:"dQw4w9WgXcQ", video_url, embed_url, thumbnail
+                "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"}.
+          PASS  GET /api/youtube/extract?url=https://youtu.be/dQw4w9WgXcQ -> 200, same
+                video_id "dQw4w9WgXcQ".
+          PASS  GET /api/youtube/extract?url=not-a-valid-url -> 400
+                "No YouTube video ID found in URL".
+          PASS  POST /api/youtube/extract regression — still returns 200 with same
+                payload shape.
+          All four assertions green via /app/backend_test_reverify.py.
 
 frontend:
   - task: "Messages icon + unread badge in Friends tab header"
@@ -283,9 +302,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Phase 4 — Vote start/cast/cancel WS flow + voting_mode policy"
-    - "Phase 4 — PATCH /api/rooms/{id}/settings voting_mode + GET /api/youtube/extract"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -364,3 +381,34 @@ agent_communication:
       Heads-up on field naming: rooms_voting.VoteState.public() emits {initiator,yes,no}
       (not {initiator_id,yes_votes,no_votes} as written in the brief). Make sure the
       frontend reads `vote.initiator`, `vote.yes`, `vote.no`.
+
+  - agent: "testing"
+    message: |
+      Phase 4 RE-VERIFICATION of the two previously flagged fixes — BOTH PASS now.
+
+      Re-test script: /app/backend_test_reverify.py (ran against
+      https://partyapp-sync.preview.emergentagent.com). All 11 assertions green.
+
+      1) GET /api/youtube/extract (newly added in rooms_voting.py:197-208):
+         • GET ?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ -> 200,
+           {video_id:"dQw4w9WgXcQ", video_url, embed_url,
+            thumbnail:"https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"}.
+         • GET ?url=https://youtu.be/dQw4w9WgXcQ -> 200, same video_id.
+         • GET ?url=not-a-valid-url -> 400 "No YouTube video ID found in URL".
+         • POST /api/youtube/extract regression -> still 200 with same payload.
+
+      2) Skip-vote now clears video_url (server.py:750-761):
+         • Created room with video_url=youtube URL, host = testuser1, peer = fresh
+           friended account.
+         • Peer vote_start kind=skip -> vote_state broadcast to both sides.
+         • Host vote_cast yes -> BOTH sides receive:
+             a) {type:"playback", event:"change_video", video_url:null,
+                 host_id:<host>}
+             b) {type:"vote_result", passed:true, kind:"skip"}
+         • GET /api/rooms/{room_id} (while WS still open) returns video_url: null.
+         • Note: when the last WS disconnects, the room is deleted (server.py:849
+           rooms.delete_one); HTTP video_url verification must happen before that.
+
+      No other regressions observed. Both Phase 4 tasks are now working:true and
+      removed from current_focus. Main agent: please summarise and finish — no
+      further backend re-test required for these items.
