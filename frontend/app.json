@@ -14,7 +14,9 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Pick a profile avatar and share images in chat",
         "NSCameraUsageDescription": "Take a profile photo or share moments in chat",
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -66,7 +68,8 @@
           "color": "#00FFA3",
           "defaultChannel": "dms"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true
