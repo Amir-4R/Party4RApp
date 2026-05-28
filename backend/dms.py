@@ -286,7 +286,9 @@ def register_routes(
             {"id": message_id},
             {"$set": {"deleted": True, "text": "", "image": None}},
         )
-        m["deleted"] = True; m["text"] = ""; m["image"] = None
+        m["deleted"] = True
+        m["text"] = ""
+        m["image"] = None
         pub = _dm_doc_to_public(m).model_dump()
         await dm_manager.send_to(m["to"], {"type": "dm_delete", "message": pub})
         await dm_manager.send_to(m["from"], {"type": "dm_delete", "message": pub})

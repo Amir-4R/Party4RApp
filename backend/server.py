@@ -974,7 +974,7 @@ app.add_middleware(
 
 
 @app.get("/")
-async def root():
+async def root():  # noqa: F811 — different router (app vs api), intentional second route
     """Plain root for Render healthchecks / uptime monitors."""
     return {"service": "party4r-backend", "status": "ok", "version": app.version}
 
