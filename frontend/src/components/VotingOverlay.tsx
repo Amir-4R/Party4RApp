@@ -123,8 +123,8 @@ export default function VotingOverlay({
         <LinearGradient
           colors={[
             "rgba(255,255,255,0.35)",
-            "rgba(34,255,136,0.55)",
-            "rgba(168,85,247,0.55)",
+            "FUTURISTIC.brandGlow",
+            "FUTURISTIC.accentGlow",
             "rgba(255,255,255,0.35)",
           ]}
           start={{ x: 0, y: 0 }}
@@ -282,7 +282,7 @@ function ActionBtn({
   const isYes = variant === "yes";
   const fg = isYes ? "#001A0C" : "#FFFFFF";
   const edge = isYes
-    ? (["rgba(255,255,255,0.55)", "rgba(34,255,136,0.55)"] as const)
+    ? (["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"] as const)
     : (["rgba(255,255,255,0.45)", "rgba(255,61,113,0.55)"] as const);
   const fill = isYes
     ? (["#26FF93", "#10C66D"] as const)

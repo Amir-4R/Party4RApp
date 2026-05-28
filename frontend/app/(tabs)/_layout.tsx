@@ -46,8 +46,8 @@ function FloatingTabBackground() {
         colors={[
           "transparent",
           "rgba(255,255,255,0.30)",
-          "rgba(34,255,136,0.40)",
-          "rgba(168,85,247,0.40)",
+          FUTURISTIC.brandGlow,
+          FUTURISTIC.accentGlow,
           "rgba(255,255,255,0.30)",
           "transparent",
         ]}
@@ -58,7 +58,7 @@ function FloatingTabBackground() {
       />
       {/* Subtle inner glow at the bottom */}
       <LinearGradient
-        colors={["transparent", "rgba(34,255,136,0.06)"]}
+        colors={["transparent", FUTURISTIC.brandSoft]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -71,7 +71,11 @@ function FloatingTabBackground() {
 export default function TabsLayout() {
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, 8);
+  // Always reserve at least ~24px below the tab bar contents so the icons
+  // and labels never collide with the Android 3-button nav bar. On gesture
+  // navigation phones `insets.bottom` is small; on 3-button phones it's
+  // ~48px. We take the max + a small visual buffer.
+  const bottomInset = Math.max(insets.bottom, 24);
 
   return (
     <Tabs

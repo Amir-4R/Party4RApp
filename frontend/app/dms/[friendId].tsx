@@ -101,7 +101,7 @@ function PulseSendButton({
     >
       {!disabled && <Animated.View pointerEvents="none" style={[styles.sendHalo, haloStyle]} />}
       <LinearGradient
-        colors={["rgba(255,255,255,0.55)", "rgba(34,255,136,0.55)"]}
+        colors={["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ borderRadius: 23, padding: 1, opacity: disabled ? 0.5 : 1 }}
@@ -187,7 +187,7 @@ function MessageBubble({
         {mine ? (
           // ---- MY bubble: gradient brand + chrome edge ----
           <LinearGradient
-            colors={["rgba(255,255,255,0.55)", "rgba(34,255,136,0.55)"]}
+            colors={["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.bubEdgeMine]}
@@ -224,7 +224,7 @@ function MessageBubble({
           <LinearGradient
             colors={[
               "rgba(255,255,255,0.20)",
-              "rgba(168,85,247,0.20)",
+              "FUTURISTIC.accentSoft",
               "rgba(255,255,255,0.05)",
             ]}
             start={{ x: 0, y: 0 }}
@@ -476,8 +476,8 @@ export default function DMChatScreen() {
   return (
     <View style={styles.safe}>
       <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
-      <LightBeam angle={-20} color="rgba(34,255,136,0.08)" speed={11000} thickness={200} intensity={0.4} />
-      <LightBeam angle={18} color="rgba(168,85,247,0.08)" speed={13000} delay={2500} thickness={180} intensity={0.36} />
+      <LightBeam angle={-20} color="FUTURISTIC.brandSoft" speed={11000} thickness={200} intensity={0.4} />
+      <LightBeam angle={18} color="FUTURISTIC.accentSoft" speed={13000} delay={2500} thickness={180} intensity={0.36} />
 
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* ----- Header ----- */}
@@ -492,7 +492,7 @@ export default function DMChatScreen() {
                 <LinearGradient
                   colors={
                     otherOnline
-                      ? ["rgba(34,255,136,0.85)", "rgba(168,85,247,0.55)"]
+                      ? ["FUTURISTIC.brand", "FUTURISTIC.accentGlow"]
                       : ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.05)"]
                   }
                   start={{ x: 0, y: 0 }}
@@ -518,8 +518,8 @@ export default function DMChatScreen() {
           colors={[
             "transparent",
             "rgba(255,255,255,0.18)",
-            "rgba(34,255,136,0.35)",
-            "rgba(168,85,247,0.35)",
+            "FUTURISTIC.brandSoft",
+            "FUTURISTIC.accentSoft",
             "rgba(255,255,255,0.18)",
             "transparent",
           ]}
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "900",
     letterSpacing: 0.4,
-    textShadowColor: "rgba(34,255,136,0.25)",
+    textShadowColor: "FUTURISTIC.brandSoft",
     textShadowRadius: 6,
   },
   subtitleRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
     right: -8,
     bottom: -8,
     borderRadius: 36,
-    backgroundColor: "rgba(34,255,136,0.35)",
+    backgroundColor: "FUTURISTIC.brandSoft",
     shadowColor: FUTURISTIC.brand,
     shadowOpacity: 1,
     shadowRadius: 18,

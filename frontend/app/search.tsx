@@ -242,8 +242,8 @@ export default function SearchScreen() {
   return (
     <View style={styles.bg}>
       <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
-      <LightBeam angle={-20} color="rgba(34,255,136,0.10)" speed={11000} thickness={200} intensity={0.40} />
-      <LightBeam angle={18} color="rgba(168,85,247,0.09)" speed={13000} delay={2400} thickness={180} intensity={0.36} />
+      <LightBeam angle={-20} color="FUTURISTIC.brandSoft" speed={11000} thickness={200} intensity={0.40} />
+      <LightBeam angle={18} color="FUTURISTIC.accentSoft" speed={13000} delay={2400} thickness={180} intensity={0.36} />
 
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Header */}
@@ -273,7 +273,7 @@ export default function SearchScreen() {
             <LinearGradient
               colors={
                 focused
-                  ? ["rgba(255,255,255,0.55)", "rgba(34,255,136,0.55)", "rgba(168,85,247,0.45)"]
+                  ? ["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow", "FUTURISTIC.accentGlow"]
                   : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
               }
               start={{ x: 0, y: 0 }}
@@ -442,7 +442,7 @@ function RoomRow({ room, onPress, highlightQuery }: { room: Room; onPress: (r: R
           <LinearGradient
             colors={
               active
-                ? ["rgba(34,255,136,0.85)", "rgba(168,85,247,0.45)"]
+                ? ["FUTURISTIC.brand", "FUTURISTIC.accentGlow"]
                 : ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.04)"]
             }
             start={{ x: 0, y: 0 }}
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   title: {
     ...TYPO.h1,
     color: FUTURISTIC.textPrimary,
-    textShadowColor: "rgba(34,255,136,0.30)",
+    textShadowColor: "FUTURISTIC.brandSoft",
     textShadowRadius: 10,
   },
   // Search bar

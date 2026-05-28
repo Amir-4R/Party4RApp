@@ -169,7 +169,7 @@ function CreateFab({ onPress }: { onPress: () => void }) {
       <Animated.View pointerEvents="none" style={[styles.fabGlow, glowStyle]} />
       <Animated.View style={innerStyle}>
         <LinearGradient
-          colors={["rgba(255,255,255,0.55)", "rgba(34,255,136,0.55)"]}
+          colors={["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ borderRadius: 28, padding: 1 }}
@@ -229,7 +229,7 @@ export default function HomeScreen() {
             <LinearGradient
               colors={
                 active
-                  ? ["rgba(34,255,136,0.85)", "rgba(168,85,247,0.45)"]
+                  ? ["FUTURISTIC.brand", "FUTURISTIC.accentGlow"]
                   : ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.04)"]
               }
               start={{ x: 0, y: 0 }}
@@ -296,7 +296,7 @@ export default function HomeScreen() {
       {/* Ambient light beams */}
       <LightBeam
         angle={-22}
-        color="rgba(34,255,136,0.16)"
+        color="FUTURISTIC.brandSoft"
         speed={9000}
         delay={0}
         thickness={220}
@@ -304,7 +304,7 @@ export default function HomeScreen() {
       />
       <LightBeam
         angle={18}
-        color="rgba(168,85,247,0.13)"
+        color="FUTURISTIC.accentSoft"
         speed={11000}
         delay={2200}
         thickness={200}
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   title: {
     ...TYPO.display,
     color: FUTURISTIC.textPrimary,
-    textShadowColor: "rgba(34,255,136,0.25)",
+    textShadowColor: "FUTURISTIC.brandSoft",
     textShadowRadius: 12,
   },
   // ---------------------- FAB ----------------------
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     top: -12,
     left: -12,
-    backgroundColor: "rgba(34,255,136,0.30)",
+    backgroundColor: "FUTURISTIC.brandSoft",
     shadowColor: FUTURISTIC.brand,
     shadowOpacity: 0.95,
     shadowRadius: 24,

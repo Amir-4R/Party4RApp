@@ -63,8 +63,8 @@ export default function DMInboxScreen() {
   return (
     <View style={styles.bg}>
       <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
-      <LightBeam angle={-20} color="rgba(34,255,136,0.12)" speed={10000} thickness={200} intensity={0.45} />
-      <LightBeam angle={18} color="rgba(168,85,247,0.10)" speed={12000} delay={2500} thickness={180} intensity={0.4} />
+      <LightBeam angle={-20} color="FUTURISTIC.brandSoft" speed={10000} thickness={200} intensity={0.45} />
+      <LightBeam angle={18} color="FUTURISTIC.accentSoft" speed={12000} delay={2500} thickness={180} intensity={0.4} />
 
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Header */}
@@ -123,7 +123,7 @@ export default function DMInboxScreen() {
                         <LinearGradient
                           colors={
                             item.online
-                              ? ["rgba(34,255,136,0.85)", "rgba(168,85,247,0.55)"]
+                              ? ["FUTURISTIC.brand", "FUTURISTIC.accentGlow"]
                               : ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.04)"]
                           }
                           start={{ x: 0, y: 0 }}
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   title: {
     ...TYPO.h1,
     color: FUTURISTIC.textPrimary,
-    textShadowColor: "rgba(34,255,136,0.30)",
+    textShadowColor: "FUTURISTIC.brandSoft",
     textShadowRadius: 10,
   },
   countPill: {

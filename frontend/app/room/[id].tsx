@@ -633,7 +633,7 @@ export default function RoomScreen() {
           <>
             <LightBeam
               angle={-22}
-              color="rgba(34,255,136,0.10)"
+              color="FUTURISTIC.brandSoft"
               speed={11000}
               delay={0}
               thickness={180}
@@ -641,7 +641,7 @@ export default function RoomScreen() {
             />
             <LightBeam
               angle={20}
-              color="rgba(168,85,247,0.10)"
+              color="FUTURISTIC.accentSoft"
               speed={13000}
               delay={2500}
               thickness={160}
@@ -716,12 +716,20 @@ export default function RoomScreen() {
                 key={`${sessionId || videoId}`}
                 ref={webRef}
                 originWhitelist={["*"]}
-                source={{ html: buildEmbedHtml(videoId) }}
+                source={{
+                  html: buildEmbedHtml(videoId),
+                  baseUrl: "https://www.youtube.com",
+                }}
                 style={{ flex: 1, backgroundColor: "#000" }}
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}
                 javaScriptEnabled
                 domStorageEnabled
+                setSupportMultipleWindows={false}
+                allowsFullscreenVideo
+                androidLayerType="hardware"
+                mixedContentMode="always"
+                userAgent="Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
                 onMessage={onWebViewMessage}
                 testID="room-webview"
               />
