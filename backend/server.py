@@ -1012,6 +1012,7 @@ _BUNDLES = {
     "web-build.zip": "party4r-web-build.zip",
     "android-gradle.zip": "party4r-android-gradle.zip",
     "android-prebuilt.zip": "party4r-android-prebuilt.zip",  # already-prebuilt for Termux
+    "mobile-full.zip": "party4r-mobile-full.zip",  # full JS source + prebuilt android/ + bundled JS
 }
 
 
@@ -1038,6 +1039,13 @@ async def download_backend_bundle_direct():
 @app.get("/api/download/frontend.zip")
 async def download_frontend_bundle_direct():
     return _serve_bundle("frontend.zip")
+
+
+@app.get("/api/download/mobile-full.zip")
+async def download_mobile_full_bundle_direct():
+    """Complete bundle for Termux local APK build:
+    full JS source + pre-generated android/ + pre-bundled index.android.bundle."""
+    return _serve_bundle("mobile-full.zip")
 
 
 @app.get("/api/download/full.zip")
