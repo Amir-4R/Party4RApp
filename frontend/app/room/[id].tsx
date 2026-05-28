@@ -28,6 +28,7 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { WebView } from "react-native-webview";
+import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -68,112 +69,9 @@ interface Member {
 function extractYouTubeId(url: string): string | null {
   if (!url) return null;
   const m = url.match(
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
   );
   return m ? m[1] : null;
-}
-
-function buildEmbedHtml(videoId: string | null): string {
-  if (!videoId) {
-    return `<!DOCTYPE html><html><body style="background:#0B0B0F;color:#6C7A89;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:20px;"><div><div style="font-size:48px;margin-bottom:12px;">📺</div><div style="font-weight:700;color:#fff;">No video loaded</div><div style="margin-top:8px;font-size:14px;">Host needs to pick a YouTube video</div></div></body></html>`;
-  }
-  return `<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}#player{width:100%;height:100%}iframe{width:100%;height:100%;border:0}</style>
-</head><body>
-<div id="player"></div>
-<script>
-// Inject the YouTube IFrame API
-(function(){
-  var tag = document.createElement('script');
-  tag.src = "https://www.youtube.com/iframe_api";
-  var first = document.getElementsByTagName('script')[0];
-  first.parentNode.insertBefore(tag, first);
-})();
-var player = null;
-var suppressEvent = false;
-var readyFired = false;
-
-function post(obj){
-  try { window.ReactNativeWebView.postMessage(JSON.stringify(obj)); } catch(e){}
-}
-
-function onYouTubeIframeAPIReady() {
-  try {
-    player = new YT.Player('player', {
-      width: '100%',
-      height: '100%',
-      videoId: '${videoId}',
-      host: 'https://www.youtube-nocookie.com',
-      playerVars: {
-        playsinline: 1,
-        controls: 1,
-        rel: 0,
-        modestbranding: 1,
-        autoplay: 1,
-        mute: 1,
-        enablejsapi: 1,
-        origin: 'https://www.youtube.com',
-        widget_referrer: 'https://www.youtube.com'
-      },
-      events: {
-        'onReady': function(){
-          readyFired = true;
-          try { player.mute(); } catch(e){}
-          try { player.playVideo(); } catch(e){}
-          // Attempt to unmute once playback has started (mobile WebViews
-          // generally permit muted autoplay; unmute usually succeeds after play).
-          setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 500);
-          setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 1500);
-          post({type:'ready'});
-        },
-        'onStateChange': function(e){
-          if (suppressEvent) return;
-          if (!player || !player.getCurrentTime) return;
-          var t = 0;
-          try { t = player.getCurrentTime(); } catch(_){}
-          if (e.data === YT.PlayerState.PLAYING) {
-            post({type:'state', event:'play', time:t});
-          } else if (e.data === YT.PlayerState.PAUSED) {
-            post({type:'state', event:'pause', time:t});
-          }
-        },
-        'onError': function(e){
-          post({type:'yterror', code: e.data});
-        }
-      }
-    });
-  } catch (e) {
-    post({type:'yterror', code: -1, msg: String(e)});
-  }
-}
-
-// Hard failure fallback: if onReady never fires within 8s, surface an error
-// so the user sees the tap-to-retry overlay instead of an infinite spinner.
-setTimeout(function(){
-  if (!readyFired) { post({type:'yterror', code: 'TIMEOUT'}); }
-}, 8000);
-
-function handleMessage(ev){
-  try {
-    var data = JSON.parse(ev.data);
-    if (!player || !player.seekTo) return;
-    suppressEvent = true;
-    if (data.event === 'play') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.playVideo(); }
-    else if (data.event === 'pause') { if (typeof data.time === 'number') player.seekTo(data.time, true); player.pauseVideo(); }
-    else if (data.event === 'seek' || data.event === 'seek_sync') { if (typeof data.time === 'number') player.seekTo(data.time, true); if (data.playing) player.playVideo(); else player.pauseVideo(); }
-    else if (data.event === 'get_state') {
-      var s = { type: 'state_response', time: player.getCurrentTime(), playing: player.getPlayerState() === 1, to: data.to };
-      post(s);
-    }
-    setTimeout(function(){ suppressEvent = false; }, 300);
-  } catch(e){}
-}
-document.addEventListener('message', handleMessage);
-window.addEventListener('message', handleMessage);
-</script>
-</body></html>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,8 +89,12 @@ export default function RoomScreen() {
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
-  const webRef = useRef<WebView>(null);
+  const playerRef = useRef<YoutubeIframeRef | null>(null);
   const pendingChangeVideoRef = useRef<string | null>(null);
+  // Buffered "remote" play/pause command to apply when player becomes ready
+  const pendingSyncRef = useRef<{ event: string; time?: number; playing?: boolean } | null>(null);
+  // Suppress local state-change reports while we're applying a remote command
+  const suppressStateRef = useRef(false);
 
   // State
   const [connected, setConnected] = useState(false);
@@ -204,6 +106,8 @@ export default function RoomScreen() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState("");
   const [forceFullscreen, setForceFullscreen] = useState(false);
+  // Playing state for the YoutubePlayer controlled `play` prop
+  const [playing, setPlaying] = useState(true);
 
   // Hub modal
   const [showSearch, setShowSearch] = useState(false);
@@ -296,30 +200,47 @@ export default function RoomScreen() {
         case "playback":
           if (data.event === "change_video" && data.video_url) {
             // Peer-side: ALWAYS init a fresh session for the new video so the
-            // WebView remounts cleanly (no "Loading…" stuck on stale player).
+            // YoutubePlayer remounts cleanly (no "Loading…" stuck on stale player).
             setVideoUrl(data.video_url);
             setSessionId(
               `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
             );
+            setPlaying(true);
           } else {
-            webRef.current?.injectJavaScript(
-              `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-                JSON.stringify({
-                  event: data.event,
-                  time: data.time,
-                  playing: data.playing,
-                })
-              )} }));true;`
-            );
+            // Remote play/pause/seek from host or peer — apply via ref.
+            // If player isn't ready yet, buffer it and apply onReady.
+            const applySync = () => {
+              suppressStateRef.current = true;
+              if (typeof data.time === "number") {
+                try { playerRef.current?.seekTo(data.time, true); } catch {}
+              }
+              if (data.event === "play") setPlaying(true);
+              else if (data.event === "pause") setPlaying(false);
+              else if (data.event === "seek" || data.event === "seek_sync") {
+                setPlaying(!!data.playing);
+              }
+              setTimeout(() => { suppressStateRef.current = false; }, 350);
+            };
+            if (playerReady) applySync();
+            else pendingSyncRef.current = data;
           }
           break;
         case "state_request":
-          if (isHost) {
-            webRef.current?.injectJavaScript(
-              `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-                JSON.stringify({ event: "get_state", to: data.from })
-              )} }));true;`
-            );
+          if (isHost && playerRef.current) {
+            (async () => {
+              try {
+                const t = await playerRef.current!.getCurrentTime();
+                wsRef.current?.send(
+                  JSON.stringify({
+                    type: "state_response",
+                    to: data.from,
+                    time: t,
+                    playing,
+                    video_url: videoUrl,
+                  })
+                );
+              } catch {}
+            })();
           }
           break;
         case "vote_state":
@@ -345,7 +266,7 @@ export default function RoomScreen() {
           break;
       }
     },
-    [isHost, user?.id, t]
+    [isHost, user?.id, t, playerReady, playing, videoUrl]
   );
 
   // -------------------------------------------------------------------------
@@ -406,39 +327,61 @@ export default function RoomScreen() {
   }, [sessionId]);
 
   // -------------------------------------------------------------------------
-  // WebView -> RN bridge
+  // YoutubePlayer event bridge
   // -------------------------------------------------------------------------
-  const onWebViewMessage = (e: any) => {
-    try {
-      const data = JSON.parse(e.nativeEvent.data);
-      if (data.type === "ready") {
-        setPlayerReady(true);
-        setPlayerError(null);
-      } else if (data.type === "yterror") {
-        setPlayerError(`YouTube error ${data.code}`);
-      } else if (data.type === "state" && isHost) {
-        wsRef.current?.send(
-          JSON.stringify({ type: "playback", event: data.event, time: data.time })
-        );
-      } else if (data.type === "state_response" && isHost) {
-        wsRef.current?.send(
-          JSON.stringify({
-            type: "state_response",
-            to: data.to,
-            time: data.time,
-            playing: data.playing,
-            video_url: videoUrl,
-          })
-        );
+  // Called by YoutubePlayer whenever its player state changes
+  // ("playing" | "paused" | "buffering" | "ended" | "unstarted" | "video cued").
+  // We only report `play` / `pause` for the host so peers can sync.
+  const onPlayerStateChange = useCallback(
+    (state: string) => {
+      if (suppressStateRef.current) return;
+      if (!isHost) return;
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (state === "playing" || state === "paused") {
+        (async () => {
+          try {
+            const t = (await playerRef.current?.getCurrentTime()) || 0;
+            ws.send(
+              JSON.stringify({
+                type: "playback",
+                event: state === "playing" ? "play" : "pause",
+                time: t,
+              })
+            );
+          } catch {}
+        })();
       }
-    } catch {}
-  };
+    },
+    [isHost]
+  );
+
+  const onPlayerReady = useCallback(() => {
+    setPlayerReady(true);
+    setPlayerError(null);
+    // Apply any buffered sync command that arrived before the player loaded
+    const buf = pendingSyncRef.current;
+    if (buf) {
+      pendingSyncRef.current = null;
+      suppressStateRef.current = true;
+      try {
+        if (typeof buf.time === "number") playerRef.current?.seekTo(buf.time, true);
+      } catch {}
+      if (buf.event === "play") setPlaying(true);
+      else if (buf.event === "pause") setPlaying(false);
+      else if (buf.event === "seek" || buf.event === "seek_sync") setPlaying(!!buf.playing);
+      setTimeout(() => { suppressStateRef.current = false; }, 350);
+    }
+  }, []);
+
+  const onPlayerError = useCallback((err: string) => {
+    setPlayerError(err || "Playback error");
+  }, []);
 
   // Manual play trigger (for environments where autoplay is blocked)
   const tapToPlay = () => {
-    webRef.current?.injectJavaScript(
-      `try{player.unMute();player.setVolume(100);player.playVideo();}catch(e){}true;`
-    );
+    setPlayerError(null);
+    setPlaying(true);
   };
 
   // -------------------------------------------------------------------------
@@ -649,13 +592,11 @@ export default function RoomScreen() {
     );
   };
 
-  // Apply video volume to YouTube IFrame whenever it changes
+  // Volume is now controlled directly by the `volume` prop on <YoutubePlayer/>,
+  // so no manual JS injection is needed. The effect below is intentionally a
+  // no-op placeholder for backward compatibility / future side-effects.
   useEffect(() => {
-    if (playerReady) {
-      webRef.current?.injectJavaScript(
-        `try{player.setVolume(${videoVolume});if(${videoVolume}>0)player.unMute();else player.mute();}catch(e){}true;`
-      );
-    }
+    // YoutubePlayer takes `volume` (0..100). When 0 it auto-mutes.
   }, [videoVolume, playerReady]);
 
   // -------------------------------------------------------------------------
@@ -752,26 +693,35 @@ export default function RoomScreen() {
         <View style={[styles.videoBox, fullscreen ? styles.videoFs : styles.videoPortrait]}>
           {videoId ? (
             <View style={{ flex: 1, position: "relative" }}>
-              <WebView
+              <YoutubePlayer
                 key={`${sessionId || videoId}`}
-                ref={webRef}
-                originWhitelist={["*"]}
-                source={{
-                  html: buildEmbedHtml(videoId),
-                  baseUrl: "https://www.youtube.com",
+                ref={playerRef}
+                height={fullscreen ? height : Math.round(width * 9 / 16)}
+                width={fullscreen ? width : width}
+                videoId={videoId}
+                play={playing}
+                volume={videoVolume}
+                onReady={onPlayerReady}
+                onError={onPlayerError}
+                onChangeState={onPlayerStateChange}
+                webViewProps={{
+                  androidLayerType: "hardware",
+                  allowsInlineMediaPlayback: true,
+                  mediaPlaybackRequiresUserAction: false,
+                  mixedContentMode: "always",
+                  setSupportMultipleWindows: false,
+                  originWhitelist: ["*"],
+                  userAgent:
+                    "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
                 }}
-                style={{ flex: 1, backgroundColor: "#000" }}
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-                javaScriptEnabled
-                domStorageEnabled
-                setSupportMultipleWindows={false}
-                allowsFullscreenVideo
-                androidLayerType="hardware"
-                mixedContentMode="always"
-                userAgent="Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
-                onMessage={onWebViewMessage}
-                testID="room-webview"
+                initialPlayerParams={{
+                  controls: true,
+                  modestbranding: true,
+                  preventFullScreen: false,
+                  rel: false,
+                  iv_load_policy: 3,
+                  // playsinline is forced on by the package
+                }}
               />
               {(!playerReady || playerError) && (
                 <TouchableOpacity

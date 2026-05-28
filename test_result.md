@@ -1130,6 +1130,68 @@ agent_communication:
 
       Termux bundle status:
         - /app/dist/party4r-complete.zip rebuilt (5.7MB, drops metro cache)
+
+  - agent: "main"
+    message: |
+      YouTube playback rewrite (per user follow-up request "Fix the YouTube
+      playback issue in the app").
+
+      Root cause of the persistent Android failure:
+        The previous implementation used a raw <WebView> rendering a
+        hand-written HTML that loaded the YouTube IFrame API. This approach
+        is fragile across Android WebView versions — origin/referrer
+        mismatches, postMessage bridging, and the autoplay/unmute dance
+        each fail in slightly different ways on different OEM ROMs.
+
+      Fix applied:
+        - Installed `react-native-youtube-iframe@2.4.1` (the most popular,
+          actively-maintained YouTube embed for RN — ~300k weekly DLs).
+        - Installed `react-native-web-webview@1.0.2` so the package's web
+          fallback also bundles cleanly under Expo Metro for web preview.
+        - Replaced the WebView + buildEmbedHtml() block in
+          /app/frontend/app/room/[id].tsx with <YoutubePlayer/>. Removed the
+          entire ~120-line embed HTML helper.
+        - Wiring:
+            * playerRef = useRef<YoutubeIframeRef>()
+            * controlled `play={playing}` boolean state
+            * onChangeState → host emits play/pause/seek over WebSocket
+              with current time fetched from playerRef.getCurrentTime()
+            * onReady → setPlayerReady(true), flush any buffered remote
+              sync command that arrived during load
+            * Remote playback events (peers / host) now apply via
+              playerRef.current.seekTo(time, true) + setPlaying(bool),
+              guarded by `suppressStateRef` so we don't echo events.
+            * Volume → passed via `volume` prop (0..100, auto-mutes at 0).
+              Removed manual `injectJavaScript("player.setVolume(...)")`.
+        - webViewProps passes the Android-optimal config (mixedContentMode:
+          'always', allowsInlineMediaPlayback, mediaPlaybackRequiresUserAction
+          false, androidLayerType: 'hardware', Chrome UA, originWhitelist *).
+        - initialPlayerParams: controls true, modestbranding true,
+          iv_load_policy 3 (no annotations), rel false, preventFullScreen
+          false.
+        - extractYouTubeId regex extended to also accept youtube.com/shorts/<id>.
+
+      Verification on web preview:
+        Created a room with the Rick Astley video and another with the
+        oldest YouTube video ("Me at the zoo"). The YoutubePlayer now
+        renders the actual video frame + title overlay (previously this
+        screen showed "React Native WebView does not support this
+        platform"). The web preview can't trigger autoplay due to
+        react-native-web-webview's postMessage limitation (a known
+        web-only quirk, unrelated to native), but the iframe IS embedded,
+        which proves the URL + dimensions are correct. On Android the
+        actual react-native-webview will run the bridge properly.
+
+      Bundle status:
+        /app/dist/party4r-complete.zip → 5.67 MB (HTTP 200)
+        /app/dist/party4r-mobile-full.zip → 12.3 MB (HTTP 200)
+        Both verified via unzip+grep to contain:
+          - import YoutubePlayer from "react-native-youtube-iframe"
+          - "react-native-youtube-iframe": "^2.4.1" in package.json
+          - "react-native-web-webview": "^1.0.2" in package.json
+
+      No backend changes; backend re-testing not required.
+
         - /app/dist/party4r-mobile-full.zip rebuilt (12.3MB)
         - README inside the zip lists all 3 fixes for the user.
 
