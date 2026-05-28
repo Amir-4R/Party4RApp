@@ -21,7 +21,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Image,
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -101,13 +101,13 @@ function PulseSendButton({
     >
       {!disabled && <Animated.View pointerEvents="none" style={[styles.sendHalo, haloStyle]} />}
       <LinearGradient
-        colors={["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"]}
+        colors={["rgba(255,255,255,0.55)", FUTURISTIC.brandGlow]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ borderRadius: 23, padding: 1, opacity: disabled ? 0.5 : 1 }}
       >
         <LinearGradient
-          colors={["#26FF93", "#10C66D"]}
+          colors={[FUTURISTIC.brandSoft, FUTURISTIC.brand]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.sendInner}
@@ -187,13 +187,13 @@ function MessageBubble({
         {mine ? (
           // ---- MY bubble: gradient brand + chrome edge ----
           <LinearGradient
-            colors={["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"]}
+            colors={["rgba(255,255,255,0.55)", FUTURISTIC.brandGlow]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.bubEdgeMine]}
           >
             <LinearGradient
-              colors={["#26FF93", "#10C66D"]}
+              colors={[FUTURISTIC.brandSoft, FUTURISTIC.brand]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={styles.bubInner}
@@ -224,7 +224,7 @@ function MessageBubble({
           <LinearGradient
             colors={[
               "rgba(255,255,255,0.20)",
-              "FUTURISTIC.accentSoft",
+              FUTURISTIC.accentSoft,
               "rgba(255,255,255,0.05)",
             ]}
             start={{ x: 0, y: 0 }}
@@ -264,6 +264,7 @@ export default function DMChatScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { t } = useT();
+  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<DM[]>([]);
   const [friend, setFriend] = useState<Friend | null>(null);
@@ -476,8 +477,8 @@ export default function DMChatScreen() {
   return (
     <View style={styles.safe}>
       <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
-      <LightBeam angle={-20} color="FUTURISTIC.brandSoft" speed={11000} thickness={200} intensity={0.4} />
-      <LightBeam angle={18} color="FUTURISTIC.accentSoft" speed={13000} delay={2500} thickness={180} intensity={0.36} />
+      <LightBeam angle={-20} color={FUTURISTIC.brandSoft} speed={11000} thickness={200} intensity={0.4} />
+      <LightBeam angle={18} color={FUTURISTIC.accentSoft} speed={13000} delay={2500} thickness={180} intensity={0.36} />
 
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* ----- Header ----- */}
@@ -492,7 +493,7 @@ export default function DMChatScreen() {
                 <LinearGradient
                   colors={
                     otherOnline
-                      ? ["FUTURISTIC.brand", "FUTURISTIC.accentGlow"]
+                      ? [FUTURISTIC.brand, FUTURISTIC.accentGlow]
                       : ["rgba(255,255,255,0.18)", "rgba(255,255,255,0.05)"]
                   }
                   start={{ x: 0, y: 0 }}
@@ -518,8 +519,8 @@ export default function DMChatScreen() {
           colors={[
             "transparent",
             "rgba(255,255,255,0.18)",
-            "FUTURISTIC.brandSoft",
-            "FUTURISTIC.accentSoft",
+            FUTURISTIC.brandSoft,
+            FUTURISTIC.accentSoft,
             "rgba(255,255,255,0.18)",
             "transparent",
           ]}
@@ -573,7 +574,7 @@ export default function DMChatScreen() {
           )}
 
           {/* ----- Composer ----- */}
-          <View style={styles.composer}>
+          <View style={[styles.composer, { paddingBottom: 10 + insets.bottom }]}>
             <TouchableOpacity onPress={sendImage} style={styles.attachBtn} activeOpacity={0.8}>
               <Ionicons name="image-outline" size={22} color={FUTURISTIC.brand} />
             </TouchableOpacity>
@@ -641,7 +642,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "900",
     letterSpacing: 0.4,
-    textShadowColor: "FUTURISTIC.brandSoft",
+    textShadowColor: FUTURISTIC.brandSoft,
     textShadowRadius: 6,
   },
   subtitleRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
@@ -835,7 +836,7 @@ const styles = StyleSheet.create({
     right: -8,
     bottom: -8,
     borderRadius: 36,
-    backgroundColor: "FUTURISTIC.brandSoft",
+    backgroundColor: FUTURISTIC.brandSoft,
     shadowColor: FUTURISTIC.brand,
     shadowOpacity: 1,
     shadowRadius: 18,

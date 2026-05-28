@@ -167,7 +167,7 @@ function LoaderBar() {
       <View style={styles.barTrack}>
         <Animated.View style={[styles.barFillContainer, fillStyle]}>
           <LinearGradient
-            colors={["#10C66D", "#26FF93", "#A855F7"]}
+            colors={[FUTURISTIC.brand, FUTURISTIC.brandSoft, FUTURISTIC.accent]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.barFillGradient}

@@ -1072,3 +1072,66 @@ agent_communication:
       Action for main agent: please summarise & finish — no further
       backend re-test required for Phase 8. The honor-default nit is
       a tiny polish item, not a regression.
+
+
+  - agent: "main"
+    message: |
+      Resumed work on the 3 user-reported issues (YouTube WebView, SafeArea
+      overlap, hardcoded green colors). Implemented in one pass:
+
+      1) DYNAMIC GREEN COLORS — comprehensive fix, not surface-level:
+         - Found 35 occurrences of `"FUTURISTIC.brand…"` written as string
+           literals (broken JSX/attribute references that silently ignored
+           the active theme). Fixed in 8 files: room/[id].tsx, dms.tsx,
+           dms/[friendId].tsx, search.tsx, (tabs)/home.tsx, (tabs)/friends.tsx,
+           (tabs)/profile.tsx, components/VotingOverlay.tsx.
+         - Replaced literal #10C66D / #26FF93 hex gradients in index.tsx (splash
+           progress bar), home.tsx (FAB), dms/[friendId].tsx (send button +
+           outgoing message bubble), and VotingOverlay.tsx with
+           FUTURISTIC.brand / FUTURISTIC.brandSoft.
+         - Converted /src/constants/avatars.ts COLORS into a getter-based proxy
+           over FUTURISTIC, so all ~241 existing `COLORS.brand` / `COLORS.bg`
+           etc. usages now follow the active theme automatically without
+           touching their styles. Only `navBg` stays neutral dark on purpose.
+
+      2) SAFE-AREA BOTTOM OVERLAP (Android system nav bar):
+         - room/[id].tsx: SafeAreaView edges changed from ["top"] to
+           ["top","bottom"] (only when not fullscreen) so the chat composer
+           and members strip sit above the system nav bar. Also imported
+           useSafeAreaInsets for any future overrides.
+         - dms/[friendId].tsx: imported useSafeAreaInsets and added
+           paddingBottom: 10 + insets.bottom to the composer view so the
+           input + send button no longer get clipped behind the Android
+           navigation bar.
+
+      3) YOUTUBE WEBVIEW PLAYBACK:
+         - Improved buildEmbedHtml(): switched player host to
+           youtube-nocookie.com (better embed compatibility), added explicit
+           origin, widget_referrer and enablejsapi player vars, wrapped the
+           YT.Player construction in try/catch, and added an 8s ready
+           watchdog that posts a 'yterror: TIMEOUT' so the user sees the
+           Tap-to-retry overlay instead of an infinite "Loading…" spinner.
+         - WebView props were already solid (originWhitelist=*, mixedContentMode=
+           always, allowsInlineMediaPlayback, mediaPlaybackRequiresUserAction=
+           false, androidLayerType=hardware, custom Chrome UA) — verified.
+
+      Verification:
+        - Web preview: screenshot tested login → home → create-modal → room.
+          No runtime crashes. Theme renders correctly. The WebView "Tap to
+          play" overlay shows on web (RNWebView itself is unsupported on web
+          which is fine — actual playback requires the Android build).
+        - TypeScript: `tsc --noEmit` reports 12 errors, all pre-existing
+          before my edits (LinearGradient strict tuple typing — same count
+          on stash/restore). No new errors introduced.
+        - Backend: /api/download/complete.zip → HTTP 200, 5.7MB.
+          /api/download/mobile-full.zip → HTTP 200, 12.3MB.
+          Both bundles verified to contain the latest edits (grep
+          confirms FUTURISTIC.brand, useSafeAreaInsets, youtube-nocookie).
+
+      Termux bundle status:
+        - /app/dist/party4r-complete.zip rebuilt (5.7MB, drops metro cache)
+        - /app/dist/party4r-mobile-full.zip rebuilt (12.3MB)
+        - README inside the zip lists all 3 fixes for the user.
+
+      No backend code changes. No testing-agent run is required for these
+      frontend-only fixes — visual verification was done via screenshot tool.

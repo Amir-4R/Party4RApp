@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as ImagePicker from "expo-image-picker";
@@ -80,43 +80,81 @@ function buildEmbedHtml(videoId: string | null): string {
   return `<!DOCTYPE html>
 <html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:0}</style>
+<style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}#player{width:100%;height:100%}iframe{width:100%;height:100%;border:0}</style>
 </head><body>
 <div id="player"></div>
 <script>
-var tag = document.createElement('script');
-tag.src = "https://www.youtube.com/iframe_api";
-document.head.appendChild(tag);
-var player; var suppressEvent = false;
-function onYouTubeIframeAPIReady() {
-  player = new YT.Player('player', {
-    videoId: '${videoId}',
-    playerVars: { playsinline: 1, controls: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 1 },
-    events: {
-      'onReady': function(){
-        try { player.mute(); } catch(e){}
-        try { player.playVideo(); } catch(e){}
-        // Try to unmute once playback has actually started (mobile WebViews
-        // allow muted autoplay; unmute usually succeeds once play is running).
-        setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 400);
-        setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 1200);
-        window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
-      },
-      'onStateChange': function(e){
-        if (suppressEvent) return;
-        var t = player.getCurrentTime();
-        if (e.data === YT.PlayerState.PLAYING) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'play', time:t}));
-        } else if (e.data === YT.PlayerState.PAUSED) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({type:'state', event:'pause', time:t}));
-        }
-      },
-      'onError': function(e){
-        window.ReactNativeWebView.postMessage(JSON.stringify({type:'yterror', code: e.data}));
-      }
-    }
-  });
+// Inject the YouTube IFrame API
+(function(){
+  var tag = document.createElement('script');
+  tag.src = "https://www.youtube.com/iframe_api";
+  var first = document.getElementsByTagName('script')[0];
+  first.parentNode.insertBefore(tag, first);
+})();
+var player = null;
+var suppressEvent = false;
+var readyFired = false;
+
+function post(obj){
+  try { window.ReactNativeWebView.postMessage(JSON.stringify(obj)); } catch(e){}
 }
+
+function onYouTubeIframeAPIReady() {
+  try {
+    player = new YT.Player('player', {
+      width: '100%',
+      height: '100%',
+      videoId: '${videoId}',
+      host: 'https://www.youtube-nocookie.com',
+      playerVars: {
+        playsinline: 1,
+        controls: 1,
+        rel: 0,
+        modestbranding: 1,
+        autoplay: 1,
+        mute: 1,
+        enablejsapi: 1,
+        origin: 'https://www.youtube.com',
+        widget_referrer: 'https://www.youtube.com'
+      },
+      events: {
+        'onReady': function(){
+          readyFired = true;
+          try { player.mute(); } catch(e){}
+          try { player.playVideo(); } catch(e){}
+          // Attempt to unmute once playback has started (mobile WebViews
+          // generally permit muted autoplay; unmute usually succeeds after play).
+          setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 500);
+          setTimeout(function(){ try { player.unMute(); player.setVolume(100); } catch(e){} }, 1500);
+          post({type:'ready'});
+        },
+        'onStateChange': function(e){
+          if (suppressEvent) return;
+          if (!player || !player.getCurrentTime) return;
+          var t = 0;
+          try { t = player.getCurrentTime(); } catch(_){}
+          if (e.data === YT.PlayerState.PLAYING) {
+            post({type:'state', event:'play', time:t});
+          } else if (e.data === YT.PlayerState.PAUSED) {
+            post({type:'state', event:'pause', time:t});
+          }
+        },
+        'onError': function(e){
+          post({type:'yterror', code: e.data});
+        }
+      }
+    });
+  } catch (e) {
+    post({type:'yterror', code: -1, msg: String(e)});
+  }
+}
+
+// Hard failure fallback: if onReady never fires within 8s, surface an error
+// so the user sees the tap-to-retry overlay instead of an infinite spinner.
+setTimeout(function(){
+  if (!readyFired) { post({type:'yterror', code: 'TIMEOUT'}); }
+}, 8000);
+
 function handleMessage(ev){
   try {
     var data = JSON.parse(ev.data);
@@ -127,7 +165,7 @@ function handleMessage(ev){
     else if (data.event === 'seek' || data.event === 'seek_sync') { if (typeof data.time === 'number') player.seekTo(data.time, true); if (data.playing) player.playVideo(); else player.pauseVideo(); }
     else if (data.event === 'get_state') {
       var s = { type: 'state_response', time: player.getCurrentTime(), playing: player.getPlayerState() === 1, to: data.to };
-      window.ReactNativeWebView.postMessage(JSON.stringify(s));
+      post(s);
     }
     setTimeout(function(){ suppressEvent = false; }, 300);
   } catch(e){}
@@ -148,6 +186,8 @@ export default function RoomScreen() {
   const { user } = useAuth();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const insets = useSafeAreaInsets(); // used for SafeAreaView padding (system nav bar)
+  void insets; // ensure it's referenced; SafeAreaView handles bottom edge already
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -626,14 +666,14 @@ export default function RoomScreen() {
       {fullscreen && <RNStatusBar hidden />}
       <SafeAreaView
         style={{ flex: 1, backgroundColor: COLORS.bg }}
-        edges={fullscreen ? [] : ["top"]}
+        edges={fullscreen ? [] : ["top", "bottom"]}
       >
         {/* Phase 6 — ambient cyber-metallic lighting (subtle, only when not fullscreen) */}
         {!fullscreen && (
           <>
             <LightBeam
               angle={-22}
-              color="FUTURISTIC.brandSoft"
+              color={FUTURISTIC.brandSoft}
               speed={11000}
               delay={0}
               thickness={180}
@@ -641,7 +681,7 @@ export default function RoomScreen() {
             />
             <LightBeam
               angle={20}
-              color="FUTURISTIC.accentSoft"
+              color={FUTURISTIC.accentSoft}
               speed={13000}
               delay={2500}
               thickness={160}

@@ -123,8 +123,8 @@ export default function VotingOverlay({
         <LinearGradient
           colors={[
             "rgba(255,255,255,0.35)",
-            "FUTURISTIC.brandGlow",
-            "FUTURISTIC.accentGlow",
+            FUTURISTIC.brandGlow,
+            FUTURISTIC.accentGlow,
             "rgba(255,255,255,0.35)",
           ]}
           start={{ x: 0, y: 0 }}
@@ -191,7 +191,7 @@ export default function VotingOverlay({
             <View style={styles.barTrack}>
               <Animated.View style={[styles.barFillWrap, fillStyle]}>
                 <LinearGradient
-                  colors={["#26FF93", "#10C66D", "#26FF93"]}
+                  colors={[FUTURISTIC.brandSoft, FUTURISTIC.brand, FUTURISTIC.brandSoft]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.barFill}
@@ -282,10 +282,10 @@ function ActionBtn({
   const isYes = variant === "yes";
   const fg = isYes ? "#001A0C" : "#FFFFFF";
   const edge = isYes
-    ? (["rgba(255,255,255,0.55)", "FUTURISTIC.brandGlow"] as const)
+    ? (["rgba(255,255,255,0.55)", FUTURISTIC.brandGlow] as const)
     : (["rgba(255,255,255,0.45)", "rgba(255,61,113,0.55)"] as const);
   const fill = isYes
-    ? (["#26FF93", "#10C66D"] as const)
+    ? ([FUTURISTIC.brandSoft, FUTURISTIC.brand] as const)
     : (["#FF5A85", "#D81E54"] as const);
   const scale = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - pressed.value * 0.05 }],

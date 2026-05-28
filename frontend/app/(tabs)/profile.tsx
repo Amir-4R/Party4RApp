@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     ...TYPO.h1,
     color: FUTURISTIC.textPrimary,
     marginTop: 10,
-    textShadowColor: "FUTURISTIC.brandSoft",
+    textShadowColor: FUTURISTIC.brandSoft,
     textShadowRadius: 8,
   },
   username: {

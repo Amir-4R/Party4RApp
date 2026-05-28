@@ -234,8 +234,8 @@ export default function FriendsScreen() {
   return (
     <View style={styles.safe}>
       <LinearGradient colors={GRADIENTS.appBg as unknown as string[]} style={StyleSheet.absoluteFill} />
-      <LightBeam angle={-20} color="FUTURISTIC.brandSoft" speed={11000} thickness={200} intensity={0.42} />
-      <LightBeam angle={18} color="FUTURISTIC.accentSoft" speed={13000} delay={2400} thickness={180} intensity={0.38} />
+      <LightBeam angle={-20} color={FUTURISTIC.brandSoft} speed={11000} thickness={200} intensity={0.42} />
+      <LightBeam angle={18} color={FUTURISTIC.accentSoft} speed={13000} delay={2400} thickness={180} intensity={0.38} />
 
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
       <View style={styles.header}>
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   title: {
     ...TYPO.h1,
     color: FUTURISTIC.textPrimary,
-    textShadowColor: "FUTURISTIC.brandSoft",
+    textShadowColor: FUTURISTIC.brandSoft,
     textShadowRadius: 10,
   },
   tabs: {

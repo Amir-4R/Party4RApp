@@ -15,41 +15,47 @@ export const AVATARS: Avatar[] = [
 export const LOGIN_BG_URL = "https://static.prod-images.emergentagent.com/jobs/2fd3e3b1-9322-4961-9b6d-db40056f5996/images/fe23407107d8ec51147db0e7004d8aabe78a835b4418012a37abfaa918253fbb.png";
 
 // =====================================================================
-// COLORS — Cyber Neon palette (Phase 1 Mega Update)
-// Neon green primary + neon purple accent on AMOLED-friendly dark.
-// All screens import this as their default. ThemeContext can override
-// at runtime; this object is the fallback / static reference.
+// COLORS — DYNAMIC theme proxy (Phase 9 — Global theme system).
+//
+// Historically this was a hardcoded neon-green palette. It is now a
+// getter-based facade over the live `FUTURISTIC` tokens, so every screen
+// that uses `COLORS.brand`, `COLORS.bg`, etc. follows the active theme
+// instantly when `applyTheme()` mutates FUTURISTIC. All ~241 existing
+// `COLORS.*` references in the app automatically become theme-reactive
+// without touching their styles.
 // =====================================================================
+import { FUTURISTIC } from "@/src/theme/futuristic";
+
 export const COLORS = {
   // Backgrounds
-  bg: "#070710",
-  bgSoft: "#0C0C18",
-  surface: "#14141F",
-  surfaceElevated: "#1C1C2A",
+  get bg() { return FUTURISTIC.bg; },
+  get bgSoft() { return FUTURISTIC.bgSoft; },
+  get surface() { return FUTURISTIC.surface1; },
+  get surfaceElevated() { return FUTURISTIC.surface2; },
   // Borders
-  border: "#1F1F2D",
-  borderAccent: "#2A2A3D",
-  // Brand — neon green
-  brand: "#22FF88",
-  brandDim: "rgba(34, 255, 136, 0.16)",
-  brandGlow: "rgba(34, 255, 136, 0.40)",
-  // Accent — neon purple
-  accent: "#A855F7",
-  accentDim: "rgba(168, 85, 247, 0.18)",
-  accentGlow: "rgba(168, 85, 247, 0.40)",
+  get border() { return FUTURISTIC.border; },
+  get borderAccent() { return FUTURISTIC.borderStrong; },
+  // Brand
+  get brand() { return FUTURISTIC.brand; },
+  get brandDim() { return FUTURISTIC.brandSoft; },
+  get brandGlow() { return FUTURISTIC.brandGlow; },
+  // Accent
+  get accent() { return FUTURISTIC.accent; },
+  get accentDim() { return FUTURISTIC.accentSoft; },
+  get accentGlow() { return FUTURISTIC.accentGlow; },
   // Text
-  textPrimary: "#FFFFFF",
-  textSecondary: "#B0B0C4",
-  textMuted: "#7A7A92",
-  textDisabled: "#48485A",
+  get textPrimary() { return FUTURISTIC.textPrimary; },
+  get textSecondary() { return FUTURISTIC.textSecondary; },
+  get textMuted() { return FUTURISTIC.textMuted; },
+  get textDisabled() { return FUTURISTIC.textDisabled; },
   // Semantic
-  error: "#FF3D71",
-  success: "#22FF88",
-  warning: "#FFB800",
-  info: "#33B5FF",
-  // Glow effect color for neon outlines
-  glow: "#22FF88",
-  // Bottom nav tint (semi-transparent over blur)
+  get error() { return FUTURISTIC.error; },
+  get success() { return FUTURISTIC.success; },
+  get warning() { return FUTURISTIC.warning; },
+  get info() { return FUTURISTIC.info; },
+  // Effect helpers
+  get glow() { return FUTURISTIC.brand; },
+  // Bottom nav tint (semi-transparent over blur) — stays neutral dark
   navBg: "rgba(10, 10, 16, 0.85)",
 };
 
