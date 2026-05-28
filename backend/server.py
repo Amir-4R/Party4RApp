@@ -1014,6 +1014,7 @@ _BUNDLES = {
     "android-prebuilt.zip": "party4r-android-prebuilt.zip",  # already-prebuilt for Termux
     "mobile-full.zip": "party4r-mobile-full.zip",  # full JS source + prebuilt android/ + bundled JS
     "complete.zip": "party4r-complete.zip",        # frontend + backend + all configs (the ENTIRE app)
+    "termux-ready.zip": "party4r-termux-ready.zip", # ready-to-build Termux bundle with BUILD_TERMUX.sh
 }
 
 
@@ -1054,6 +1055,14 @@ async def download_complete_bundle_direct():
     """ENTIRE app source code: frontend + backend + all configs + README.
     Best for archiving the whole project or migrating to a new dev machine."""
     return _serve_bundle("complete.zip")
+
+
+@app.get("/api/download/termux-ready.zip")
+async def download_termux_ready_bundle_direct():
+    """Termux-ready bundle: frontend JS + pre-generated android/ folder +
+    one-shot BUILD_TERMUX.sh script that installs Android SDK + builds APK.
+    The easiest way to build the APK locally on an Android phone."""
+    return _serve_bundle("termux-ready.zip")
 
 
 @app.get("/api/download/full.zip")
