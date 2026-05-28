@@ -12,7 +12,7 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://party4rapp.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://partyapp-sync.preview.emergentagent.com"
       }
     },
     "production": {
@@ -21,7 +21,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://party4rapp.onrender.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://partyapp-sync.preview.emergentagent.com"
       }
     }
   },
