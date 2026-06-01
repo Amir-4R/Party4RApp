@@ -108,6 +108,11 @@ export default function RoomScreen() {
   const [forceFullscreen, setForceFullscreen] = useState(false);
   // Playing state for the YoutubePlayer controlled `play` prop
   const [playing, setPlaying] = useState(true);
+  // Tracks whether the user has dismissed our "Tap to play" overlay for the
+  // current session. Once true, we hand the floor over to YouTube's native
+  // player UI even if the IFrame API hasn't ack'd `ready` yet (web preview /
+  // some Android WebView builds drop those postMessage events silently).
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
 
   // Hub modal
   const [showSearch, setShowSearch] = useState(false);
@@ -324,6 +329,7 @@ export default function RoomScreen() {
   useEffect(() => {
     setPlayerReady(false);
     setPlayerError(null);
+    setOverlayDismissed(false);
   }, [sessionId]);
 
   // -------------------------------------------------------------------------
@@ -378,11 +384,27 @@ export default function RoomScreen() {
     setPlayerError(err || "Playback error");
   }, []);
 
-  // Manual play trigger (for environments where autoplay is blocked)
+  // Manual play trigger. Tapping IS a user gesture, so we treat the player
+  // as ready and permanently dismiss the overlay for this session — the user
+  // gets the embedded YouTube UI from this point on.
   const tapToPlay = () => {
     setPlayerError(null);
+    setPlayerReady(true);
+    setOverlayDismissed(true);
     setPlaying(true);
   };
+
+  // Watchdog: if `onReady` hasn't fired within ~4s after the player mounts
+  // we auto-dismiss the overlay anyway, so the user can interact with the
+  // iframe controls directly. This protects against silent postMessage
+  // failures on web preview and some Android WebView builds.
+  useEffect(() => {
+    if (!videoId) return;
+    const handle = setTimeout(() => {
+      setOverlayDismissed(true);
+    }, 4000);
+    return () => clearTimeout(handle);
+  }, [videoId, sessionId]);
 
   // -------------------------------------------------------------------------
   // Actions
@@ -723,7 +745,7 @@ export default function RoomScreen() {
                   // playsinline is forced on by the package
                 }}
               />
-              {(!playerReady || playerError) && (
+              {!overlayDismissed && (!playerReady || playerError) && (
                 <TouchableOpacity
                   testID="tap-to-play"
                   activeOpacity={0.85}
