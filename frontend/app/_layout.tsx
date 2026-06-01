@@ -1,10 +1,12 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { LanguageProvider } from "@/src/context/LanguageContext";
 import { ThemeProvider, useTheme } from "@/src/context/ThemeContext";
 import { View } from "react-native";
+import { pingBackend } from "@/src/api/client";
 
 function RootShell() {
   // Subscribing to themeId here triggers a remount of the inner Stack via
@@ -13,6 +15,13 @@ function RootShell() {
   // new colors everywhere — navigation bars, cards, buttons, glows, gradients,
   // chat bubbles, popups, search, settings — globally and instantly.
   const { theme, themeId } = useTheme();
+
+  // Wake the Render free-tier backend the moment the app launches so that by
+  // the time the user reaches the login screen the server is already warm.
+  useEffect(() => {
+    pingBackend();
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <StatusBar style="light" backgroundColor={theme.bg} translucent={false} />

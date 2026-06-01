@@ -275,12 +275,18 @@ export default function RoomScreen() {
   );
 
   // -------------------------------------------------------------------------
-  // Connect WebSocket
+  // -------------------------------------------------------------------------
+  // Connect WebSocket — with auto-reconnect on close/error (handles Render
+  // free-tier wake-up, server restarts, and transient drops).
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    (async () => {
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+
+    const connect = async () => {
+      if (cancelled) return;
       const token = await storage.secureGet<string>(TOKEN_KEY, "");
       if (!token) {
         router.replace("/login");
@@ -288,8 +294,11 @@ export default function RoomScreen() {
       }
       const ws = new WebSocket(getWsUrl(id, token));
       wsRef.current = ws;
+
       ws.onopen = () => {
-        if (!cancelled) setConnected(true);
+        if (cancelled) return;
+        attempt = 0; // reset backoff on success
+        setConnected(true);
         // Flush any queued change_video that fired before WS was ready
         const pending = pendingChangeVideoRef.current;
         if (pending) {
@@ -304,23 +313,39 @@ export default function RoomScreen() {
             );
           } catch {}
         }
+        // Ask host for current playback state so we resync after reconnect
+        setTimeout(() => {
+          try { ws.send(JSON.stringify({ type: "state_request" })); } catch {}
+        }, 500);
       };
+
       ws.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
           handleServerEvent(data);
         } catch {}
       };
-      ws.onerror = () => {};
+
+      ws.onerror = () => { /* handled by onclose */ };
+
       ws.onclose = () => {
-        if (!cancelled) setConnected(false);
+        if (cancelled) return;
+        setConnected(false);
+        // Exponential-ish backoff capped at 8s — fast enough to feel
+        // instant when the server briefly bounces, slow enough to avoid
+        // a tight reconnect loop while Render is mid-coldstart.
+        attempt += 1;
+        const delay = Math.min(1000 * Math.pow(1.6, attempt - 1), 8000);
+        reconnectTimer = setTimeout(connect, delay);
       };
-    })();
+    };
+
+    connect();
+
     return () => {
       cancelled = true;
-      try {
-        wsRef.current?.close();
-      } catch {}
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try { wsRef.current?.close(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
