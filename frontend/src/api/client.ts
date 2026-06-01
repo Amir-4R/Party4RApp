@@ -3,10 +3,10 @@ import { storage } from "@/src/utils/storage";
 // Production backend URL — embedded as a build-time constant so the APK
 // works even when `.env` is not loaded by the bundler. The `.env` value
 // (used in `expo start`) wins when defined; otherwise we fall back to the
-// hosted Emergent preview backend that the app actually runs against.
+// hosted Render deployment that the production APK actually talks to.
 const BASE_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL ||
-  "https://partyapp-sync.preview.emergentagent.com";
+  "https://party4rapp.onrender.com";
 export const API_BASE = `${BASE_URL}/api`;
 
 export const TOKEN_KEY = "party_auth_token";
