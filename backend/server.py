@@ -1075,6 +1075,73 @@ async def download_backend_deploy_bundle_direct():
     return _serve_bundle("backend-deploy.zip")
 
 
+# --- Per-file backend source downloads -------------------------------------
+# Lets the user drop individual files straight into their Render repo when
+# their entry-point uses a different filename layout (e.g. `main.py`).
+_BACKEND_SRC_ROOT = Path(__file__).parent
+
+
+def _serve_backend_source(filename: str):
+    """Serve a single backend source file as a plain-text download."""
+    target = _BACKEND_SRC_ROOT / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(404, f"{filename} not found")
+    return FileResponse(
+        path=str(target),
+        media_type="text/x-python" if filename.endswith(".py") else "text/plain",
+        filename=filename,
+    )
+
+
+@app.get("/api/source/server.py")
+async def source_server_py():
+    """Main FastAPI app — registers all routers. Rename to main.py if your
+    Render service entrypoint expects that filename."""
+    return _serve_backend_source("server.py")
+
+
+@app.get("/api/source/dms.py")
+async def source_dms_py():
+    """Direct Messages module — REST + WebSocket + Mongo TTL indexes."""
+    return _serve_backend_source("dms.py")
+
+
+@app.get("/api/source/notifications.py")
+async def source_notifications_py():
+    """Expo Push Notifications module — POST/DELETE /api/push/token."""
+    return _serve_backend_source("notifications.py")
+
+
+@app.get("/api/source/moderation.py")
+async def source_moderation_py():
+    """Reports + word filter + Gmail SMTP delivery for admin alerts."""
+    return _serve_backend_source("moderation.py")
+
+
+@app.get("/api/source/privacy_safety.py")
+async def source_privacy_safety_py():
+    """Block/unblock + privacy settings + presence heartbeat + honor logic."""
+    return _serve_backend_source("privacy_safety.py")
+
+
+@app.get("/api/source/rooms_voting.py")
+async def source_rooms_voting_py():
+    """Voting mode for rooms — accept/reject host's video changes."""
+    return _serve_backend_source("rooms_voting.py")
+
+
+@app.get("/api/source/requirements.txt")
+async def source_requirements_txt():
+    """Python pip dependencies, sane versions for Render's Python 3.11."""
+    return _serve_backend_source("requirements.txt")
+
+
+@app.get("/api/source/Procfile")
+async def source_procfile():
+    """Render web process command — uvicorn server:app …"""
+    return _serve_backend_source("Procfile")
+
+
 @app.get("/api/download/full.zip")
 async def download_full_bundle_direct():
     return _serve_bundle("full.zip")
