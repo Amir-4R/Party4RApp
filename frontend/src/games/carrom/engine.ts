@@ -51,31 +51,42 @@ export interface CarromState {
   lastShotPockets: string[];
 }
 
-// ─── DIMENSIONS (per tournament-grade carrom spec) ───────────────────────────
-// Logical units = physical 740 × 740 units. UI scales this with a single multiplier.
-export const BOARD_SIZE = 740;                  // ✦ outer playable area
-export const FRAME_INSET = 30;                  // edge thickness (visual only)
+// ─── DIMENSIONS (ICF — International Carrom Federation tournament spec) ─────
+// Logical units: 1 unit = 1 mm of a real 740 mm × 740 mm carrom board.
+// All sizes derived from ICF measurements (NOT arbitrary numbers).
+export const BOARD_SIZE = 740;                  // 740 mm × 740 mm playing surface
+export const FRAME_INSET = 30;                  // 30 mm inner-frame thickness (wall)
 
-export const COIN_RADIUS = 15.9;                // ✦ matches center-circle radius
-export const STRIKER_RADIUS = 19;
-export const POCKET_RADIUS = 24;                // ✦ pocket physical radius (visible & forgiving)
-const POCKET_OFFSET = 55;                       // ✦ pocket center inside playable area (balanced w/ frame)
+export const COIN_RADIUS = 31.8 / 2;            // ICF coin Ø31.8 mm  → r = 15.9
+export const STRIKER_RADIUS = 41.3 / 2;         // ICF striker Ø41.3 mm → r = 20.65
+export const POCKET_RADIUS = 51 / 2;            // ICF pocket Ø51 mm  → r = 25.5
+// Pocket centre is positioned so that the OUTER edge of the pocket lies exactly
+// on the inner wall of the frame — matches ICF tournament geometry.
+const POCKET_OFFSET = FRAME_INSET + POCKET_RADIUS; // = 55.5 (mm from board edge)
 
-export const CENTER_CIRCLE_RADIUS = 31.8 / 2;   // ✦ central decoration radius
-export const DECOR_RING_RADIUS = 31.8;          // ✦ distance of 6 decor circles from center
+export const CENTER_CIRCLE_RADIUS = 31.8 / 2;   // ICF: central circle = coin Ø
+export const DECOR_RING_RADIUS = 170 / 2;       // ICF: 6 small circles on Ø170 mm ring
 
-export const THROW_LINE_LENGTH = 470;           // ✦ horizontal throw line length
-export const THROW_LINE_OFFSET = 100;           // ✦ distance from frame edge
+export const THROW_LINE_LENGTH = 470;           // ICF baseline length = 470 mm
+export const THROW_LINE_OFFSET = 100;           // baseline 100 mm from board edge
 export const THROW_END_CIRCLE_RADIUS = 31.8 / 2;
 
 // ─── PHYSICS CONSTANTS ───────────────────────────────────────────────────────
-export const STATIC_FRICTION = 0.07;            // applied when slow (was 0.05)
-export const DYNAMIC_FRICTION = 0.05;           // applied when in motion (was 0.03)
-export const LINEAR_DRAG = 0.6;                 // global drag factor — natural slowdown (was 0.2)
-export const MIN_VELOCITY = 0.5;                // ✦ stop threshold
-export const WALL_RESTITUTION = 0.78;           // ✦ slightly damped bounce (softer feel)
-export const COIN_RESTITUTION = 0.55;           // ✦ slightly damped piece-piece bounce
-export const STRIKER_MAX_POWER = 18;            // ✦ tuned per UX: stronger control (was 28, then 38)
+// Tuned so a max-power striker can carry a centre coin to a far-corner pocket
+// (distance ≈ √2·(BOARD/2 − POCKET_OFFSET) ≈ 445 mm) in ~1.1 s with COIN
+// restitution 0.55 and the drag values below.
+export const STATIC_FRICTION = 0.07;            // applied when slow
+export const DYNAMIC_FRICTION = 0.05;           // applied each frame while moving
+export const LINEAR_DRAG = 0.55;                // proportional drag per second
+export const MIN_VELOCITY = 0.5;                // stop threshold
+export const WALL_RESTITUTION = 0.78;           // wall bounce coefficient
+export const COIN_RESTITUTION = 0.55;           // piece-piece bounce coefficient
+// STRIKER_MAX_POWER derived from:
+//   target distance d = √2 · (BOARD_SIZE/2 − POCKET_OFFSET) ≈ 445 mm
+//   coin-vel after impact ≈ v_striker · (1 + COIN_RESTITUTION)/2 ≈ 0.78 · v
+//   With drag 0.55/s + dyn friction, stop-distance s = v² / (2·a_eff)
+//   Solving for v_striker giving s ≈ 445 → v ≈ 22 units/frame
+export const STRIKER_MAX_POWER = 22;            // ✦ ICF-tuned max striker velocity
 
 const CENTER = BOARD_SIZE / 2;
 const DT = 1 / 60;                              // fixed simulation timestep

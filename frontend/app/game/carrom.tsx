@@ -389,9 +389,11 @@ export default function CarromScreen() {
             borderColor: "rgba(120,80,40,0.2)",
           }} />
 
-          {/* Pockets — properly sized & balanced with subtle halo for depth */}
+          {/* Pockets — balanced (outer edge sits on inner wall) with subtle halo */}
           {POCKETS.map((p, i) => {
-            const visualRadius = POCKET_RADIUS * 1.15; // slight halo over hitbox
+            // Visual = hitbox · 1.1  → tiny halo ring for premium look without
+            // changing physics behavior.
+            const visualRadius = POCKET_RADIUS * 1.1;
             return (
               <View key={`pocket-${i}`} style={{
                 position: "absolute",
