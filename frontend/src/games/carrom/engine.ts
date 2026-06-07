@@ -58,8 +58,8 @@ export const FRAME_INSET = 30;                  // edge thickness (visual only)
 
 export const COIN_RADIUS = 15.9;                // ✦ matches center-circle radius
 export const STRIKER_RADIUS = 19;
-export const POCKET_RADIUS = 22.5 / 2;          // ✦ pocket hitbox radius = 11.25
-const POCKET_OFFSET = 25;                       // ✦ pocket center distance from edge
+export const POCKET_RADIUS = 24;                // ✦ pocket physical radius (visible & forgiving)
+const POCKET_OFFSET = 55;                       // ✦ pocket center inside playable area (balanced w/ frame)
 
 export const CENTER_CIRCLE_RADIUS = 31.8 / 2;   // ✦ central decoration radius
 export const DECOR_RING_RADIUS = 31.8;          // ✦ distance of 6 decor circles from center
@@ -69,13 +69,13 @@ export const THROW_LINE_OFFSET = 100;           // ✦ distance from frame edge
 export const THROW_END_CIRCLE_RADIUS = 31.8 / 2;
 
 // ─── PHYSICS CONSTANTS ───────────────────────────────────────────────────────
-export const STATIC_FRICTION = 0.05;            // applied when slow
-export const DYNAMIC_FRICTION = 0.03;           // applied when in motion
-export const LINEAR_DRAG = 0.2;                 // global drag factor (per second)
+export const STATIC_FRICTION = 0.07;            // applied when slow (was 0.05)
+export const DYNAMIC_FRICTION = 0.05;           // applied when in motion (was 0.03)
+export const LINEAR_DRAG = 0.6;                 // global drag factor — natural slowdown (was 0.2)
 export const MIN_VELOCITY = 0.5;                // ✦ stop threshold
-export const WALL_RESTITUTION = 0.85;           // ✦ bounce off walls
-export const COIN_RESTITUTION = 0.60;           // ✦ bounce between pieces
-export const STRIKER_MAX_POWER = 38;            // tuned for 740-unit board
+export const WALL_RESTITUTION = 0.78;           // ✦ slightly damped bounce (softer feel)
+export const COIN_RESTITUTION = 0.55;           // ✦ slightly damped piece-piece bounce
+export const STRIKER_MAX_POWER = 18;            // ✦ tuned per UX: stronger control (was 28, then 38)
 
 const CENTER = BOARD_SIZE / 2;
 const DT = 1 / 60;                              // fixed simulation timestep
@@ -411,8 +411,8 @@ export function simulateStep(state: CarromState): { state: CarromState; settled:
       }
     }
     // 4. Pocket detection (per sub-step so fast pieces still get pocketed)
-    // Use 1.6x visual radius for hitbox match with rendered pocket
-    const POCKET_HITBOX = POCKET_RADIUS * 1.6;
+    // Hitbox = raw POCKET_RADIUS (matches the new larger, visible pocket).
+    const POCKET_HITBOX = POCKET_RADIUS;
     for (const p of allPieces) {
       if (!p.active) continue;
       for (const pocket of POCKETS) {

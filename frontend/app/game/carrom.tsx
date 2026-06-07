@@ -389,9 +389,9 @@ export default function CarromScreen() {
             borderColor: "rgba(120,80,40,0.2)",
           }} />
 
-          {/* Pockets — larger visual + halo so they're clearly visible */}
+          {/* Pockets — properly sized & balanced with subtle halo for depth */}
           {POCKETS.map((p, i) => {
-            const visualRadius = POCKET_RADIUS * 1.6; // 60% bigger for visibility
+            const visualRadius = POCKET_RADIUS * 1.15; // slight halo over hitbox
             return (
               <View key={`pocket-${i}`} style={{
                 position: "absolute",
@@ -402,23 +402,22 @@ export default function CarromScreen() {
                 borderRadius: visualRadius * SCALE,
                 backgroundColor: "#050505",
                 borderWidth: 2,
-                borderColor: "#2A1F0F",
+                borderColor: "#3A2716",
                 zIndex: 5,
                 shadowColor: "#000",
-                shadowOpacity: 0.7,
-                shadowRadius: 4,
-                shadowOffset: { width: 0, height: 1 },
-                // Inner highlight for depth
+                shadowOpacity: 0.85,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
                 alignItems: "center",
                 justifyContent: "center",
               }}>
                 <View style={{
-                  width: visualRadius * 0.8 * SCALE,
-                  height: visualRadius * 0.8 * SCALE,
-                  borderRadius: visualRadius * 0.4 * SCALE,
+                  width: visualRadius * 1.6 * SCALE,
+                  height: visualRadius * 1.6 * SCALE,
+                  borderRadius: visualRadius * 0.8 * SCALE,
                   backgroundColor: "#000",
                   borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.06)",
+                  borderColor: "rgba(255,255,255,0.08)",
                 }} />
               </View>
             );
