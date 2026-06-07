@@ -11,7 +11,7 @@
 // =============================================================================
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, PanResponder, Dimensions, Alert,
+  View, Text, StyleSheet, TouchableOpacity, PanResponder, Dimensions, Alert, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +26,8 @@ import {
 import { planBotShot } from "@/src/games/carrom/ai";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
+import { useAuth } from "@/src/context/AuthContext";
+import { getAvatarUrl } from "@/src/constants/avatars";
 
 const { width } = Dimensions.get("window");
 const DISPLAY = Math.min(width - 24, 380);
@@ -41,6 +43,7 @@ export default function CarromScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useT();
+  const { user } = useAuth();
 
   const [state, setState] = useState<CarromState>(createInitialState);
   const [aimAngle, setAimAngle] = useState(-Math.PI / 2);
@@ -113,60 +116,63 @@ export default function CarromScreen() {
 
   // ── Drag to aim ───────────────────────────────────────────────────────────
   const boardOriginRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  // Drag offset (vector from striker → current touch) in BOARD units.  The
+  // striker shoots in the OPPOSITE direction (slingshot) with power
+  // proportional to drag length.
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const MAX_DRAG = 160; // board units → full power
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => stateRef.current.phase === "aiming",
-      onMoveShouldSetPanResponder: () => stateRef.current.phase === "aiming",
-      onPanResponderMove: (e, gesture) => {
+      // Only respond if the user starts the touch ON or very NEAR the striker.
+      onStartShouldSetPanResponder: (e) => {
+        const s = stateRef.current;
+        if (s.phase !== "aiming" || s.turn !== "player1") return false;
+        const tx = (e.nativeEvent.locationX) / SCALE;
+        const ty = (e.nativeEvent.locationY) / SCALE;
+        const d = Math.hypot(tx - s.striker.pos.x, ty - s.striker.pos.y);
+        return d < s.striker.radius * 3.5; // generous touch hit-box
+      },
+      onMoveShouldSetPanResponder: () => stateRef.current.phase === "aiming" && stateRef.current.turn === "player1",
+      onPanResponderGrant: () => {
+        setDragOffset({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (e) => {
         const s = stateRef.current;
         if (s.phase !== "aiming") return;
-        const line = throwLineForPlayer(s.turn);
-        // The first touch DOWN starts at the striker; subsequent moves draw an
-        // angled arrow.  The player drags AWAY from the target — releasing
-        // catapults the striker in the OPPOSITE direction.
         const touchBoardX = (e.nativeEvent.pageX - boardOriginRef.current.x) / SCALE;
         const touchBoardY = (e.nativeEvent.pageY - boardOriginRef.current.y) / SCALE;
         const dx = touchBoardX - s.striker.pos.x;
         const dy = touchBoardY - s.striker.pos.y;
-
-        // While the touch is *along the throw line* (horizontal for top/bottom,
-        // vertical for left/right) we treat it as repositioning. Otherwise we
-        // treat it as aiming.
-        // Heuristic: if drag is mostly along the line axis AND power is tiny,
-        // it's a slide; otherwise it's an aim drag.
-        const dragLen = Math.hypot(dx, dy);
-        const alongLine = line.horizontal ? Math.abs(dx) > Math.abs(dy) * 1.5 : Math.abs(dy) > Math.abs(dx) * 1.5;
-
-        if (alongLine && dragLen < 60) {
-          // Slide the striker along the line
-          if (line.horizontal) {
-            setState((prev) => setStrikerPosition(prev, touchBoardX));
-          } else {
-            setState((prev) => setStrikerPosition(prev, line.start.x, touchBoardY));
-          }
-          return;
-        }
-
-        // Aiming: angle points FROM the drag-end BACK to the striker, so the
-        // striker shoots in the OPPOSITE direction of the drag (slingshot).
-        const angle = Math.atan2(-dy, -dx);
+        // Clamp drag length so the arrow can't extend forever
+        const len = Math.hypot(dx, dy);
+        const clampedLen = Math.min(len, MAX_DRAG);
+        const cx = len > 0 ? (dx / len) * clampedLen : 0;
+        const cy = len > 0 ? (dy / len) * clampedLen : 0;
+        setDragOffset({ x: cx, y: cy });
+        // Aim direction is OPPOSITE the drag (slingshot)
+        const angle = Math.atan2(-cy, -cx);
         setAimAngle(angle);
-        setPower(Math.min(1, dragLen / 160));
+        setPower(clampedLen / MAX_DRAG);
       },
       onPanResponderRelease: () => {
         const s = stateRef.current;
-        if (s.phase !== "aiming" || power < 0.05) {
+        const p = power;
+        setDragOffset(null);
+        if (s.phase !== "aiming" || p < 0.08) {
           setPower(0);
           return;
         }
-        const shot = shootStriker(s, aimAngle, power);
+        const shot = shootStriker(s, aimAngle, p);
         setState(shot);
         stateRef.current = shot;
         setPower(0);
         runSimulation();
       },
-      onPanResponderTerminate: () => setPower(0),
+      onPanResponderTerminate: () => {
+        setDragOffset(null);
+        setPower(0);
+      },
     }),
   ).current;
 
@@ -200,21 +206,42 @@ export default function CarromScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Scores + Timer */}
-      <View style={styles.scoreBar}>
-        <View style={[styles.scoreBox, state.turn === "player1" && styles.scoreActive]}>
-          <Text style={styles.scoreLabel}>{t("you") || "You"}</Text>
-          <Text style={styles.scoreVal}>{state.scores.player1}</Text>
+      {/* Player VS Bot panel */}
+      <View style={styles.vsBar}>
+        {/* Player (You) */}
+        <View style={[styles.playerCard, state.turn === "player1" && styles.playerCardActive]}>
+          <Image
+            source={{ uri: getAvatarUrl(user?.avatar || "avatar_ninja") }}
+            style={[styles.playerAvatar, state.turn === "player1" && styles.playerAvatarActive]}
+          />
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={styles.playerName} numberOfLines={1}>
+              {user?.nickname || user?.username || (t("you") || "You")}
+            </Text>
+            <Text style={styles.playerScore}>{state.scores.player1}</Text>
+          </View>
         </View>
-        <View style={[styles.timerBox, state.turnSecondsLeft <= 10 && styles.timerWarn]}>
-          <Ionicons name="time-outline" size={18} color={state.turnSecondsLeft <= 10 ? "#FF5C5C" : FUTURISTIC.brand} />
-          <Text style={[styles.timerText, state.turnSecondsLeft <= 10 && { color: "#FF5C5C" }]}>
-            {Math.ceil(state.turnSecondsLeft)}s
-          </Text>
+
+        {/* Timer/VS center */}
+        <View style={styles.vsCenter}>
+          <Text style={styles.vsText}>VS</Text>
+          <View style={[styles.timerBox, state.turnSecondsLeft <= 10 && styles.timerWarn]}>
+            <Ionicons name="time-outline" size={14} color={state.turnSecondsLeft <= 10 ? "#FF5C5C" : FUTURISTIC.brand} />
+            <Text style={[styles.timerText, state.turnSecondsLeft <= 10 && { color: "#FF5C5C" }]}>
+              {Math.ceil(state.turnSecondsLeft)}s
+            </Text>
+          </View>
         </View>
-        <View style={[styles.scoreBox, state.turn === "player2" && styles.scoreActive]}>
-          <Text style={styles.scoreLabel}>🤖 {t("bot") || "Bot"}</Text>
-          <Text style={styles.scoreVal}>{state.scores.player2}</Text>
+
+        {/* Bot opponent */}
+        <View style={[styles.playerCard, state.turn === "player2" && styles.playerCardActive]}>
+          <View style={{ flex: 1, marginRight: 8, alignItems: "flex-end" }}>
+            <Text style={styles.playerName} numberOfLines={1}>🤖 {t("bot") || "Bot"}</Text>
+            <Text style={styles.playerScore}>{state.scores.player2}</Text>
+          </View>
+          <View style={[styles.botAvatar, state.turn === "player2" && styles.playerAvatarActive]}>
+            <Ionicons name="hardware-chip" size={28} color={FUTURISTIC.brand} />
+          </View>
         </View>
       </View>
 
@@ -373,18 +400,42 @@ export default function CarromScreen() {
             }]} />
           )}
 
-          {/* Aim arrow */}
-          {state.phase === "aiming" && power > 0.05 && (
-            <View pointerEvents="none" style={{
-              position: "absolute",
-              left: state.striker.pos.x * SCALE,
-              top: state.striker.pos.y * SCALE - 1.5,
-              width: power * 120,
-              height: 3,
-              backgroundColor: power > 0.7 ? "#FF5C5C" : FUTURISTIC.brand,
-              transform: [{ translateY: -1.5 }, { rotate: `${aimAngle}rad` }],
-              transformOrigin: "0% 50%",
-            }} />
+          {/* Aim arrow — points FROM the striker in the direction it will go */}
+          {state.phase === "aiming" && power > 0.05 && dragOffset && (
+            <>
+              {/* Drag trail (dashed line FROM striker TO the drag end-point) */}
+              <View pointerEvents="none" style={{
+                position: "absolute",
+                left: state.striker.pos.x * SCALE,
+                top: state.striker.pos.y * SCALE,
+                width: Math.hypot(dragOffset.x, dragOffset.y) * SCALE,
+                height: 2,
+                backgroundColor: "rgba(255,255,255,0.35)",
+                transform: [{ rotate: `${Math.atan2(dragOffset.y, dragOffset.x)}rad` }],
+                transformOrigin: "0% 50%",
+              }} />
+              {/* Shooting line (solid, opposite direction = where striker GOES) */}
+              <View pointerEvents="none" style={{
+                position: "absolute",
+                left: state.striker.pos.x * SCALE,
+                top: state.striker.pos.y * SCALE,
+                width: power * 140,
+                height: 4,
+                backgroundColor: power > 0.75 ? "#FF5C5C" : power > 0.4 ? "#FFB147" : FUTURISTIC.brand,
+                borderRadius: 2,
+                transform: [{ rotate: `${aimAngle}rad` }],
+                transformOrigin: "0% 50%",
+              }} />
+              {/* Arrowhead — small triangle at the tip of the shooting line */}
+              <View pointerEvents="none" style={{
+                position: "absolute",
+                left: state.striker.pos.x * SCALE + Math.cos(aimAngle) * power * 140 - 6,
+                top: state.striker.pos.y * SCALE + Math.sin(aimAngle) * power * 140 - 6,
+                width: 12, height: 12, borderRadius: 6,
+                backgroundColor: power > 0.75 ? "#FF5C5C" : power > 0.4 ? "#FFB147" : FUTURISTIC.brand,
+                borderWidth: 2, borderColor: "#fff",
+              }} />
+            </>
           )}
         </View>
       </View>
@@ -423,6 +474,39 @@ const styles = StyleSheet.create({
   scoreBar: {
     flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10,
     paddingVertical: 8, paddingHorizontal: 12,
+  },
+  vsBar: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  playerCard: {
+    flex: 1, flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 10, paddingVertical: 10, borderRadius: 14,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+    minHeight: 56,
+  },
+  playerCardActive: {
+    borderColor: FUTURISTIC.brand,
+    backgroundColor: FUTURISTIC.brand + "10",
+  },
+  playerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: FUTURISTIC.surface2 },
+  playerAvatarActive: {
+    borderWidth: 2,
+    borderColor: FUTURISTIC.brand,
+  },
+  botAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: FUTURISTIC.surface2,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+  },
+  playerName: { color: FUTURISTIC.textPrimary, fontSize: 12, fontWeight: "800", maxWidth: 110 },
+  playerScore: { color: FUTURISTIC.brand, fontSize: 22, fontWeight: "900", marginTop: 2 },
+  vsCenter: { alignItems: "center", gap: 4 },
+  vsText: {
+    color: FUTURISTIC.textMuted, fontSize: 11, fontWeight: "900",
+    letterSpacing: 1.6,
   },
   scoreBox: {
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 12,
