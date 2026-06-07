@@ -1,10 +1,8 @@
 // =============================================================================
-// app/game/chess.tsx — Playable Chess Screen (PREMIUM 3D LOOK)
+// app/game/chess.tsx — Playable Chess Screen (SCULPTED REALISTIC PIECES)
 // =============================================================================
-// • Solid filled glyphs only (NO outline / transparent characters)
-// • Each piece sits on a metallic circular podium with LinearGradient
-// • Ivory-white for "white" pieces, charcoal-black for "black" pieces
-// • Subtle highlight + drop shadow → premium 3-D feel without heavy assets
+// Hand-drawn SVG silhouettes (Cburnett-style, public domain) so each piece
+// looks carved/sculpted rather than cartoon. Solid ivory/charcoal fills.
 // =============================================================================
 import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from "react-native";
@@ -16,36 +14,13 @@ import {
   createInitialState, legalMoves, makeMove, getGameResult,
   GameState, Square, PieceType,
 } from "@/src/games/chess/engine";
+import ChessPieceSvg from "@/src/games/chess/ChessPieceSvg";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
 
 const { width } = Dimensions.get("window");
 const BOARD = Math.min(width - 24, 360);
 const CELL = BOARD / 8;
-
-// ─── Premium glyphs: ALWAYS use the SOLID (filled) Unicode chess glyphs.
-//     The "white" Unicode glyphs (♔♕♖♗♘♙) are outline characters and tend
-//     to render thin/translucent on RN — we use the solid set for both
-//     colours and recolour them via the `color` style.
-const PIECE_GLYPH: Record<PieceType, string> = {
-  k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟",
-};
-
-// ─── Colour palette for the pieces ────────────────────────────────────────
-const WHITE_PIECE = {
-  glyphColor: "#FFF7E1",        // warm ivory
-  glyphShadow: "rgba(40,25,5,0.55)",
-  baseGrad: ["#F8ECD0", "#E2C893", "#B68F4E"] as const, // brushed gold/ivory
-  ring: "#F5DEB1",
-  shadow: "rgba(180,140,70,0.55)",
-};
-const BLACK_PIECE = {
-  glyphColor: "#0E0E12",        // deep charcoal
-  glyphShadow: "rgba(255,255,255,0.18)",
-  baseGrad: ["#5B5B68", "#2A2A30", "#0C0C10"] as const, // gunmetal
-  ring: "#7A7A88",
-  shadow: "rgba(0,0,0,0.65)",
-};
 
 export default function ChessScreen() {
   const router = useRouter();
@@ -115,60 +90,8 @@ export default function ChessScreen() {
     return state.turn === "white" ? (t("white_turn") || "White's turn") : (t("black_turn") || "Black's turn");
   }, [result, state.turn, t]);
 
-  // ─── Premium piece renderer ────────────────────────────────────────────
-  const renderPiece = (color: "white" | "black", type: PieceType) => {
-    const theme = color === "white" ? WHITE_PIECE : BLACK_PIECE;
-    const baseSize = CELL * 0.88;
-    return (
-      <View style={{
-        width: baseSize, height: baseSize,
-        alignItems: "center", justifyContent: "center",
-      }}>
-        {/* Outer rim — gives premium thickness */}
-        <LinearGradient
-          colors={theme.baseGrad}
-          start={{ x: 0.25, y: 0.1 }}
-          end={{ x: 0.75, y: 0.95 }}
-          style={{
-            position: "absolute", inset: 0 as any,
-            width: baseSize, height: baseSize,
-            borderRadius: baseSize / 2,
-            borderWidth: 1.5, borderColor: theme.ring,
-            shadowColor: theme.shadow,
-            shadowOpacity: 0.85, shadowRadius: 4,
-            shadowOffset: { width: 0, height: 2 },
-          }}
-        />
-        {/* Top sheen highlight (gives 3-D pop) */}
-        <View pointerEvents="none" style={{
-          position: "absolute",
-          top: baseSize * 0.08, left: baseSize * 0.22,
-          width: baseSize * 0.45, height: baseSize * 0.16,
-          borderRadius: baseSize,
-          backgroundColor: color === "w" ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
-        }} />
-        {/* Solid glyph (always the filled chess character) */}
-        <Text style={{
-          fontSize: baseSize * 0.62,
-          color: theme.glyphColor,
-          textShadowColor: theme.glyphShadow,
-          textShadowOffset: { width: 0, height: 1 },
-          textShadowRadius: 2,
-          // Bake-in weight (RN ignores font-weight on emojis but harmless)
-          fontWeight: "900",
-          textAlign: "center",
-          // Center perfectly inside the podium
-          marginTop: -baseSize * 0.04,
-        }}>
-          {PIECE_GLYPH[type]}
-        </Text>
-      </View>
-    );
-  };
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
@@ -179,14 +102,12 @@ export default function ChessScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Status */}
       <View style={styles.statusBar}>
         <Text style={[styles.statusText, result.status === "check" && { color: "#FF6B6B" }]}>
           {statusText}
         </Text>
       </View>
 
-      {/* Board */}
       <View style={styles.boardWrap}>
         <LinearGradient
           colors={["#3A1F0E", "#2A1508"]}
@@ -210,7 +131,6 @@ export default function ChessScreen() {
                       { width: CELL, height: CELL, left: col * CELL, top: row * CELL },
                     ]}
                   >
-                    {/* Cell background with subtle gradient — gives premium wood feel */}
                     <LinearGradient
                       colors={
                         isSelected
@@ -223,11 +143,15 @@ export default function ChessScreen() {
                       end={{ x: 1, y: 1 }}
                       style={StyleSheet.absoluteFill as any}
                     />
-                    {/* Highlight indicators */}
                     {isHighlight && !piece && <View style={styles.dot} />}
                     {isHighlight && piece && <View style={styles.captureRing} />}
-                    {/* Piece */}
-                    {piece && renderPiece(piece.color, piece.type)}
+                    {piece && (
+                      <ChessPieceSvg
+                        type={piece.type}
+                        color={piece.color}
+                        size={CELL * 0.92}
+                      />
+                    )}
                   </TouchableOpacity>
                 );
               })
@@ -236,7 +160,6 @@ export default function ChessScreen() {
         </LinearGradient>
       </View>
 
-      {/* Move count */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           {t("moves") || "Moves"}: {state.moveHistory.length}
