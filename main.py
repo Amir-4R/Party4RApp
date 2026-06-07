@@ -3,39 +3,39 @@ import logging
 import uuid
 import json
 import secrets
-import urllib.parse
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Annotated, Dict
+from typing import Optional, Annotated, Dict, Set
 
-import bcrypt
-import jwt
-import httpx
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Query
 from fastapi.security import OAuth2PasswordBearer
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+import bcrypt
+import jwt
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 # -----------------------------------------------------------------------------
-# Config
+# Config — all read cleanly from environment with safe production defaults.
+# Render injects these via render.yaml / dashboard env vars.
 # -----------------------------------------------------------------------------
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "party4r")
 JWT_SECRET = os.environ.get("JWT_SECRET") or secrets.token_hex(32)
 JWT_ALGO = "HS256"
-TOKEN_EXPIRE_HOURS = int(os.environ.get("TOKEN_EXPIRE_HOURS", "168"))
+TOKEN_EXPIRE_HOURS = int(os.environ.get("TOKEN_EXPIRE_HOURS", "168"))  # 1 week
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
+# CORS origins: comma-separated env or "*" for fully open (current preview setup)
 CORS_ORIGINS_RAW = os.environ.get("CORS_ORIGINS", "*").strip()
 _CORS_LIST = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()] or ["*"]
 ALLOW_CREDENTIALS = "*" not in _CORS_LIST  # browsers reject "*" + credentials
 
-client = AsyncIOMotorClient(MONGO_URI)
+client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
 app = FastAPI(
@@ -50,9 +50,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 if not os.environ.get("JWT_SECRET"):
-    logger.warning("JWT_SECRET not set — generated ephemeral key. Tokens invalidate on restart.")
-if MONGO_URI.startswith("mongodb://localhost"):
-    logger.warning("MONGO_URI points to localhost — set a real MongoDB Atlas URI in production.")
+    logger.warning(
+        "JWT_SECRET not set — generated ephemeral key. Tokens will invalidate on restart."
+    )
+if MONGO_URL.startswith("mongodb://localhost"):
+    logger.warning(
+        "MONGO_URL points to localhost — set a real MongoDB Atlas URI in production."
+    )
 
 
 # ============== Models ==============
@@ -180,6 +184,7 @@ def user_to_public(u: dict) -> UserPublic:
     )
 
 
+# Track online users by their WS connection count
 ONLINE_USERS: Dict[str, int] = {}
 
 
@@ -213,10 +218,15 @@ def to_friend(u: dict) -> FriendUser:
 # ============== WebSocket Room Manager ==============
 class RoomManager:
     def __init__(self):
+        # room_id -> {user_id: WebSocket}
         self.rooms: Dict[str, Dict[str, WebSocket]] = {}
+        # room_id -> ordered list of user_ids (join order, for host succession)
         self.join_order: Dict[str, list] = {}
+        # room_id -> user dict cache
         self.members: Dict[str, Dict[str, dict]] = {}
+        # room_id -> current host user_id
         self.current_host: Dict[str, str] = {}
+        # (room_id, user_id) -> connect epoch seconds
         self.connect_time: Dict[tuple, float] = {}
 
     async def connect(self, room_id: str, user: dict, ws: WebSocket):
@@ -238,7 +248,32 @@ class RoomManager:
             return 0
         return max(0, int(_t.time() - start))
 
+    def get_peer_overlaps(self, room_id: str, user_id: str) -> list:
+        """Return [(peer_id, overlap_seconds), ...] for all OTHER members
+        currently in the room at the time this user leaves.
+
+        Overlap = now - max(my_connect_time, peer_connect_time)
+        Used to track shared-time between pairs of friends co-watching.
+        """
+        import time as _t
+        now = _t.time()
+        my_start = self.connect_time.get((room_id, user_id))
+        if my_start is None:
+            return []
+        peers = []
+        for peer_id in list(self.rooms.get(room_id, {}).keys()):
+            if peer_id == user_id:
+                continue
+            peer_start = self.connect_time.get((room_id, peer_id))
+            if peer_start is None:
+                continue
+            overlap = max(0, int(now - max(my_start, peer_start)))
+            if overlap > 0:
+                peers.append((peer_id, overlap))
+        return peers
+
     def disconnect(self, room_id: str, user_id: str) -> bool:
+        """Returns True if room became empty and should be destroyed."""
         empty = False
         if room_id in self.rooms:
             self.rooms[room_id].pop(user_id, None)
@@ -287,7 +322,7 @@ manager = RoomManager()
 
 # ============== Auth Routes ==============
 @api.get("/")
-async def api_root():
+async def root():
     return {"message": "PartyApp API"}
 
 
@@ -340,6 +375,7 @@ async def update_profile(
     if avatar is not None:
         updates["avatar"] = avatar
     if avatar_image is not None:
+        # base64 data URI capped at ~700KB
         if len(avatar_image) > 720_000:
             raise HTTPException(400, "Avatar image too large (max ~500KB)")
         updates["avatar_image"] = avatar_image
@@ -348,6 +384,7 @@ async def update_profile(
     if banner_id is not None:
         updates["banner_id"] = banner_id
     if badge is not None:
+        # toggle badge in/out of badges array
         existing = current.get("badges", [])
         if badge in existing:
             existing.remove(badge)
@@ -410,6 +447,7 @@ async def friend_request_send(target_id: str, current: dict = Depends(get_curren
     if target_id in current.get("friend_requests_out", []):
         return {"ok": True, "status": "already_requested"}
     if target_id in current.get("friend_requests_in", []):
+        # They already requested us → auto-accept
         return await friend_request_accept(target_id, current)
     await db.users.update_one(
         {"id": current["id"]}, {"$addToSet": {"friend_requests_out": target_id}}
@@ -421,22 +459,32 @@ async def friend_request_send(target_id: str, current: dict = Depends(get_curren
 
 
 @api.post("/friends/accept/{requester_id}")
-async def friend_request_accept(requester_id: str, current: dict = Depends(get_current_user)):
+async def friend_request_accept(
+    requester_id: str, current: dict = Depends(get_current_user)
+):
     if requester_id not in current.get("friend_requests_in", []):
         raise HTTPException(400, "No pending request from this user")
     await db.users.update_one(
         {"id": current["id"]},
-        {"$pull": {"friend_requests_in": requester_id}, "$addToSet": {"friends": requester_id}},
+        {
+            "$pull": {"friend_requests_in": requester_id},
+            "$addToSet": {"friends": requester_id},
+        },
     )
     await db.users.update_one(
         {"id": requester_id},
-        {"$pull": {"friend_requests_out": current["id"]}, "$addToSet": {"friends": current["id"]}},
+        {
+            "$pull": {"friend_requests_out": current["id"]},
+            "$addToSet": {"friends": current["id"]},
+        },
     )
     return {"ok": True, "status": "accepted"}
 
 
 @api.post("/friends/reject/{requester_id}")
-async def friend_request_reject(requester_id: str, current: dict = Depends(get_current_user)):
+async def friend_request_reject(
+    requester_id: str, current: dict = Depends(get_current_user)
+):
     await db.users.update_one(
         {"id": current["id"]}, {"$pull": {"friend_requests_in": requester_id}}
     )
@@ -448,8 +496,12 @@ async def friend_request_reject(requester_id: str, current: dict = Depends(get_c
 
 @api.delete("/friends/{friend_id}")
 async def friend_remove(friend_id: str, current: dict = Depends(get_current_user)):
-    await db.users.update_one({"id": current["id"]}, {"$pull": {"friends": friend_id}})
-    await db.users.update_one({"id": friend_id}, {"$pull": {"friends": current["id"]}})
+    await db.users.update_one(
+        {"id": current["id"]}, {"$pull": {"friends": friend_id}}
+    )
+    await db.users.update_one(
+        {"id": friend_id}, {"$pull": {"friends": current["id"]}}
+    )
     return {"ok": True}
 
 
@@ -525,6 +577,10 @@ async def set_video(room_id: str, video_url: str, current: dict = Depends(get_cu
 
 
 # ============== YouTube Search ==============
+import urllib.parse
+import httpx
+
+
 @api.get("/youtube/search")
 async def youtube_search(q: str, current: dict = Depends(get_current_user)):
     if not YOUTUBE_API_KEY:
@@ -562,6 +618,7 @@ async def youtube_search(q: str, current: dict = Depends(get_current_user)):
 # ============== WebSocket ==============
 @app.websocket("/api/ws/rooms/{room_id}")
 async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
+    # Authenticate
     try:
         user_id = decode_token(token)
     except ValueError:
@@ -577,18 +634,20 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
         await websocket.close(code=1008)
         return
 
+    is_host = room["host_id"] == user["id"]
     creator_id = room["host_id"]
     await manager.connect(room_id, user, websocket)
-    mark_online(user["id"])
 
+    # Host succession: creator returns → reclaim; otherwise current host stays
     cur = manager.get_host(room_id)
     if cur is None:
-        manager.set_host(room_id, user["id"])
+        manager.set_host(room_id, user["id"])  # first connection = host
     elif user["id"] == creator_id and cur != creator_id:
-        manager.set_host(room_id, creator_id)
+        manager.set_host(room_id, creator_id)  # creator reclaims
         await manager.broadcast(room_id, {"type": "host_changed", "host_id": creator_id})
     is_host = manager.get_host(room_id) == user["id"]
 
+    # Notify others + send init
     await manager.broadcast(
         room_id,
         {
@@ -623,11 +682,16 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
 
             if mtype == "chat":
                 text = (data.get("text") or "").strip()
-                image = data.get("image")
+                image = data.get("image")  # base64 data URI (optional)
                 if image and len(image) > 720_000:
+                    # ~500KB binary after base64 overhead
                     continue
                 if not text and not image:
                     continue
+                # Phase 5 — Word filter (soft censor only)
+                bot_warning = False
+                if text:
+                    text, bot_warning = censor_text(text)
                 payload = {
                     "type": "chat",
                     "text": text[:500] if text else "",
@@ -638,9 +702,11 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 }
                 if image:
                     payload["image"] = image
+                if bot_warning:
+                    payload["bot_flag"] = True
                 await manager.broadcast(room_id, payload)
-
             elif mtype == "playback":
+                # Only current host can issue playback commands
                 if manager.get_host(room_id) != user["id"]:
                     continue
                 event = data.get("event")
@@ -658,16 +724,63 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                         {"id": room_id}, {"$set": {"video_url": data["video_url"]}}
                     )
                 await manager.broadcast(room_id, payload)
-
             elif mtype == "transfer_host":
+                # Only current host can transfer
                 if manager.get_host(room_id) != user["id"]:
                     continue
                 target = data.get("to")
                 if target and target in manager.rooms.get(room_id, {}):
                     manager.set_host(room_id, target)
                     await manager.broadcast(room_id, {"type": "host_changed", "host_id": target})
-
+            elif mtype == "vote_start":
+                room_doc = await db.rooms.find_one({"id": room_id}, {"_id": 0, "voting_mode": 1})
+                mode = (room_doc or {}).get("voting_mode", "allowed")
+                if mode == "owner_only" and manager.get_host(room_id) != user["id"]:
+                    continue
+                kind = data.get("kind")
+                if kind not in ("skip", "next"):
+                    continue
+                v = _vote_start(
+                    room_id, kind, user["id"], manager.member_count(room_id),
+                    video_id=data.get("video_id"),
+                    video_url=data.get("video_url"),
+                    title=data.get("title"),
+                )
+                if v:
+                    await manager.broadcast(room_id, {"type": "vote_state", "vote": v.public()})
+            elif mtype == "vote_cast":
+                v = _vote_cast(room_id, user["id"], bool(data.get("yes", False)))
+                if not v:
+                    continue
+                await manager.broadcast(room_id, {"type": "vote_state", "vote": v.public()})
+                if v.passed():
+                    if v.kind == "skip":
+                        # Clear the room's current video and broadcast a change_video
+                        # so all clients actually drop to "No video" state.
+                        await db.rooms.update_one(
+                            {"id": room_id}, {"$set": {"video_url": None}}
+                        )
+                        await manager.broadcast(room_id, {
+                            "type": "playback", "event": "change_video",
+                            "video_url": None, "host_id": manager.get_host(room_id),
+                        })
+                        await manager.broadcast(room_id, {"type": "vote_result", "passed": True, "kind": "skip"})
+                    elif v.kind == "next" and (v.video_url or v.video_id):
+                        url = v.video_url or f"https://www.youtube.com/watch?v={v.video_id}"
+                        await db.rooms.update_one({"id": room_id}, {"$set": {"video_url": url}})
+                        await manager.broadcast(room_id, {
+                            "type": "playback", "event": "change_video",
+                            "video_url": url, "host_id": manager.get_host(room_id),
+                        })
+                        await manager.broadcast(room_id, {"type": "vote_result", "passed": True, "kind": "next", "video_url": url})
+                    _vote_end(room_id)
+            elif mtype == "vote_cancel":
+                v = _vote_active(room_id)
+                if v and (v.initiator == user["id"] or manager.get_host(room_id) == user["id"]):
+                    _vote_end(room_id)
+                    await manager.broadcast(room_id, {"type": "vote_result", "passed": False, "kind": v.kind, "cancelled": True})
             elif mtype == "state_request":
+                # New joiner asks for current playback state — forward to host
                 host_ws = manager.rooms.get(room_id, {}).get(room["host_id"])
                 if host_ws:
                     try:
@@ -676,8 +789,8 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                         )
                     except Exception:
                         pass
-
             elif mtype == "state_response":
+                # Host sends current state — relay to specific user
                 target = data.get("to")
                 if is_host and target:
                     target_ws = manager.rooms.get(room_id, {}).get(target)
@@ -703,6 +816,9 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
     finally:
         was_host = manager.get_host(room_id) == user["id"]
         mark_offline(user["id"])
+        # Track shared-time with currently-connected peers (Phase 3)
+        peer_overlaps = manager.get_peer_overlaps(room_id, user["id"])
+        # Track session duration for analytics
         session_secs = manager.pop_session_seconds(room_id, user["id"])
         if session_secs > 0:
             try:
@@ -711,6 +827,29 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 )
             except Exception:
                 pass
+        # Persist pair-level shared seconds (upsert per pair)
+        for peer_id, overlap_seconds in peer_overlaps:
+            if overlap_seconds <= 0:
+                continue
+            try:
+                pair_key = ":".join(sorted([user["id"], peer_id]))
+                await db.pair_time.update_one(
+                    {"pair": pair_key},
+                    {
+                        "$inc": {"seconds": int(overlap_seconds)},
+                        "$set": {
+                            "last_room_id": room_id,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                        "$setOnInsert": {
+                            "pair": pair_key,
+                            "user_ids": sorted([user["id"], peer_id]),
+                        },
+                    },
+                    upsert=True,
+                )
+            except Exception as e:
+                logger.warning("pair_time upsert failed: %s", e)
         empty = manager.disconnect(room_id, user["id"])
         if empty:
             await db.rooms.delete_one({"id": room_id})
@@ -736,8 +875,95 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                 )
 
 
-# ============== App wiring ==============
 app.include_router(api)
+
+# ============================================================================
+# Phase 3 — Shared Time (pair-level co-watching minutes)
+# ============================================================================
+@app.get("/api/users/{user_id}/shared_time")
+async def get_shared_time(user_id: str, current: dict = Depends(get_current_user)):
+    """Return total seconds the current user has co-watched with `user_id`.
+
+    Privacy gate: respects the target user's `shared_time_visibility` field
+    from PrivacySettings (everyone | friends | nobody).
+    """
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "privacy": 1, "friends": 1})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if user_id != current["id"]:
+        vis = (target.get("privacy") or {}).get("shared_time_visibility", "friends")
+        if vis == "nobody":
+            return {"seconds": 0, "hidden": True}
+        if vis == "friends" and user_id not in (current.get("friends") or []):
+            return {"seconds": 0, "hidden": True}
+    pair_key = ":".join(sorted([current["id"], user_id]))
+    row = await db.pair_time.find_one({"pair": pair_key}, {"_id": 0, "seconds": 1})
+    return {"seconds": int((row or {}).get("seconds", 0)), "hidden": False}
+
+
+@app.on_event("startup")
+async def _pair_time_indexes():
+    try:
+        await db.pair_time.create_index("pair", unique=True, name="pair_unique")
+        await db.pair_time.create_index("user_ids", name="pair_user_ids")
+    except Exception as e:
+        logger.warning("pair_time index creation skipped: %s", e)
+
+# ============================================================================
+# Phase 2 (Mega Update) — Privacy, Safety, Moderation routes
+# Note: these routes register directly on `app` (so they bypass the already-
+# included `api` router). They all use the /api prefix explicitly.
+# ============================================================================
+from privacy_safety import register_routes as _register_phase2, ensure_indexes as _ensure_phase2_indexes  # noqa: E402
+from dms import (
+    register_routes as _register_dms,
+    register_ws as _register_dms_ws,
+    ensure_indexes as _ensure_dms_indexes,
+)  # noqa: E402
+from rooms_voting import (
+    register_routes as _register_voting,
+    start_vote as _vote_start,
+    cast_vote as _vote_cast,
+    get_active as _vote_active,
+    end_vote as _vote_end,
+)  # noqa: E402
+from moderation import censor_text  # noqa: E402 — Phase 5 word filter
+from notifications import (
+    register_routes as _register_push,
+    send_dm_push as _send_dm_push,
+)  # noqa: E402 — Phase 5 push notifications
+
+# We create a NEW router for phase 2 then include it (works because we include after)
+_phase2_router = APIRouter(prefix="/api")
+_register_phase2(_phase2_router, db, get_current_user)
+app.include_router(_phase2_router)
+
+# Phase 3 — Direct Messages
+_dms_router = APIRouter(prefix="/api")
+_register_dms(_dms_router, db, get_current_user, push_callback=_send_dm_push)
+app.include_router(_dms_router)
+_register_dms_ws(app, db, get_user_by_id, decode_token)
+
+# Phase 4 — Room voting + settings
+_voting_router = APIRouter(prefix="/api")
+_register_voting(_voting_router, db, get_current_user)
+app.include_router(_voting_router)
+
+# Phase 5 — Push notification token routes
+_push_router = APIRouter(prefix="/api")
+_register_push(_push_router, db, get_current_user)
+app.include_router(_push_router)
+
+
+@app.on_event("startup")
+async def _phase2_startup():
+    try:
+        await _ensure_phase2_indexes(db)
+        await _ensure_dms_indexes(db)
+    except Exception as e:
+        logger.warning("Phase 2/3 index creation skipped: %s", e)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=ALLOW_CREDENTIALS,
@@ -748,12 +974,14 @@ app.add_middleware(
 
 
 @app.get("/")
-async def root():
+async def root():  # noqa: F811 — different router (app vs api), intentional second route
+    """Plain root for Render healthchecks / uptime monitors."""
     return {"service": "party4r-backend", "status": "ok", "version": app.version}
 
 
 @app.get("/health")
 async def health():
+    """Lightweight liveness probe — used by Render's healthCheckPath."""
     try:
         await db.command("ping")
         return {"status": "ok", "db": "ok"}
@@ -761,7 +989,203 @@ async def health():
         return {"status": "degraded", "db": str(e)}
 
 
+# ---------------------------------------------------------------------------
+# One-shot download endpoint for the Render deployment bundle.
+# Only exposed when /app/dist/party4r-backend-render.zip exists.
+# Safe to leave in place — it serves a static file, no DB access.
+# ---------------------------------------------------------------------------
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+# Mount the static web export under /api/web/ so it can be tested in any browser
+# AND used as the source URL for PWABuilder.com (ingress only forwards /api/*).
+_WEB_BUILD = "/app/dist/web-build"
+if os.path.exists(_WEB_BUILD):
+    app.mount("/api/web", StaticFiles(directory=_WEB_BUILD, html=True), name="web-export")
+
+_DIST_DIR = "/app/dist"
+_BUNDLES = {
+    "backend.zip": "party4r-backend-render.zip",
+    "render-flat.zip": "party4r-render-flat.zip",
+    "frontend.zip": "party4r-frontend-eas.zip",
+    "full.zip": "party4r-app-full.zip",
+    "web-build.zip": "party4r-web-build.zip",
+    "android-gradle.zip": "party4r-android-gradle.zip",
+    "android-prebuilt.zip": "party4r-android-prebuilt.zip",  # already-prebuilt for Termux
+    "mobile-full.zip": "party4r-mobile-full.zip",  # full JS source + prebuilt android/ + bundled JS
+    "complete.zip": "party4r-complete.zip",        # frontend + backend + all configs (the ENTIRE app)
+    "termux-ready.zip": "party4r-termux-ready.zip", # ready-to-build Termux bundle with BUILD_TERMUX.sh
+    "backend-deploy.zip": "party4r-backend-deploy.zip", # backend-only, ready for Render redeploy
+}
+
+
+def _serve_bundle(name: str):
+    fname = _BUNDLES.get(name)
+    if not fname:
+        raise HTTPException(status_code=404, detail="unknown bundle")
+    path = os.path.join(_DIST_DIR, fname)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="bundle not built yet")
+    return FileResponse(path, media_type="application/zip", filename=fname)
+
+
+@api.get("/download/backend.zip")
+async def download_backend_bundle_api():
+    return _serve_bundle("backend.zip")
+
+
+@app.get("/api/download/backend.zip")
+async def download_backend_bundle_direct():
+    return _serve_bundle("backend.zip")
+
+
+@app.get("/api/download/frontend.zip")
+async def download_frontend_bundle_direct():
+    return _serve_bundle("frontend.zip")
+
+
+@app.get("/api/download/mobile-full.zip")
+async def download_mobile_full_bundle_direct():
+    """Complete bundle for Termux local APK build:
+    full JS source + pre-generated android/ + pre-bundled index.android.bundle."""
+    return _serve_bundle("mobile-full.zip")
+
+
+@app.get("/api/download/complete.zip")
+async def download_complete_bundle_direct():
+    """ENTIRE app source code: frontend + backend + all configs + README.
+    Best for archiving the whole project or migrating to a new dev machine."""
+    return _serve_bundle("complete.zip")
+
+
+@app.get("/api/download/termux-ready.zip")
+async def download_termux_ready_bundle_direct():
+    """Termux-ready bundle: frontend JS + pre-generated android/ folder +
+    one-shot BUILD_TERMUX.sh script that installs Android SDK + builds APK.
+    The easiest way to build the APK locally on an Android phone."""
+    return _serve_bundle("termux-ready.zip")
+
+
+@app.get("/api/download/backend-deploy.zip")
+async def download_backend_deploy_bundle_direct():
+    """Backend-only deploy bundle: server.py + dms.py + notifications.py +
+    moderation.py + privacy_safety.py + rooms_voting.py + requirements.txt +
+    Procfile + DEPLOY_TO_RENDER.md. Drop into a Render GitHub repo + redeploy
+    to enable DMs and Push Notifications on production."""
+    return _serve_bundle("backend-deploy.zip")
+
+
+# --- Per-file backend source downloads -------------------------------------
+# Lets the user drop individual files straight into their Render repo when
+# their entry-point uses a different filename layout (e.g. `main.py`).
+_BACKEND_SRC_ROOT = Path(__file__).parent
+
+
+def _serve_backend_source(filename: str):
+    """Serve a single backend source file as a plain-text download."""
+    target = _BACKEND_SRC_ROOT / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(404, f"{filename} not found")
+    return FileResponse(
+        path=str(target),
+        media_type="text/x-python" if filename.endswith(".py") else "text/plain",
+        filename=filename,
+    )
+
+
+@app.get("/api/source/server.py")
+async def source_server_py():
+    """Main FastAPI app — registers all routers. Rename to main.py if your
+    Render service entrypoint expects that filename."""
+    return _serve_backend_source("server.py")
+
+
+@app.get("/api/source/dms.py")
+async def source_dms_py():
+    """Direct Messages module — REST + WebSocket + Mongo TTL indexes."""
+    return _serve_backend_source("dms.py")
+
+
+@app.get("/api/source/notifications.py")
+async def source_notifications_py():
+    """Expo Push Notifications module — POST/DELETE /api/push/token."""
+    return _serve_backend_source("notifications.py")
+
+
+@app.get("/api/source/moderation.py")
+async def source_moderation_py():
+    """Reports + word filter + Gmail SMTP delivery for admin alerts."""
+    return _serve_backend_source("moderation.py")
+
+
+@app.get("/api/source/privacy_safety.py")
+async def source_privacy_safety_py():
+    """Block/unblock + privacy settings + presence heartbeat + honor logic."""
+    return _serve_backend_source("privacy_safety.py")
+
+
+@app.get("/api/source/rooms_voting.py")
+async def source_rooms_voting_py():
+    """Voting mode for rooms — accept/reject host's video changes."""
+    return _serve_backend_source("rooms_voting.py")
+
+
+@app.get("/api/source/requirements.txt")
+async def source_requirements_txt():
+    """Python pip dependencies, sane versions for Render's Python 3.11."""
+    return _serve_backend_source("requirements.txt")
+
+
+@app.get("/api/source/Procfile")
+async def source_procfile():
+    """Render web process command — uvicorn server:app …"""
+    return _serve_backend_source("Procfile")
+
+
+@app.get("/api/download/full.zip")
+async def download_full_bundle_direct():
+    return _serve_bundle("full.zip")
+
+
+@app.get("/api/download/render-flat.zip")
+async def download_render_flat_bundle_direct():
+    return _serve_bundle("render-flat.zip")
+
+
+@app.get("/api/download/main.py")
+async def download_main_py():
+    """Serve the production main.py (with MONGO_URI) as plain text so it
+    can be viewed/copied directly in a mobile browser."""
+    path = "/app/dist/main.py"
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="main.py not built yet")
+    return FileResponse(
+        path,
+        media_type="text/plain; charset=utf-8",
+        filename="main.py",
+    )
+
+
+@app.get("/api/download/web-build.zip")
+async def download_web_build():
+    return _serve_bundle("web-build.zip")
+
+
+@app.get("/api/download/android-gradle.zip")
+async def download_android_gradle_bundle():
+    return _serve_bundle("android-gradle.zip")
+
+
+@app.get("/api/download/android-prebuilt.zip")
+async def download_android_prebuilt():
+    return _serve_bundle("android-prebuilt.zip")
+
+
+@app.get("/download/backend.zip")
+async def download_backend_bundle_root():
+    return _serve_bundle("backend.zip")
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
-
