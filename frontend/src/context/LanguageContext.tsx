@@ -71,6 +71,21 @@ const dict: Record<Lang, Record<string, string>> = {
     tab_rooms: "ROOMS",
     tab_friends: "FRIENDS",
     tab_profile: "PROFILE",
+    tab_play: "PLAY",
+
+    // ---- Play Hub ----
+    play_hub_title: "Game Center",
+    play_hub_subtitle: "Choose your game",
+    play_coming_soon: "Coming Soon",
+    play_chess: "Chess",
+    play_carrom: "Carrom",
+    play_damma: "Damma",
+    play_global: "Play Online",
+    play_friends: "Play with Friends",
+    play_tournaments: "Tournaments",
+    play_leaderboard: "Leaderboard",
+    play_achievements: "Achievements",
+    play_missions: "Daily Missions",
 
     // ---- Leaderboard ----
     lb_title: "Leaderboard",
@@ -498,6 +513,21 @@ const dict: Record<Lang, Record<string, string>> = {
     tab_rooms: "الغرف",
     tab_friends: "الأصدقاء",
     tab_profile: "الملف",
+    tab_play: "العب",
+
+    // ---- Play Hub ----
+    play_hub_title: "مركز الألعاب",
+    play_hub_subtitle: "اختر لعبتك",
+    play_coming_soon: "قريباً",
+    play_chess: "شطرنج",
+    play_carrom: "كيرم",
+    play_damma: "ضمنة",
+    play_global: "العب أونلاين",
+    play_friends: "العب مع أصدقاء",
+    play_tournaments: "البطولات",
+    play_leaderboard: "التصنيف العالمي",
+    play_achievements: "الإنجازات",
+    play_missions: "المهام اليومية",
 
     // ---- Leaderboard ----
     lb_title: "لوحة المتصدرين",

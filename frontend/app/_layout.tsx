@@ -6,6 +6,7 @@ import { AuthProvider } from "@/src/context/AuthContext";
 import { LanguageProvider } from "@/src/context/LanguageContext";
 import { ThemeProvider, useTheme } from "@/src/context/ThemeContext";
 import { CloudSyncProvider } from "@/src/utils/cloudSync";
+import { GameProvider } from "@/src/context/GameContext";
 import { View } from "react-native";
 import { pingBackend } from "@/src/api/client";
 
@@ -45,7 +46,9 @@ export default function RootLayout() {
         <LanguageProvider>
           <AuthProvider>
             <CloudSyncProvider>
-              <RootShell />
+              <GameProvider>
+                <RootShell />
+              </GameProvider>
             </CloudSyncProvider>
           </AuthProvider>
         </LanguageProvider>

@@ -14,6 +14,7 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "@/src/context/LanguageContext";
+import { useGame } from "@/src/context/GameContext";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 
 function FloatingTabBackground() {
@@ -70,6 +71,7 @@ function FloatingTabBackground() {
 
 export default function TabsLayout() {
   const { t } = useT();
+  const { totalBadgeCount } = useGame();
   const insets = useSafeAreaInsets();
   // Always reserve at least ~24px below the tab bar contents so the icons
   // and labels never collide with the Android 3-button nav bar. On gesture
@@ -126,6 +128,30 @@ export default function TabsLayout() {
           title: t("tab_friends"),
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused} name="people-outline" activeName="people" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="play"
+        options={{
+          title: t("tab_play"),
+          tabBarBadge: totalBadgeCount > 0 ? totalBadgeCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: FUTURISTIC.brand,
+            color: FUTURISTIC.bg,
+            fontSize: 10,
+            fontWeight: "900",
+            minWidth: 16,
+            height: 16,
+            borderRadius: 8,
+            lineHeight: 16,
+          },
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name="game-controller-outline"
+              activeName="game-controller"
+            />
           ),
         }}
       />
