@@ -73,20 +73,20 @@ export const THROW_END_CIRCLE_RADIUS = 31.8 / 2;
 
 // ─── PHYSICS CONSTANTS ───────────────────────────────────────────────────────
 // Tuned so a max-power striker can carry a centre coin to a far-corner pocket
-// (distance ≈ √2·(BOARD/2 − POCKET_OFFSET) ≈ 445 mm) in ~1.1 s with COIN
+// (distance ≈ √2·(BOARD/2 − POCKET_OFFSET) ≈ 445 mm) in ~1.0 s with COIN
 // restitution 0.55 and the drag values below.
-export const STATIC_FRICTION = 0.07;            // applied when slow
-export const DYNAMIC_FRICTION = 0.05;           // applied each frame while moving
-export const LINEAR_DRAG = 0.55;                // proportional drag per second
+export const STATIC_FRICTION = 0.06;            // applied when slow (was 0.07)
+export const DYNAMIC_FRICTION = 0.04;           // per-frame kinetic loss (was 0.05)
+export const LINEAR_DRAG = 0.45;                // proportional drag per second (was 0.55)
 export const MIN_VELOCITY = 0.5;                // stop threshold
-export const WALL_RESTITUTION = 0.78;           // wall bounce coefficient
+export const WALL_RESTITUTION = 0.80;           // wall bounce (slightly bouncier)
 export const COIN_RESTITUTION = 0.55;           // piece-piece bounce coefficient
 // STRIKER_MAX_POWER derived from:
 //   target distance d = √2 · (BOARD_SIZE/2 − POCKET_OFFSET) ≈ 445 mm
 //   coin-vel after impact ≈ v_striker · (1 + COIN_RESTITUTION)/2 ≈ 0.78 · v
-//   With drag 0.55/s + dyn friction, stop-distance s = v² / (2·a_eff)
-//   Solving for v_striker giving s ≈ 445 → v ≈ 22 units/frame
-export const STRIKER_MAX_POWER = 26;            // ✦ ICF-tuned max striker velocity
+//   With drag 0.45/s + dyn friction 0.04, stop-distance s = v²/(2·a_eff)
+//   Solving s ≈ 445 with new lower drag → v ≈ 30 units/frame for snappy feel.
+export const STRIKER_MAX_POWER = 30;            // ✦ snappier striker (was 26)
 
 const CENTER = BOARD_SIZE / 2;
 const DT = 1 / 60;                              // fixed simulation timestep
