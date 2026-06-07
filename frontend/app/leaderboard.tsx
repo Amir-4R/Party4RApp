@@ -19,7 +19,7 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -241,6 +241,15 @@ export default function LeaderboardScreen() {
     setLoading(true);
     load();
   }, [load]);
+
+  // Smart polling: refresh every 15s while screen is focused — keeps
+  // the leaderboard fresh without hammering the server.
+  useFocusEffect(
+    useCallback(() => {
+      const interval = setInterval(() => { load(); }, 15000);
+      return () => clearInterval(interval);
+    }, [load])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
