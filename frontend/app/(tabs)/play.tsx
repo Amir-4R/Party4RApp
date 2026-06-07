@@ -27,6 +27,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,6 +43,12 @@ import { GameType } from "@/src/api/games";
 // ---------------------------------------------------------------------------
 // Game catalog — static definitions (availability controlled by backend later)
 // ---------------------------------------------------------------------------
+const GAME_IMAGES: Record<GameType, any> = {
+  chess: require("@/assets/images/games/chess_logo.jpg"),
+  carrom: require("@/assets/images/games/carrom_logo.jpg"),
+  damma: require("@/assets/images/games/damma_logo.jpg"),
+};
+
 const GAME_CATALOG: Array<{
   id: GameType;
   nameKey: string;
@@ -214,10 +221,21 @@ export default function PlayScreen() {
               activeOpacity={0.85}
               disabled={!game.available}
             >
-              <View style={[styles.gameIcon, { borderColor: game.color }]}>
-                <Ionicons name={game.icon} size={32} color={game.color} />
+              <View style={[styles.gameImageWrap, { borderColor: game.color }]}>
+                <Image
+                  source={GAME_IMAGES[game.id]}
+                  style={styles.gameImage}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.85)"]}
+                  style={styles.gameImageOverlay}
+                />
+                <View style={styles.gameNameOverlay}>
+                  <Ionicons name={game.icon} size={14} color={game.color} />
+                  <Text style={styles.gameName}>{t(game.nameKey)}</Text>
+                </View>
               </View>
-              <Text style={styles.gameName}>{t(game.nameKey)}</Text>
               {!game.available && (
                 <View style={styles.comingSoonBadge}>
                   <Text style={styles.comingSoonText}>
@@ -386,14 +404,33 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: FUTURISTIC.layer3,
+    backgroundColor: FUTURISTIC.surface2,
+  },
+  gameImageWrap: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 2,
+    backgroundColor: FUTURISTIC.surface2,
+    marginBottom: 8,
+    position: "relative",
+  },
+  gameImage: { width: "100%", height: "100%" },
+  gameImageOverlay: {
+    position: "absolute", bottom: 0, left: 0, right: 0, height: "55%",
+  },
+  gameNameOverlay: {
+    position: "absolute", bottom: 8, left: 8, right: 8,
+    flexDirection: "row", alignItems: "center", gap: 6,
   },
   gameName: {
-    color: FUTURISTIC.text,
+    color: "#fff",
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "900",
     letterSpacing: 0.5,
-    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.7)",
+    textShadowRadius: 4,
   },
   comingSoonBadge: {
     backgroundColor: FUTURISTIC.layer3,

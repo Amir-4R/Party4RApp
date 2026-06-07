@@ -346,77 +346,94 @@ export function simulateStep(state: CarromState): { state: CarromState; settled:
 
   const allPieces: Coin[] = [striker, ...coins].filter((c) => c.active);
 
-  // 1. Integrate position
+  // ── CONTINUOUS COLLISION DETECTION (sub-stepping) ─────────────────────────
+  // Split fast-moving pieces into N sub-steps so they can never pass through
+  // walls/coins between frames at high velocity.
+  let maxSpeed = 0;
   for (const p of allPieces) {
-    p.pos.x += p.vel.x;
-    p.pos.y += p.vel.y;
-    p.vel = applyFriction(p.vel);
+    const sp = Math.hypot(p.vel.x, p.vel.y);
+    if (sp > maxSpeed) maxSpeed = sp;
   }
+  // Each sub-step must move the fastest piece at most half its radius.
+  const safeStep = STRIKER_RADIUS * 0.5;
+  const substeps = Math.max(1, Math.min(8, Math.ceil(maxSpeed / safeStep)));
+  const dtSub = 1 / substeps;
 
-  // 2. Wall collisions (board interior, accounting for frame inset)
-  const wallMin = FRAME_INSET;
-  const wallMax = BOARD_SIZE - FRAME_INSET;
-  for (const p of allPieces) {
-    if (p.pos.x - p.radius < wallMin) {
-      p.pos.x = wallMin + p.radius;
-      p.vel.x *= -WALL_RESTITUTION;
+  for (let sub = 0; sub < substeps; sub++) {
+    // 1. Integrate position (fraction of full step)
+    for (const p of allPieces) {
+      p.pos.x += p.vel.x * dtSub;
+      p.pos.y += p.vel.y * dtSub;
     }
-    if (p.pos.x + p.radius > wallMax) {
-      p.pos.x = wallMax - p.radius;
-      p.vel.x *= -WALL_RESTITUTION;
+    // 2. HARD WALL collisions (impenetrable barriers around the inner frame)
+    const wallMin = FRAME_INSET;
+    const wallMax = BOARD_SIZE - FRAME_INSET;
+    for (const p of allPieces) {
+      if (p.pos.x - p.radius < wallMin) {
+        p.pos.x = wallMin + p.radius;
+        if (p.vel.x < 0) p.vel.x *= -WALL_RESTITUTION;
+      }
+      if (p.pos.x + p.radius > wallMax) {
+        p.pos.x = wallMax - p.radius;
+        if (p.vel.x > 0) p.vel.x *= -WALL_RESTITUTION;
+      }
+      if (p.pos.y - p.radius < wallMin) {
+        p.pos.y = wallMin + p.radius;
+        if (p.vel.y < 0) p.vel.y *= -WALL_RESTITUTION;
+      }
+      if (p.pos.y + p.radius > wallMax) {
+        p.pos.y = wallMax - p.radius;
+        if (p.vel.y > 0) p.vel.y *= -WALL_RESTITUTION;
+      }
     }
-    if (p.pos.y - p.radius < wallMin) {
-      p.pos.y = wallMin + p.radius;
-      p.vel.y *= -WALL_RESTITUTION;
+    // 3. Piece-piece collisions
+    for (let i = 0; i < allPieces.length; i++) {
+      for (let j = i + 1; j < allPieces.length; j++) {
+        const a = allPieces[i], b = allPieces[j];
+        if (!a.active || !b.active) continue;
+        const d = dist(a.pos, b.pos);
+        const minDist = a.radius + b.radius;
+        if (d < minDist && d > 0.0001) {
+          const overlap = (minDist - d) / 2;
+          const nx = (b.pos.x - a.pos.x) / d;
+          const ny = (b.pos.y - a.pos.y) / d;
+          a.pos.x -= nx * overlap; a.pos.y -= ny * overlap;
+          b.pos.x += nx * overlap; b.pos.y += ny * overlap;
+          const dvx = b.vel.x - a.vel.x;
+          const dvy = b.vel.y - a.vel.y;
+          const impact = dvx * nx + dvy * ny;
+          if (impact < 0) {
+            const k = (1 + COIN_RESTITUTION) * impact / 2;
+            a.vel.x += k * nx; a.vel.y += k * ny;
+            b.vel.x -= k * nx; b.vel.y -= k * ny;
+          }
+        }
+      }
     }
-    if (p.pos.y + p.radius > wallMax) {
-      p.pos.y = wallMax - p.radius;
-      p.vel.y *= -WALL_RESTITUTION;
-    }
-  }
-
-  // 3. Piece-piece collisions (impulse-based with restitution 0.60)
-  for (let i = 0; i < allPieces.length; i++) {
-    for (let j = i + 1; j < allPieces.length; j++) {
-      const a = allPieces[i], b = allPieces[j];
-      const d = dist(a.pos, b.pos);
-      const minDist = a.radius + b.radius;
-      if (d < minDist && d > 0.0001) {
-        // Separate overlap
-        const overlap = (minDist - d) / 2;
-        const nx = (b.pos.x - a.pos.x) / d;
-        const ny = (b.pos.y - a.pos.y) / d;
-        a.pos.x -= nx * overlap; a.pos.y -= ny * overlap;
-        b.pos.x += nx * overlap; b.pos.y += ny * overlap;
-        // Impulse along the contact normal
-        const dvx = b.vel.x - a.vel.x;
-        const dvy = b.vel.y - a.vel.y;
-        const impact = dvx * nx + dvy * ny;
-        if (impact < 0) {
-          // (1 + e) where e is the coefficient of restitution
-          const k = (1 + COIN_RESTITUTION) * impact / 2;
-          a.vel.x += k * nx; a.vel.y += k * ny;
-          b.vel.x -= k * nx; b.vel.y -= k * ny;
+    // 4. Pocket detection (per sub-step so fast pieces still get pocketed)
+    // Use 1.6x visual radius for hitbox match with rendered pocket
+    const POCKET_HITBOX = POCKET_RADIUS * 1.6;
+    for (const p of allPieces) {
+      if (!p.active) continue;
+      for (const pocket of POCKETS) {
+        if (dist(p.pos, pocket) < POCKET_HITBOX) {
+          p.active = false;
+          p.pocketed = true;
+          p.vel = { x: 0, y: 0 };
+          p.pocketedBy = state.turn;
+          newShotPockets.push(p.id);
+          break;
         }
       }
     }
   }
 
-  // 4. Pocket detection (any piece centre inside a pocket hitbox)
+  // 5. Apply friction (once per full frame, not per substep)
   for (const p of allPieces) {
-    for (const pocket of POCKETS) {
-      if (dist(p.pos, pocket) < POCKET_RADIUS + p.radius * 0.5) {
-        p.active = false;
-        p.pocketed = true;
-        p.vel = { x: 0, y: 0 };
-        p.pocketedBy = state.turn;
-        newShotPockets.push(p.id);
-        break;
-      }
-    }
+    p.vel = applyFriction(p.vel);
   }
 
-  // 5. All settled?
+  // 6. All settled?
   const settled = allPieces.every((p) => !p.active || len(p.vel) < MIN_VELOCITY);
   if (settled) {
     for (const p of allPieces) p.vel = { x: 0, y: 0 };
