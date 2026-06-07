@@ -99,11 +99,11 @@ export default function ChessScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={26} color={FUTURISTIC.text} />
+          <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_chess") || "Chess"}</Text>
         <TouchableOpacity onPress={reset} style={styles.iconBtn}>
-          <Ionicons name="refresh" size={22} color={FUTURISTIC.text} />
+          <Ionicons name="refresh" size={22} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -130,14 +130,25 @@ export default function ChessScreen() {
                   style={[
                     styles.cell,
                     { width: CELL, height: CELL, left: col * CELL, top: row * CELL },
-                    { backgroundColor: isDark ? "#8B6F47" : "#E8D9B8" },
-                    isSelected && { backgroundColor: "#7BAE5C" },
+                    { backgroundColor: isDark ? "#8B5A2B" : "#F5E6C8" },
+                    isSelected && { backgroundColor: "#7BAE5C", shadowColor: "#7BAE5C", shadowOpacity: 0.5, shadowRadius: 6 },
                   ]}
                 >
                   {isHighlight && !piece && <View style={styles.dot} />}
                   {isHighlight && piece && <View style={styles.captureRing} />}
                   {piece && (
-                    <Text style={[styles.piece, { fontSize: CELL * 0.7 }]}>
+                    <Text
+                      style={[
+                        styles.piece,
+                        {
+                          fontSize: CELL * 0.75,
+                          color: piece.color === "w" ? "#FFFBE8" : "#15161A",
+                          textShadowColor: piece.color === "w" ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.35)",
+                          textShadowOffset: { width: 0, height: 1 },
+                          textShadowRadius: 3,
+                        },
+                      ]}
+                    >
                       {GLYPH[`${piece.color}_${piece.type}`]}
                     </Text>
                   )}
@@ -162,15 +173,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: FUTURISTIC.bg },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: FUTURISTIC.text, fontSize: 18, fontWeight: "800" },
+  title: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "800" },
   statusBar: { alignItems: "center", paddingVertical: 12 },
-  statusText: { color: FUTURISTIC.text, fontSize: 16, fontWeight: "700" },
+  statusText: { color: FUTURISTIC.textPrimary, fontSize: 16, fontWeight: "700" },
   boardWrap: { alignItems: "center", marginTop: 12 },
-  board: { position: "relative", borderRadius: 8, overflow: "hidden", borderWidth: 2, borderColor: FUTURISTIC.border },
+  board: { position: "relative", borderRadius: 8, overflow: "hidden", borderWidth: 2, borderColor: FUTURISTIC.borderSoft },
   cell: { position: "absolute", alignItems: "center", justifyContent: "center" },
   piece: { textAlign: "center" },
   dot: { width: CELL * 0.25, height: CELL * 0.25, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.35)" },
   captureRing: { position: "absolute", width: CELL * 0.9, height: CELL * 0.9, borderRadius: 999, borderWidth: 3, borderColor: "rgba(255,80,80,0.7)" },
   footer: { alignItems: "center", marginTop: 20 },
-  footerText: { color: FUTURISTIC.textMuted, fontSize: 13 },
+  footerText: { color: FUTURISTIC.textPrimaryMuted, fontSize: 13 },
 });

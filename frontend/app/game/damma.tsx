@@ -126,11 +126,11 @@ export default function DammaScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={26} color={FUTURISTIC.text} />
+          <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_damma") || "Damma"}</Text>
         <TouchableOpacity onPress={reset} style={styles.iconBtn}>
-          <Ionicons name="refresh" size={22} color={FUTURISTIC.text} />
+          <Ionicons name="refresh" size={22} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -221,7 +221,7 @@ export default function DammaScreen() {
           </TouchableOpacity>
         )}
         {isMyTurn && options.mustPass && (
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: FUTURISTIC.textMuted }]} onPress={handlePass}>
+          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: FUTURISTIC.textPrimaryMuted }]} onPress={handlePass}>
             <Text style={styles.actionText}>{t("pass") || "تخطي"}</Text>
           </TouchableOpacity>
         )}
@@ -234,29 +234,29 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: FUTURISTIC.bg },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: FUTURISTIC.text, fontSize: 18, fontWeight: "800" },
+  title: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "800" },
   scoreBar: { flexDirection: "row", justifyContent: "center", gap: 16, paddingVertical: 8 },
-  scoreBox: { paddingHorizontal: 20, paddingVertical: 6, borderRadius: 12, backgroundColor: FUTURISTIC.layer2, borderWidth: 1, borderColor: FUTURISTIC.border, alignItems: "center" },
+  scoreBox: { paddingHorizontal: 20, paddingVertical: 6, borderRadius: 12, backgroundColor: FUTURISTIC.surface1, borderWidth: 1, borderColor: FUTURISTIC.borderSoft, alignItems: "center" },
   scoreActive: { borderColor: FUTURISTIC.brand },
-  scoreLabel: { color: FUTURISTIC.textMuted, fontSize: 11 },
-  scoreVal: { color: FUTURISTIC.text, fontSize: 18, fontWeight: "900" },
+  scoreLabel: { color: FUTURISTIC.textPrimaryMuted, fontSize: 11 },
+  scoreVal: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "900" },
   oppHand: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 12, flexWrap: "wrap" },
-  tileBack: { width: 24, height: 44, borderRadius: 4, backgroundColor: FUTURISTIC.layer3, borderWidth: 1, borderColor: FUTURISTIC.border },
+  tileBack: { width: 24, height: 44, borderRadius: 4, backgroundColor: FUTURISTIC.surface2, borderWidth: 1, borderColor: FUTURISTIC.borderSoft },
   boardArea: { flex: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  endsLabel: { color: FUTURISTIC.textMuted, fontSize: 12, textAlign: "center", marginBottom: 8 },
+  endsLabel: { color: FUTURISTIC.textPrimaryMuted, fontSize: 12, textAlign: "center", marginBottom: 8 },
   boardScroll: { alignItems: "center", paddingVertical: 20, gap: 2, minWidth: "100%", justifyContent: "center" },
-  emptyBoard: { color: FUTURISTIC.textMuted, fontSize: 14, fontStyle: "italic" },
-  tile: { width: 36, height: 68, backgroundColor: "#FBF6E9", borderRadius: 6, borderWidth: 1, borderColor: "#C9B896", alignItems: "center", justifyContent: "center", padding: 3 },
+  emptyBoard: { color: FUTURISTIC.textPrimaryMuted, fontSize: 14, fontStyle: "italic" },
+  tile: { width: 36, height: 68, backgroundColor: "#FBF6E9", borderRadius: 6, borderWidth: 1.5, borderColor: "#A89070", alignItems: "center", justifyContent: "center", padding: 3, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 1, height: 2 } },
   tileHorizontal: { width: 68, height: 36, flexDirection: "row" },
-  tileSelected: { borderColor: FUTURISTIC.brand, borderWidth: 2, transform: [{ translateY: -8 }] },
-  tileDivider: { width: "70%", height: 1, backgroundColor: "#C9B896", marginVertical: 2 },
+  tileSelected: { borderColor: FUTURISTIC.brand, borderWidth: 2.5, transform: [{ translateY: -8 }], shadowColor: FUTURISTIC.brand, shadowOpacity: 0.7, shadowRadius: 8 },
+  tileDivider: { width: "70%", height: 1.5, backgroundColor: "#8B7355", marginVertical: 2 },
   pipHalf: { flex: 1, alignItems: "center", justifyContent: "center" },
-  pipText: { fontSize: 16, fontWeight: "900", color: "#2A2A2A" },
+  pipText: { fontSize: 18, fontWeight: "900", color: "#2A2A2A", textShadowColor: "rgba(255,255,255,0.4)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   sideButtons: { flexDirection: "row", justifyContent: "center", gap: 12, paddingVertical: 8 },
   sideBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: FUTURISTIC.brand, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
   sideBtnText: { color: FUTURISTIC.bg, fontWeight: "800", fontSize: 14 },
-  myHandArea: { paddingVertical: 12, paddingHorizontal: 8, backgroundColor: FUTURISTIC.layer2, borderTopWidth: 1, borderTopColor: FUTURISTIC.border },
-  turnText: { color: FUTURISTIC.text, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 8 },
+  myHandArea: { paddingVertical: 12, paddingHorizontal: 8, backgroundColor: FUTURISTIC.surface1, borderTopWidth: 1, borderTopColor: FUTURISTIC.borderSoft },
+  turnText: { color: FUTURISTIC.textPrimary, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 8 },
   handScroll: { gap: 6, paddingHorizontal: 8, alignItems: "flex-end", minHeight: 76 },
   actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: FUTURISTIC.brand, marginTop: 12, marginHorizontal: 40, paddingVertical: 12, borderRadius: 12 },
   actionText: { color: FUTURISTIC.bg, fontWeight: "800", fontSize: 14 },
