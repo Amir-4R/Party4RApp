@@ -261,6 +261,13 @@ export default function SettingsScreen() {
             />
             <View style={styles.divider} />
             <MenuRow
+              icon="volume-mute-outline"
+              label={t("mw_title")}
+              sub={t("mw_subtitle")}
+              onPress={() => router.push("/muted-words")}
+            />
+            <View style={styles.divider} />
+            <MenuRow
               icon="document-text-outline"
               label={t("privacy_policy")}
               sub={t("privacy_policy_sub")}

@@ -39,6 +39,7 @@ import { apiGet, apiPatch, TOKEN_KEY, getWsUrl } from "@/src/api/client";
 import { COLORS, getAvatarUrl } from "@/src/constants/avatars";
 import { useAuth } from "@/src/context/AuthContext";
 import { useT } from "@/src/context/LanguageContext";
+import { useMutedWords } from "@/src/utils/useMutedWords";
 import VotingOverlay, { ActiveVote } from "@/src/components/VotingOverlay";
 import { FUTURISTIC, GRADIENTS } from "@/src/theme/futuristic";
 import LightBeam from "@/src/components/futuristic/LightBeam";
@@ -104,6 +105,7 @@ export default function RoomScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const { shouldMute } = useMutedWords();
   const [draft, setDraft] = useState("");
   const [forceFullscreen, setForceFullscreen] = useState(false);
   // Playing state for the YoutubePlayer controlled `play` prop
@@ -885,7 +887,7 @@ export default function RoomScreen() {
             )}
 
             <FlatList
-              data={messages}
+              data={messages.filter((m) => !shouldMute(m.text))}
               keyExtractor={(m) => m.id}
               renderItem={({ item }) => {
                 const mine = item.user_id === user?.id;

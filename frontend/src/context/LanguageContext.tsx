@@ -127,6 +127,17 @@ const dict: Record<Lang, Record<string, string>> = {
     sync_idle: "Not synced yet",
     sync_idle_sub: "Tap refresh to sync your settings",
 
+    // ---- Muted Words ----
+    mw_title: "Muted Words",
+    mw_subtitle: "Hide messages containing these words",
+    mw_kicker: "Personal filter",
+    mw_help: "Add words you don't want to see. Messages containing them will be hidden in chat (case-insensitive).",
+    mw_placeholder: "Type a word to mute",
+    mw_empty_title: "No muted words yet",
+    mw_empty_sub: "Add words you want to hide from chats and messages.",
+    mw_err_too_long: "Word too long (max 40 characters)",
+    mw_err_full: "Maximum 100 muted words reached",
+
     // ---- Auth ----
     login: "Log in",
     signup: "Create new account",
@@ -542,6 +553,17 @@ const dict: Record<Lang, Record<string, string>> = {
     sync_failed: "فشلت المزامنة",
     sync_idle: "لم تتم المزامنة بعد",
     sync_idle_sub: "اضغط على زر التحديث لمزامنة إعداداتك",
+
+    // ---- Muted Words ----
+    mw_title: "الكلمات المسكتة",
+    mw_subtitle: "إخفاء الرسائل التي تحوي هذه الكلمات",
+    mw_kicker: "فلتر شخصي",
+    mw_help: "أضف الكلمات التي لا تريد رؤيتها. الرسائل التي تحويها ستختفي من المحادثات (غير حساس لحالة الأحرف).",
+    mw_placeholder: "اكتب كلمة لإسكاتها",
+    mw_empty_title: "لا توجد كلمات مسكتة بعد",
+    mw_empty_sub: "أضف الكلمات التي تريد إخفاءها من المحادثات والرسائل.",
+    mw_err_too_long: "الكلمة طويلة جداً (الحد 40 حرف)",
+    mw_err_full: "تم الوصول للحد الأقصى (100 كلمة)",
 
     // ---- Auth ----
     login: "تسجيل الدخول",

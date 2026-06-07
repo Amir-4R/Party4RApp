@@ -324,6 +324,43 @@ def register_routes(api: APIRouter, db: AsyncIOMotorDatabase, get_current_user):
             shared_time_visibility=p.get("shared_time_visibility", "friends"),
         )
 
+    # ====== MUTED WORDS ======
+    # Each user has a personal list of forbidden words. When a chat message
+    # contains any of these words (case-insensitive substring match) it is
+    # hidden client-side. We keep the list capped at 100 entries × 40 chars.
+    @api.get("/users/muted_words")
+    async def list_muted_words(current: dict = Depends(get_current_user)):
+        words = current.get("muted_words", []) or []
+        return {"items": words, "total": len(words)}
+
+    @api.post("/users/muted_words")
+    async def add_muted_word(payload: dict, current: dict = Depends(get_current_user)):
+        word = (payload.get("word") or "").strip().lower()
+        if not word:
+            raise HTTPException(400, "word is required")
+        if len(word) > 40:
+            raise HTTPException(400, "word too long (max 40)")
+        existing = current.get("muted_words", []) or []
+        if len(existing) >= 100:
+            raise HTTPException(400, "muted words list is full (max 100)")
+        if word in existing:
+            return {"items": existing, "already_exists": True}
+        await db.users.update_one(
+            {"id": current["id"]},
+            {"$addToSet": {"muted_words": word}},
+        )
+        return {"items": existing + [word]}
+
+    @api.delete("/users/muted_words")
+    async def remove_muted_word(word: str, current: dict = Depends(get_current_user)):
+        w = (word or "").strip().lower()
+        await db.users.update_one(
+            {"id": current["id"]},
+            {"$pull": {"muted_words": w}},
+        )
+        u = await db.users.find_one({"id": current["id"]}, {"_id": 0, "muted_words": 1})
+        return {"items": (u or {}).get("muted_words", []) or []}
+
     # ====== PRESENCE / LAST SEEN ======
     @api.post("/users/presence/heartbeat")
     async def heartbeat(current: dict = Depends(get_current_user)):
