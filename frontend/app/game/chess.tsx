@@ -4,8 +4,9 @@
 // Hand-drawn SVG silhouettes (Cburnett-style, public domain) so each piece
 // looks carved/sculpted rather than cartoon. Solid ivory/charcoal fills.
 // =============================================================================
-import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from "react-native";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Modal, Pressable } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,13 +15,21 @@ import {
   createInitialState, legalMoves, makeMove, getGameResult,
   GameState, Square, PieceType,
 } from "@/src/games/chess/engine";
-import ChessPieceSvg from "@/src/games/chess/ChessPieceSvg";
+import ChessPieceSvg, { ChessTheme, CHESS_THEMES } from "@/src/games/chess/ChessPieceSvg";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
 
 const { width } = Dimensions.get("window");
 const BOARD = Math.min(width - 24, 360);
 const CELL = BOARD / 8;
+
+// Persisted theme key
+const THEME_KEY = "chess_piece_theme";
+const THEME_OPTIONS: { id: ChessTheme; label: string; emoji: string }[] = [
+  { id: "classic", label: "كلاسيكي", emoji: "🪵" },
+  { id: "royal",   label: "ملكي",    emoji: "👑" },
+  { id: "ocean",   label: "محيطي",   emoji: "🌊" },
+];
 
 export default function ChessScreen() {
   const router = useRouter();
@@ -31,6 +40,23 @@ export default function ChessScreen() {
   const [state, setState] = useState<GameState>(createInitialState);
   const [selected, setSelected] = useState<Square | null>(null);
   const [highlights, setHighlights] = useState<Square[]>([]);
+  const [theme, setTheme] = useState<ChessTheme>("royal");
+  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  // Load saved theme on mount
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_KEY).then((v) => {
+      if (v && (v === "classic" || v === "royal" || v === "ocean")) {
+        setTheme(v as ChessTheme);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const pickTheme = useCallback((id: ChessTheme) => {
+    setTheme(id);
+    AsyncStorage.setItem(THEME_KEY, id).catch(() => {});
+    setShowThemePicker(false);
+  }, []);
 
   const result = useMemo(() => getGameResult(state), [state]);
 
@@ -97,9 +123,14 @@ export default function ChessScreen() {
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_chess") || "Chess"}</Text>
-        <TouchableOpacity onPress={reset} style={styles.iconBtn}>
-          <Ionicons name="refresh" size={22} color={FUTURISTIC.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity onPress={() => setShowThemePicker(true)} style={styles.iconBtn}>
+            <Ionicons name="color-palette-outline" size={22} color={FUTURISTIC.textPrimary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={reset} style={styles.iconBtn}>
+            <Ionicons name="refresh" size={22} color={FUTURISTIC.textPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.statusBar}>
@@ -150,6 +181,7 @@ export default function ChessScreen() {
                         type={piece.type}
                         color={piece.color}
                         size={CELL * 0.92}
+                        theme={theme}
                       />
                     )}
                   </TouchableOpacity>
@@ -165,6 +197,41 @@ export default function ChessScreen() {
           {t("moves") || "Moves"}: {state.moveHistory.length}
         </Text>
       </View>
+
+      {/* Theme picker modal */}
+      <Modal
+        visible={showThemePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowThemePicker(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowThemePicker(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>اختر ألوان القطع</Text>
+            {THEME_OPTIONS.map((opt) => {
+              const sel = theme === opt.id;
+              const cols = CHESS_THEMES[opt.id];
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.themeRow, sel && styles.themeRowActive]}
+                  onPress={() => pickTheme(opt.id)}
+                >
+                  <Text style={styles.themeEmoji}>{opt.emoji}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.themeLabel}>{opt.label}</Text>
+                    <View style={{ flexDirection: "row", marginTop: 6, gap: 6 }}>
+                      <View style={[styles.swatch, { backgroundColor: cols.fillWhite, borderColor: cols.strokeWhite }]} />
+                      <View style={[styles.swatch, { backgroundColor: cols.fillBlack, borderColor: cols.strokeBlack }]} />
+                    </View>
+                  </View>
+                  {sel && <Ionicons name="checkmark-circle" size={24} color="#4ADE80" />}
+                </TouchableOpacity>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -203,4 +270,36 @@ const styles = StyleSheet.create({
   },
   footer: { alignItems: "center", marginTop: 20 },
   footerText: { color: FUTURISTIC.textMuted, fontSize: 13 },
+  // Theme picker modal
+  modalBackdrop: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center", justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%", maxWidth: 360,
+    backgroundColor: "#1A1B22",
+    borderRadius: 16, padding: 20,
+    borderWidth: 1, borderColor: "#2A2C36",
+  },
+  modalTitle: {
+    color: "#FFF", fontSize: 18, fontWeight: "800",
+    textAlign: "center", marginBottom: 16,
+  },
+  themeRow: {
+    flexDirection: "row", alignItems: "center",
+    padding: 12, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    marginBottom: 10,
+    borderWidth: 1, borderColor: "transparent",
+  },
+  themeRowActive: {
+    backgroundColor: "rgba(74,222,128,0.10)",
+    borderColor: "rgba(74,222,128,0.40)",
+  },
+  themeEmoji: { fontSize: 30, marginRight: 12 },
+  themeLabel: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  swatch: {
+    width: 24, height: 24, borderRadius: 6, borderWidth: 2,
+  },
 });
