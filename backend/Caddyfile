@@ -1,0 +1,50 @@
+# =============================================================================
+# Caddy reverse proxy + automatic HTTPS for Party4R backend.
+# Reads PUBLIC_DOMAIN + ADMIN_EMAIL from docker-compose environment.
+# =============================================================================
+
+{
+	email {$ADMIN_EMAIL}
+	# Faster TLS handshakes; harmless if not supported by client.
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$PUBLIC_DOMAIN} {
+	# Brotli + gzip compression for HTTP responses.
+	encode zstd gzip
+
+	# WebSocket-aware reverse proxy: passes through /api/ws/* with Upgrade.
+	reverse_proxy /api/* backend:8001 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		transport http {
+			keepalive 75s
+		}
+	}
+
+	# Public health endpoint (no /api prefix for convenience monitoring tools).
+	reverse_proxy /health backend:8001/api/health
+
+	# Default — redirect root to docs (FastAPI's interactive UI).
+	handle / {
+		redir /api/docs 302
+	}
+
+	# Security headers (mobile apps + browsers).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+}

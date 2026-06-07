@@ -1,0 +1,80 @@
+# =============================================================================
+# Party4R full stack — single-file deployment for any VPS
+# Brings up: backend API + MongoDB + Caddy (automatic SSL via Let's Encrypt)
+#
+# Quick start on a fresh VPS:
+#   1. apt install docker.io docker-compose-plugin
+#   2. cp .env.example .env  &&  edit values
+#   3. docker compose up -d
+#   4. (Optional) Point your domain's A record to this VPS IP
+# =============================================================================
+services:
+
+  mongo:
+    image: mongo:7.0
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    # Bind to localhost only — backend reaches it on the internal docker net.
+    # No public port exposed for security.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: party4r-backend:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override .env defaults to ensure backend uses the bundled mongo service.
+      # Comment out if you use Atlas instead.
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - internal
+      - web
+    # Expose only inside the docker network — Caddy fronts it for the public.
+    expose:
+      - "8001"
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+    networks:
+      - web
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  mongo_config:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge
+  web:
+    driver: bridge

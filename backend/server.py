@@ -933,6 +933,25 @@ from notifications import (
     send_dm_push as _send_dm_push,
 )  # noqa: E402 — Phase 5 push notifications
 
+# ───────────────────────────────────────────────────────────────────────────
+# Phase 9 — Portable / paid-hosting stubs (Google Login, Tournaments,
+# Leaderboard, Cloud Sync). These import lazily so a missing optional env
+# var doesn't break boot.
+# ───────────────────────────────────────────────────────────────────────────
+import importlib
+
+def _safe_import(name):
+    try:
+        return importlib.import_module(name)
+    except Exception as e:  # pragma: no cover
+        logger.warning("Phase 9 module %s not loaded: %s", name, e)
+        return None
+
+_mod_google = _safe_import("google_auth")
+_mod_leaderboard = _safe_import("leaderboard")
+_mod_tournaments = _safe_import("tournaments")
+_mod_cloud_sync = _safe_import("cloud_sync")
+
 # We create a NEW router for phase 2 then include it (works because we include after)
 _phase2_router = APIRouter(prefix="/api")
 _register_phase2(_phase2_router, db, get_current_user)
@@ -954,14 +973,37 @@ _push_router = APIRouter(prefix="/api")
 _register_push(_push_router, db, get_current_user)
 app.include_router(_push_router)
 
+# ───────────────────────────────────────────────────────────────────────────
+# Phase 9 — Portable hosting feature stubs.  All four modules are optional;
+# they no-op when their env vars / collections aren't ready.
+# ───────────────────────────────────────────────────────────────────────────
+def _sign_token_for_user(user: dict) -> str:
+    """Helper exposed to google_auth for issuing JWTs after Google login."""
+    return create_token(user["id"])
+
+_phase9_router = APIRouter(prefix="/api")
+if _mod_google:
+    _mod_google.register_routes(_phase9_router, db, _sign_token_for_user)
+if _mod_leaderboard:
+    _mod_leaderboard.register_routes(_phase9_router, db, get_current_user)
+if _mod_tournaments:
+    _mod_tournaments.register_routes(_phase9_router, db, get_current_user)
+if _mod_cloud_sync:
+    _mod_cloud_sync.register_routes(_phase9_router, db, get_current_user)
+app.include_router(_phase9_router)
+
 
 @app.on_event("startup")
 async def _phase2_startup():
     try:
         await _ensure_phase2_indexes(db)
         await _ensure_dms_indexes(db)
+        if _mod_tournaments:
+            await _mod_tournaments.ensure_indexes(db)
+        if _mod_cloud_sync:
+            await _mod_cloud_sync.ensure_indexes(db)
     except Exception as e:
-        logger.warning("Phase 2/3 index creation skipped: %s", e)
+        logger.warning("Phase 2/3/9 index creation skipped: %s", e)
 
 
 app.add_middleware(
@@ -980,8 +1022,11 @@ async def root():  # noqa: F811 — different router (app vs api), intentional s
 
 
 @app.get("/health")
+@app.get("/api/health")
 async def health():
-    """Lightweight liveness probe — used by Render's healthCheckPath."""
+    """Lightweight liveness probe — exposed at both /health (legacy Render
+    convention) and /api/health (uniform with the rest of the public API,
+    used by Docker/K8s healthchecks + reverse proxies)."""
     try:
         await db.command("ping")
         return {"status": "ok", "db": "ok"}
