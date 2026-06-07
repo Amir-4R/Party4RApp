@@ -1015,6 +1015,7 @@ _BUNDLES = {
     "mobile-full.zip": "party4r-mobile-full.zip",  # full JS source + prebuilt android/ + bundled JS
     "complete.zip": "party4r-complete.zip",        # frontend + backend + all configs (the ENTIRE app)
     "termux-ready.zip": "party4r-termux-ready.zip", # ready-to-build Termux bundle with BUILD_TERMUX.sh
+    "backend-deploy.zip": "party4r-backend-deploy.zip", # backend-only, ready for Render redeploy
 }
 
 
@@ -1063,6 +1064,15 @@ async def download_termux_ready_bundle_direct():
     one-shot BUILD_TERMUX.sh script that installs Android SDK + builds APK.
     The easiest way to build the APK locally on an Android phone."""
     return _serve_bundle("termux-ready.zip")
+
+
+@app.get("/api/download/backend-deploy.zip")
+async def download_backend_deploy_bundle_direct():
+    """Backend-only deploy bundle: server.py + dms.py + notifications.py +
+    moderation.py + privacy_safety.py + rooms_voting.py + requirements.txt +
+    Procfile + DEPLOY_TO_RENDER.md. Drop into a Render GitHub repo + redeploy
+    to enable DMs and Push Notifications on production."""
+    return _serve_bundle("backend-deploy.zip")
 
 
 @app.get("/api/download/full.zip")
