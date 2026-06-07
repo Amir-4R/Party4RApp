@@ -97,6 +97,7 @@ const dict: Record<Lang, Record<string, string>> = {
     you_win: "You win!",
     opponent_wins: "Opponent wins",
     its_a_draw: "It's a draw!",
+    bot: "Bot",
     game_not_found: "Game not found",
 
     // ---- Leaderboard ----
@@ -551,6 +552,7 @@ const dict: Record<Lang, Record<string, string>> = {
     you_win: "لقد فزت!",
     opponent_wins: "فاز الخصم",
     its_a_draw: "تعادل!",
+    bot: "روبوت",
     game_not_found: "اللعبة غير موجودة",
 
     // ---- Leaderboard ----

@@ -23,6 +23,7 @@ import {
   CENTER_CIRCLE_RADIUS, DECOR_CIRCLES, DECOR_RING_RADIUS,
   THROW_LINES, THROW_END_CIRCLE_RADIUS, throwLineForPlayer,
 } from "@/src/games/carrom/engine";
+import { planBotShot } from "@/src/games/carrom/ai";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
 
@@ -88,6 +89,27 @@ export default function CarromScreen() {
     }, 1000);
     return () => clearInterval(id);
   }, [state.phase]);
+
+  // ── AI bot: plays automatically when it's player2's turn ──────────────────
+  useEffect(() => {
+    if (state.phase !== "aiming") return;
+    if (state.turn !== "player2") return;
+    // Slight delay so the player can see the result of their own shot first.
+    const id = setTimeout(() => {
+      // Re-check current state (the player may have reset the game)
+      const s = stateRef.current;
+      if (s.phase !== "aiming" || s.turn !== "player2") return;
+      const plan = planBotShot(s);
+      // 1) Position the striker on the bot's throw line
+      const positioned = setStrikerPosition(s, plan.strikerX, plan.strikerY);
+      // 2) Shoot
+      const shot = shootStriker(positioned, plan.angle, plan.power);
+      setState(shot);
+      stateRef.current = shot;
+      runSimulation();
+    }, 2000);
+    return () => clearTimeout(id);
+  }, [state.phase, state.turn, runSimulation]);
 
   // ── Drag to aim ───────────────────────────────────────────────────────────
   const boardOriginRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -191,7 +213,7 @@ export default function CarromScreen() {
           </Text>
         </View>
         <View style={[styles.scoreBox, state.turn === "player2" && styles.scoreActive]}>
-          <Text style={styles.scoreLabel}>{t("opponent") || "Opponent"}</Text>
+          <Text style={styles.scoreLabel}>🤖 {t("bot") || "Bot"}</Text>
           <Text style={styles.scoreVal}>{state.scores.player2}</Text>
         </View>
       </View>
