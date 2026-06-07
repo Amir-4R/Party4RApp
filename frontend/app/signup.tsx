@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { AVATARS, COLORS } from "@/src/constants/avatars";
 import { useT } from "@/src/context/LanguageContext";
+import GoogleSignInButton from "@/src/components/auth/GoogleSignInButton";
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -140,6 +141,11 @@ export default function SignupScreen() {
               <Text style={styles.primaryBtnText}>{t("create_account")}</Text>
             )}
           </TouchableOpacity>
+
+          <GoogleSignInButton
+            onSuccess={() => router.replace("/(tabs)/home")}
+            onError={(e) => setError(e.message || t("err_login_failed"))}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

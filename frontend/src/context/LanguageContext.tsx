@@ -82,6 +82,11 @@ const dict: Record<Lang, Record<string, string>> = {
     lb_empty_sub: "Be the first to earn honor points or host a watch party.",
     lb_button: "Leaderboard",
 
+    // ---- Google Login ----
+    google_signin: "Continue with Google",
+    google_signing_in: "Signing in...",
+    google_or: "OR",
+
     // ---- Auth ----
     login: "Log in",
     signup: "Create new account",
@@ -452,6 +457,11 @@ const dict: Record<Lang, Record<string, string>> = {
     lb_empty_title: "لا يوجد ترتيب بعد",
     lb_empty_sub: "كن أول من يكسب نقاط شرف أو يستضيف غرفة مشاهدة.",
     lb_button: "المتصدرون",
+
+    // ---- Google Login ----
+    google_signin: "المتابعة باستخدام Google",
+    google_signing_in: "جاري تسجيل الدخول...",
+    google_or: "أو",
 
     // ---- Auth ----
     login: "تسجيل الدخول",

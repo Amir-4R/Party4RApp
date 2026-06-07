@@ -22,6 +22,8 @@ interface AuthContextValue {
   loading: boolean;
   signup: (username: string, password: string, nickname: string, avatar: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  /** Persist a JWT obtained from an external auth flow (e.g. Google). */
+  loginWithToken: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -78,6 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persist(res.access_token, res.user);
   };
 
+  const loginWithToken: AuthContextValue["loginWithToken"] = async (t, u) => {
+    await persist(t, u);
+  };
+
   const logout = async () => {
     // Phase 5 — best-effort token clear before token is wiped locally.
     await clearPushToken();
@@ -94,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signup, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, token, loading, signup, login, loginWithToken, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

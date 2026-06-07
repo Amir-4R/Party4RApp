@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/src/context/AuthContext";
 import { COLORS, LOGIN_BG_URL } from "@/src/constants/avatars";
 import { useT } from "@/src/context/LanguageContext";
+import GoogleSignInButton from "@/src/components/auth/GoogleSignInButton";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -105,6 +106,11 @@ export default function LoginScreen() {
                   <Text style={styles.secondaryBtnText}>{t("signup")}</Text>
                 </TouchableOpacity>
               </Link>
+
+              <GoogleSignInButton
+                onSuccess={() => router.replace("/(tabs)/home")}
+                onError={(e) => setError(e.message || t("err_login_failed"))}
+              />
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
