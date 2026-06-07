@@ -86,7 +86,7 @@ export const COIN_RESTITUTION = 0.55;           // piece-piece bounce coefficien
 //   coin-vel after impact ≈ v_striker · (1 + COIN_RESTITUTION)/2 ≈ 0.78 · v
 //   With drag 0.55/s + dyn friction, stop-distance s = v² / (2·a_eff)
 //   Solving for v_striker giving s ≈ 445 → v ≈ 22 units/frame
-export const STRIKER_MAX_POWER = 22;            // ✦ ICF-tuned max striker velocity
+export const STRIKER_MAX_POWER = 26;            // ✦ ICF-tuned max striker velocity
 
 const CENTER = BOARD_SIZE / 2;
 const DT = 1 / 60;                              // fixed simulation timestep
@@ -422,10 +422,14 @@ export function simulateStep(state: CarromState): { state: CarromState; settled:
       }
     }
     // 4. Pocket detection (per sub-step so fast pieces still get pocketed)
-    // Hitbox = raw POCKET_RADIUS (matches the new larger, visible pocket).
-    const POCKET_HITBOX = POCKET_RADIUS;
+    // Physics-based: piece center must enter pocket throat (POCKET_RADIUS − r),
+    // multiplied by a forgiveness factor of 1.7 for arcade-feel pocketing.
+    //   coin (r=15.9):    threshold ≈ 16.32  (forgiving)
+    //   striker (r=20.65):threshold ≈ 8.25   (needs near-direct hit → fewer fouls)
     for (const p of allPieces) {
       if (!p.active) continue;
+      const throat = Math.max(0, POCKET_RADIUS - p.radius);
+      const POCKET_HITBOX = throat * 1.7;
       for (const pocket of POCKETS) {
         if (dist(p.pos, pocket) < POCKET_HITBOX) {
           p.active = false;
