@@ -85,8 +85,19 @@ export const COIN_RESTITUTION = 0.55;           // piece-piece bounce coefficien
 //   target distance d = √2 · (BOARD_SIZE/2 − POCKET_OFFSET) ≈ 445 mm
 //   coin-vel after impact ≈ v_striker · (1 + COIN_RESTITUTION)/2 ≈ 0.78 · v
 //   With drag 0.45/s + dyn friction 0.04, stop-distance s = v²/(2·a_eff)
-//   Solving s ≈ 445 with new lower drag → v ≈ 30 units/frame for snappy feel.
-export const STRIKER_MAX_POWER = 30;            // ✦ snappier striker (was 26)
+//   Solving s ≈ 445 with new lower drag → v ≈ 32 units/frame for snappy feel.
+export const STRIKER_MAX_POWER = 32;            // ✦ +2 per UX request (was 30)
+
+// ─── POCKET "SKIM" EQUATION (real-world physical lip) ───────────────────────
+// In real carrom, a piece moving too fast skims over the pocket without
+// falling in (the pocket has a lip and finite depth ≈ 25 mm). Equation:
+//   v_skim = D_pocket / √(2·d_lip/g)
+//   with D_pocket = 51 mm, d_lip = 25 mm, g = 9810 mm/s² → v_skim ≈ 12 / frame
+// We bias slightly upward for arcade fairness so medium-power shots pocket
+// reliably while only very strong shots fly over:
+//   MAX_POCKET_CATCH_SPEED = STRIKER_MAX_POWER · 0.5
+// Pieces with speed ≤ this are caught; faster pieces skim and continue.
+export const MAX_POCKET_CATCH_SPEED = STRIKER_MAX_POWER * 0.5;  // ≈ 16
 
 const CENTER = BOARD_SIZE / 2;
 const DT = 1 / 60;                              // fixed simulation timestep
@@ -422,16 +433,23 @@ export function simulateStep(state: CarromState): { state: CarromState; settled:
       }
     }
     // 4. Pocket detection (per sub-step so fast pieces still get pocketed)
-    // Physics-based: piece center must enter pocket throat (POCKET_RADIUS − r),
-    // multiplied by a forgiveness factor of 1.7 for arcade-feel pocketing.
-    //   coin (r=15.9):    threshold ≈ 16.32  (forgiving)
-    //   striker (r=20.65):threshold ≈ 8.25   (needs near-direct hit → fewer fouls)
+    // Two-condition catch (physics-based):
+    //   (a) piece center inside pocket "throat"  → geometric overlap
+    //   (b) piece speed ≤ MAX_POCKET_CATCH_SPEED  → real-world "lip" model
+    // Pieces that satisfy (a) but NOT (b) skim over the pocket and continue
+    // — they'll hit the corner walls behind the pocket and bounce back, as
+    // happens with a fast-moving coin in a real carrom board.
+    //   throat(r) = max(0, POCKET_RADIUS − r) · 1.7  (1.7 = arcade forgiveness)
+    //   coin (r=15.9):    throat ≈ 16.32
+    //   striker (r=20.65):throat ≈ 8.25
     for (const p of allPieces) {
       if (!p.active) continue;
-      const throat = Math.max(0, POCKET_RADIUS - p.radius);
-      const POCKET_HITBOX = throat * 1.7;
+      const throat = Math.max(0, POCKET_RADIUS - p.radius) * 1.7;
+      const speed = Math.hypot(p.vel.x, p.vel.y);
+      // Only pieces moving slow enough get caught (real-world physical lip).
+      if (speed > MAX_POCKET_CATCH_SPEED) continue;
       for (const pocket of POCKETS) {
-        if (dist(p.pos, pocket) < POCKET_HITBOX) {
+        if (dist(p.pos, pocket) < throat) {
           p.active = false;
           p.pocketed = true;
           p.vel = { x: 0, y: 0 };
