@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { LanguageProvider } from "@/src/context/LanguageContext";
 import { ThemeProvider, useTheme } from "@/src/context/ThemeContext";
+import { CloudSyncProvider } from "@/src/utils/cloudSync";
 import { View } from "react-native";
 import { pingBackend } from "@/src/api/client";
 
@@ -43,7 +44,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
-            <RootShell />
+            <CloudSyncProvider>
+              <RootShell />
+            </CloudSyncProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>

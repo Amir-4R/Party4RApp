@@ -47,6 +47,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useT } from "@/src/context/LanguageContext";
 import { useTheme } from "@/src/context/ThemeContext";
+import { useCloudSync } from "@/src/utils/cloudSync";
 import {
   THEMES,
   ThemeId,
@@ -70,14 +71,31 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { t, tErr, lang, setLang } = useT();
   const { themeId, setThemeId } = useTheme();
+  const cloud = useCloudSync();
   const [switching, setSwitching] = useState<null | "en" | "ar">(null);
   const [themeSwitching, setThemeSwitching] = useState<ThemeId | null>(null);
+
+  // ── Apply cloud-pulled settings on first sync ─────────────────────────────
+  // When the user logs in on a new device the CloudSyncProvider pulls their
+  // last-known preferences. We apply them once, *only* if they differ from
+  // the local defaults.  This is intentionally not in the providers so the
+  // user sees the UI flash to the right language/theme just after login.
+  const appliedRef = useRef(false);
+  useEffect(() => {
+    if (appliedRef.current) return;
+    if (!cloud.status.hasPulledOnce) return;
+    appliedRef.current = true;
+    const cp = cloud.payload;
+    if (cp.language && cp.language !== lang) setLang(cp.language);
+    if (cp.theme && cp.theme !== themeId) setThemeId(cp.theme as ThemeId);
+  }, [cloud.status.hasPulledOnce]);  // eslint-disable-line
 
   const handleSwitch = async (l: "en" | "ar") => {
     if (l === lang || switching) return;
     setSwitching(l);
     const { needsRestart } = await setLang(l);
     setSwitching(null);
+    cloud.update({ language: l });
     if (needsRestart) {
       Alert.alert(t("rtl_restart_title"), t("rtl_restart_msg"), [
         { text: t("rtl_restart_ok") },
@@ -91,6 +109,7 @@ export default function SettingsScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     await setThemeId(id);
     setThemeSwitching(null);
+    cloud.update({ theme: id });
   };
 
   return (
@@ -103,6 +122,63 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: 60, paddingTop: 10 }}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── CLOUD SYNC STATUS ────────────────────────────────────────── */}
+        <Section label={t("sync_section")}>
+          <MetallicCard padding={14} radius={FUTURISTIC.radius.lg} accent="neutral">
+            <View style={styles.syncRow}>
+              <View style={styles.syncIconWrap}>
+                <Ionicons
+                  name={
+                    cloud.status.syncing
+                      ? "cloud-upload-outline"
+                      : cloud.status.error
+                      ? "cloud-offline-outline"
+                      : "cloud-done"
+                  }
+                  size={24}
+                  color={
+                    cloud.status.error
+                      ? "#FF8A50"
+                      : cloud.status.syncing
+                      ? FUTURISTIC.accentGlow
+                      : FUTURISTIC.brand
+                  }
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.syncTitle}>
+                  {cloud.status.syncing
+                    ? t("sync_syncing")
+                    : cloud.status.error
+                    ? t("sync_failed")
+                    : cloud.status.lastSyncedAt
+                    ? t("sync_synced")
+                    : t("sync_idle")}
+                </Text>
+                <Text style={styles.syncSub}>
+                  {cloud.status.error
+                    ? cloud.status.error
+                    : cloud.status.lastSyncedAt
+                    ? `v${cloud.status.version} · ${new Date(cloud.status.lastSyncedAt).toLocaleTimeString()}`
+                    : t("sync_idle_sub")}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => cloud.pull()}
+                disabled={cloud.status.syncing}
+                style={[styles.syncBtn, cloud.status.syncing && { opacity: 0.55 }]}
+                testID="cloud-sync-now"
+              >
+                {cloud.status.syncing ? (
+                  <ActivityIndicator size="small" color={FUTURISTIC.brand} />
+                ) : (
+                  <Ionicons name="refresh" size={18} color={FUTURISTIC.brand} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </MetallicCard>
+        </Section>
+
         {/* ── THEME (featured 4) ───────────────────────────────────────── */}
         <Section label={t("settings_theme")}>
           <MetallicCard padding={0} radius={FUTURISTIC.radius.lg} accent="neutral">
@@ -643,6 +719,35 @@ function MenuRow({
 const styles = StyleSheet.create({
   section: { paddingHorizontal: 20, marginTop: 24 },
   sectionLabel: { ...TYPO.caption, color: FUTURISTIC.textMuted, marginBottom: 10 },
+
+  // ── Cloud Sync ─────────────────────────────────────────────────────────
+  syncRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  syncIconWrap: {
+    width: 44, height: 44,
+    borderRadius: 12,
+    backgroundColor: FUTURISTIC.surface2,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+  },
+  syncTitle: {
+    color: FUTURISTIC.textPrimary,
+    fontSize: 14, fontWeight: "800", letterSpacing: 0.3,
+  },
+  syncSub: {
+    color: FUTURISTIC.textMuted,
+    fontSize: 12, marginTop: 2,
+  },
+  syncBtn: {
+    width: 36, height: 36,
+    borderRadius: 10,
+    backgroundColor: FUTURISTIC.surface2,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: FUTURISTIC.brandEdge,
+  },
 
   row: {
     flexDirection: "row",

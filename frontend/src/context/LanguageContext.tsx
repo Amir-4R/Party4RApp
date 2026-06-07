@@ -119,6 +119,14 @@ const dict: Record<Lang, Record<string, string>> = {
     tour_not_found: "Tournament not found",
     tour_button: "Tournaments",
 
+    // ---- Cloud Sync ----
+    sync_section: "CLOUD SYNC",
+    sync_syncing: "Syncing...",
+    sync_synced: "Synced ✓",
+    sync_failed: "Sync failed",
+    sync_idle: "Not synced yet",
+    sync_idle_sub: "Tap refresh to sync your settings",
+
     // ---- Auth ----
     login: "Log in",
     signup: "Create new account",
@@ -526,6 +534,14 @@ const dict: Record<Lang, Record<string, string>> = {
     tour_champion: "🏆 البطل",
     tour_not_found: "البطولة غير موجودة",
     tour_button: "البطولات",
+
+    // ---- Cloud Sync ----
+    sync_section: "المزامنة السحابية",
+    sync_syncing: "جاري المزامنة...",
+    sync_synced: "متزامن ✓",
+    sync_failed: "فشلت المزامنة",
+    sync_idle: "لم تتم المزامنة بعد",
+    sync_idle_sub: "اضغط على زر التحديث لمزامنة إعداداتك",
 
     // ---- Auth ----
     login: "تسجيل الدخول",
