@@ -328,6 +328,14 @@ export default function HomeScreen() {
           >
             <Ionicons name="search" size={20} color={FUTURISTIC.brand} />
           </TouchableOpacity>
+          <TouchableOpacity
+            testID="open-leaderboard"
+            onPress={() => router.push("/leaderboard")}
+            style={styles.trophyBtn}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="trophy" size={20} color={FUTURISTIC.brand} />
+          </TouchableOpacity>
           <CreateFab onPress={() => router.push("/create-room")} />
         </View>
 
@@ -537,6 +545,21 @@ const styles = StyleSheet.create({
     shadowColor: FUTURISTIC.brand,
     shadowOpacity: 0.30,
     shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  trophyBtn: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1,
+    borderColor: FUTURISTIC.brandEdge,
+    marginRight: 10,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
   },
   emptyTitle: {

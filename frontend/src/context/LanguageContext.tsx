@@ -72,6 +72,16 @@ const dict: Record<Lang, Record<string, string>> = {
     tab_friends: "FRIENDS",
     tab_profile: "PROFILE",
 
+    // ---- Leaderboard ----
+    lb_title: "Leaderboard",
+    lb_kicker: "Global rankings",
+    lb_tab_honor: "Honor",
+    lb_tab_watch: "Watch",
+    lb_tab_hosts: "Hosts",
+    lb_empty_title: "No rankings yet",
+    lb_empty_sub: "Be the first to earn honor points or host a watch party.",
+    lb_button: "Leaderboard",
+
     // ---- Auth ----
     login: "Log in",
     signup: "Create new account",
@@ -432,6 +442,16 @@ const dict: Record<Lang, Record<string, string>> = {
     tab_rooms: "الغرف",
     tab_friends: "الأصدقاء",
     tab_profile: "الملف",
+
+    // ---- Leaderboard ----
+    lb_title: "لوحة المتصدرين",
+    lb_kicker: "الترتيب العالمي",
+    lb_tab_honor: "الشرف",
+    lb_tab_watch: "المشاهدة",
+    lb_tab_hosts: "المضيفون",
+    lb_empty_title: "لا يوجد ترتيب بعد",
+    lb_empty_sub: "كن أول من يكسب نقاط شرف أو يستضيف غرفة مشاهدة.",
+    lb_button: "المتصدرون",
 
     // ---- Auth ----
     login: "تسجيل الدخول",
