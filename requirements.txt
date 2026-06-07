@@ -6,6 +6,7 @@
 fastapi==0.110.1            # HTTP framework + WebSocket support
 uvicorn[standard]==0.25.0   # ASGI server (includes uvloop, httptools, websockets)
 motor==3.3.1                # Async MongoDB driver (depends on pymongo)
+pymongo>=4.5,<4.9           # Pinned: motor 3.3.1 imports _QUERY_OPTIONS which was removed in pymongo 4.9+
 pydantic>=2.6.4             # Request/response models (also pulled by FastAPI)
 python-dotenv>=1.0.1        # Loads .env files for local dev
 bcrypt==4.1.3               # Password hashing
