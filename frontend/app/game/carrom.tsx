@@ -49,6 +49,12 @@ export default function CarromScreen() {
   const [state, setState] = useState<CarromState>(createInitialState);
   const [aimAngle, setAimAngle] = useState(-Math.PI / 2);
   const [power, setPower] = useState(0);
+  // Refs to capture the latest aim/power values inside the PanResponder
+  // closure (which is created only ONCE on mount). Without these refs the
+  // release callback would always see the stale initial values, so the
+  // striker never shoots.
+  const powerRef = useRef(0);
+  const aimAngleRef = useRef(-Math.PI / 2);
   const rafRef = useRef<number | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -117,6 +123,18 @@ export default function CarromScreen() {
 
   // ── Drag to aim ───────────────────────────────────────────────────────────
   const boardOriginRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const boardRef = useRef<View>(null);
+  // Re-measure on mount and on window resize so touches map correctly.
+  useEffect(() => {
+    const update = () => {
+      boardRef.current?.measure?.((_x, _y, _w, _h, pageX, pageY) => {
+        boardOriginRef.current = { x: pageX, y: pageY };
+      });
+    };
+    update();
+    const id = setTimeout(update, 300); // catch post-layout settling
+    return () => clearTimeout(id);
+  }, []);
   // Drag offset (vector from striker → current touch) in BOARD units.  The
   // striker shoots in the OPPOSITE direction (slingshot) with power
   // proportional to drag length.
@@ -125,16 +143,18 @@ export default function CarromScreen() {
 
   const panResponder = useRef(
     PanResponder.create({
-      // Only respond if the user starts the touch ON or very NEAR the striker.
-      onStartShouldSetPanResponder: (e) => {
+      // Allow any touch on the player's half of the board to start aiming.
+      // The PanResponder gate is intentionally loose so users don't need to
+      // pixel-hit the small striker. Aim direction is still calculated
+      // relative to the striker's actual position.
+      onStartShouldSetPanResponder: () => {
         const s = stateRef.current;
-        if (s.phase !== "aiming" || s.turn !== "player1") return false;
-        const tx = (e.nativeEvent.locationX) / SCALE;
-        const ty = (e.nativeEvent.locationY) / SCALE;
-        const d = Math.hypot(tx - s.striker.pos.x, ty - s.striker.pos.y);
-        return d < s.striker.radius * 3.5; // generous touch hit-box
+        return s.phase === "aiming" && s.turn === "player1";
       },
-      onMoveShouldSetPanResponder: () => stateRef.current.phase === "aiming" && stateRef.current.turn === "player1",
+      onMoveShouldSetPanResponder: () => {
+        const s = stateRef.current;
+        return s.phase === "aiming" && s.turn === "player1";
+      },
       onPanResponderGrant: () => {
         setDragOffset({ x: 0, y: 0 });
       },
@@ -153,26 +173,34 @@ export default function CarromScreen() {
         setDragOffset({ x: cx, y: cy });
         // Aim direction is OPPOSITE the drag (slingshot)
         const angle = Math.atan2(-cy, -cx);
+        const p = clampedLen / MAX_DRAG;
         setAimAngle(angle);
-        setPower(clampedLen / MAX_DRAG);
+        setPower(p);
+        // Keep refs in sync so the release callback sees the LATEST values.
+        aimAngleRef.current = angle;
+        powerRef.current = p;
       },
       onPanResponderRelease: () => {
         const s = stateRef.current;
-        const p = power;
+        const p = powerRef.current;
+        const angle = aimAngleRef.current;
         setDragOffset(null);
         if (s.phase !== "aiming" || p < 0.08) {
           setPower(0);
+          powerRef.current = 0;
           return;
         }
-        const shot = shootStriker(s, aimAngle, p);
+        const shot = shootStriker(s, angle, p);
         setState(shot);
         stateRef.current = shot;
         setPower(0);
+        powerRef.current = 0;
         runSimulation();
       },
       onPanResponderTerminate: () => {
         setDragOffset(null);
         setPower(0);
+        powerRef.current = 0;
       },
     }),
   ).current;
@@ -271,11 +299,11 @@ export default function CarromScreen() {
       {/* Board */}
       <View style={styles.boardWrap}>
         <View
+          ref={boardRef}
           style={[styles.board, { width: DISPLAY, height: DISPLAY }]}
           {...panResponder.panHandlers}
-          onLayout={(e) => {
-            // Capture absolute origin for accurate touch → board coords.
-            e.target?.measure?.((_x, _y, _w, _h, pageX, pageY) => {
+          onLayout={() => {
+            boardRef.current?.measure?.((_x, _y, _w, _h, pageX, pageY) => {
               boardOriginRef.current = { x: pageX, y: pageY };
             });
           }}
