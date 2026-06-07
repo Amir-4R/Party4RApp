@@ -16,6 +16,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   createInitialState, simulateStep, resolveTurn, shootStriker,
   setStrikerPosition, tickTurnTimer,
@@ -375,30 +376,103 @@ export default function CarromScreen() {
             }} />
           ))}
 
-          {/* Coins */}
-          {state.coins.filter((c) => c.active).map((coin) => (
-            <View key={coin.id} style={[styles.coin, {
-              width: coin.radius * 2 * SCALE,
-              height: coin.radius * 2 * SCALE,
-              borderRadius: coin.radius * SCALE,
-              backgroundColor: COIN_COLORS[coin.color],
-              left: coin.pos.x * SCALE - coin.radius * SCALE,
-              top: coin.pos.y * SCALE - coin.radius * SCALE,
-              borderColor: coin.color === "queen" ? "#FFD86B" : "rgba(0,0,0,0.25)",
-              borderWidth: coin.color === "queen" ? 2 : 1,
-            }]} />
-          ))}
+          {/* Coins — with metallic gradient + central ornament */}
+          {state.coins.filter((c) => c.active).map((coin) => {
+            const size = coin.radius * 2 * SCALE;
+            const isQueen = coin.color === "queen";
+            const isWhite = coin.color === "white";
+            const baseColor = COIN_COLORS[coin.color];
+            const ringColor = isQueen ? "#FFD86B" : isWhite ? "#A8A085" : "#444";
+            const innerColor = isQueen ? "#FF4D5F" : isWhite ? "#FFF8E8" : "#3A3A40";
+            return (
+              <View key={coin.id} style={{
+                position: "absolute",
+                width: size, height: size, borderRadius: size / 2,
+                left: coin.pos.x * SCALE - coin.radius * SCALE,
+                top: coin.pos.y * SCALE - coin.radius * SCALE,
+                backgroundColor: ringColor,
+                padding: 1.5,
+                shadowColor: isQueen ? "#FFD86B" : "#000",
+                shadowOpacity: isQueen ? 0.6 : 0.4,
+                shadowRadius: isQueen ? 6 : 2,
+              }}>
+                <LinearGradient
+                  colors={[innerColor, baseColor, isWhite ? "#D8C9A8" : isQueen ? "#9B0F26" : "#000"]}
+                  start={{ x: 0.3, y: 0.2 }}
+                  end={{ x: 0.7, y: 0.8 }}
+                  style={{
+                    flex: 1, borderRadius: (size - 3) / 2,
+                    alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  {isQueen ? (
+                    <Ionicons name="diamond" size={size * 0.5} color="#FFD86B" />
+                  ) : (
+                    <Ionicons
+                      name="flower-outline"
+                      size={size * 0.42}
+                      color={isWhite ? "rgba(120,100,60,0.6)" : "rgba(180,180,200,0.5)"}
+                    />
+                  )}
+                  {/* Top highlight */}
+                  <View pointerEvents="none" style={{
+                    position: "absolute", top: 2, left: size * 0.18,
+                    width: size * 0.35, height: size * 0.18, borderRadius: size,
+                    backgroundColor: "rgba(255,255,255,0.35)",
+                  }} />
+                </LinearGradient>
+              </View>
+            );
+          })}
 
-          {/* Striker */}
-          {state.striker.active && (
-            <View style={[styles.striker, {
-              width: state.striker.radius * 2 * SCALE,
-              height: state.striker.radius * 2 * SCALE,
-              borderRadius: state.striker.radius * SCALE,
-              left: state.striker.pos.x * SCALE - state.striker.radius * SCALE,
-              top: state.striker.pos.y * SCALE - state.striker.radius * SCALE,
-            }]} />
-          )}
+          {/* Striker — premium metallic blue */}
+          {state.striker.active && (() => {
+            const size = state.striker.radius * 2 * SCALE;
+            return (
+              <View style={{
+                position: "absolute",
+                width: size, height: size, borderRadius: size / 2,
+                left: state.striker.pos.x * SCALE - state.striker.radius * SCALE,
+                top: state.striker.pos.y * SCALE - state.striker.radius * SCALE,
+                backgroundColor: "#1B3A6B",
+                padding: 2,
+                shadowColor: "#5BC0EB", shadowOpacity: 0.7, shadowRadius: 8,
+              }}>
+                <LinearGradient
+                  colors={["#7DD3FF", "#5BC0EB", "#1B6FBA"]}
+                  start={{ x: 0.3, y: 0.2 }}
+                  end={{ x: 0.7, y: 0.85 }}
+                  style={{
+                    flex: 1, borderRadius: (size - 4) / 2,
+                    alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  {/* Outer rim ornament */}
+                  <View style={{
+                    position: "absolute", inset: 2 as any,
+                    borderRadius: size / 2,
+                    borderWidth: 1, borderColor: "rgba(255,255,255,0.4)",
+                  }} />
+                  {/* Central jewel */}
+                  <View style={{
+                    width: size * 0.42, height: size * 0.42,
+                    borderRadius: size * 0.21,
+                    backgroundColor: "#0E2A4F",
+                    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.7)",
+                    alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Ionicons name="star" size={size * 0.26} color="#FFD86B" />
+                  </View>
+                  {/* Top highlight */}
+                  <View pointerEvents="none" style={{
+                    position: "absolute", top: 3, left: size * 0.2,
+                    width: size * 0.4, height: size * 0.18, borderRadius: size,
+                    backgroundColor: "rgba(255,255,255,0.5)",
+                  }} />
+                </LinearGradient>
+              </View>
+            );
+          })()}
 
           {/* Aim arrow — points FROM the striker in the direction it will go */}
           {state.phase === "aiming" && power > 0.05 && dragOffset && (
