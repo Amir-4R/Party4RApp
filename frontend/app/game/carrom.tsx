@@ -389,20 +389,40 @@ export default function CarromScreen() {
             borderColor: "rgba(120,80,40,0.2)",
           }} />
 
-          {/* Pockets */}
-          {POCKETS.map((p, i) => (
-            <View key={`pocket-${i}`} style={{
-              position: "absolute",
-              left: p.x * SCALE - POCKET_RADIUS * SCALE,
-              top: p.y * SCALE - POCKET_RADIUS * SCALE,
-              width: POCKET_RADIUS * 2 * SCALE,
-              height: POCKET_RADIUS * 2 * SCALE,
-              borderRadius: POCKET_RADIUS * SCALE,
-              backgroundColor: "#0A0A0A",
-              borderWidth: 1.5,
-              borderColor: "#3A2F1F",
-            }} />
-          ))}
+          {/* Pockets — larger visual + halo so they're clearly visible */}
+          {POCKETS.map((p, i) => {
+            const visualRadius = POCKET_RADIUS * 1.6; // 60% bigger for visibility
+            return (
+              <View key={`pocket-${i}`} style={{
+                position: "absolute",
+                left: p.x * SCALE - visualRadius * SCALE,
+                top: p.y * SCALE - visualRadius * SCALE,
+                width: visualRadius * 2 * SCALE,
+                height: visualRadius * 2 * SCALE,
+                borderRadius: visualRadius * SCALE,
+                backgroundColor: "#050505",
+                borderWidth: 2,
+                borderColor: "#2A1F0F",
+                zIndex: 5,
+                shadowColor: "#000",
+                shadowOpacity: 0.7,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 1 },
+                // Inner highlight for depth
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                <View style={{
+                  width: visualRadius * 0.8 * SCALE,
+                  height: visualRadius * 0.8 * SCALE,
+                  borderRadius: visualRadius * 0.4 * SCALE,
+                  backgroundColor: "#000",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.06)",
+                }} />
+              </View>
+            );
+          })}
 
           {/* Coins — with metallic gradient + central ornament */}
           {state.coins.filter((c) => c.active).map((coin) => {
@@ -646,8 +666,7 @@ const styles = StyleSheet.create({
   boardWrap: { alignItems: "center", marginTop: 10 },
   board: {
     position: "relative", backgroundColor: "#D4A772",
-    borderRadius: 14, borderWidth: 10, borderColor: "#6B4F2E",
-    overflow: "hidden",
+    borderRadius: 6, borderWidth: 8, borderColor: "#6B4F2E",
   },
   coin: { position: "absolute" },
   striker: {
