@@ -221,6 +221,16 @@ export default function TournamentDetailsScreen() {
   }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // ── Smart polling: refresh every 5s while screen is focused AND the
+  // tournament is not finished (no point polling completed brackets).
+  useFocusEffect(
+    useCallback(() => {
+      if (!tour || tour.status === "finished") return;
+      const interval = setInterval(() => { load(); }, 5000);
+      return () => clearInterval(interval);
+    }, [tour?.status, load])
+  );
+
   const onRefresh = () => {
     setRefreshing(true);
     load();
@@ -331,6 +341,12 @@ export default function TournamentDetailsScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color={FUTURISTIC.textPrimary} />
           </Pressable>
+          {tour.status === "running" && (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          )}
           <View style={[styles.statusBadge, { borderColor: STATUS_COLOR[tour.status] + "55", backgroundColor: STATUS_COLOR[tour.status] + "15" }]}>
             <Text style={[styles.statusText, { color: STATUS_COLOR[tour.status] }]}>
               {tour.status.toUpperCase()}
@@ -484,6 +500,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
   },
   statusText: { fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
+  liveBadge: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 8, borderWidth: 1,
+    borderColor: "#FF8A5055",
+    backgroundColor: "#FF8A5015",
+    marginLeft: "auto", marginRight: 8,
+  },
+  liveDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: "#FF8A50",
+    shadowColor: "#FF8A50", shadowOpacity: 0.8, shadowRadius: 6,
+  },
+  liveText: {
+    color: "#FF8A50", fontSize: 10, fontWeight: "900", letterSpacing: 1.4,
+  },
   title: {
     color: FUTURISTIC.textPrimary, fontSize: 26, fontWeight: "900",
     letterSpacing: -0.5,

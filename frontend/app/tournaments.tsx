@@ -124,6 +124,15 @@ export default function TournamentsScreen() {
   useEffect(() => { setLoading(true); load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Smart polling: refresh the list every 8s while screen is focused — keeps
+  // OPEN/LIVE sections fresh without hammering the server.
+  useFocusEffect(
+    useCallback(() => {
+      const interval = setInterval(() => { load(); }, 8000);
+      return () => clearInterval(interval);
+    }, [load])
+  );
+
   const onRefresh = () => { setRefreshing(true); load(); };
 
   // Group by status
