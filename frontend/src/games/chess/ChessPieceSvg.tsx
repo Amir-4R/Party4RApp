@@ -19,10 +19,13 @@ export interface ChessPieceSvgProps {
   size: number;
 }
 
-const STROKE_WHITE = "#1A0F05";   // deep brown outline for white pieces
-const STROKE_BLACK = "#F5DEB1";   // ivory outline for black pieces
-const FILL_WHITE   = "#FBF1D8";   // warm ivory
-const FILL_BLACK   = "#15161A";   // deep charcoal
+const STROKE_WHITE = "#B8860B";   // rich gold outline for white team
+const STROKE_BLACK = "#A855F7";   // royal purple outline for opponent
+const FILL_WHITE   = "#FFF8E0";   // bright ivory (slightly brighter for contrast)
+const FILL_BLACK   = "#0A0A0F";   // pitch black for crisp contrast
+// Inner accent fills (subtle, used for highlights)
+const HIGHLIGHT_WHITE = "#FFE08A"; // pale gold sheen
+const HIGHLIGHT_BLACK = "#3A1B5A"; // deep amethyst sheen
 
 // ─── Path data (simplified Cburnett, public domain) ─────────────────────────
 const PATHS: Record<PieceType, string[]> = {
@@ -71,10 +74,15 @@ export default function ChessPieceSvg({ type, color, size }: ChessPieceSvgProps)
   const fill = color === "white" ? FILL_WHITE : FILL_BLACK;
   const stroke = color === "white" ? STROKE_WHITE : STROKE_BLACK;
   const paths = PATHS[type];
-  // Wrap in a View with explicit width/height — works around RN-Web SVG sizing
-  // quirk that otherwise generates negative width on some browsers.
+  // Drop-shadow color matches team accent (gold / purple)
+  const shadowColor = color === "white" ? "rgba(184,134,11,0.55)" : "rgba(168,85,247,0.55)";
   return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+    <View style={{
+      width: size, height: size,
+      alignItems: "center", justifyContent: "center",
+      shadowColor, shadowOpacity: 1, shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+    }}>
       <Svg width={size} height={size} viewBox="0 0 45 45">
         {paths.map((d, i) => (
           <Path
@@ -82,7 +90,7 @@ export default function ChessPieceSvg({ type, color, size }: ChessPieceSvgProps)
             d={d}
             fill={fill}
             stroke={stroke}
-            strokeWidth={1.5}
+            strokeWidth={2.2}
             strokeLinecap="round"
             strokeLinejoin="round"
             fillRule="evenodd"
