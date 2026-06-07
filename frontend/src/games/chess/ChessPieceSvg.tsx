@@ -19,10 +19,10 @@ export interface ChessPieceSvgProps {
   size: number;
 }
 
-const STROKE_WHITE = "#B8860B";   // rich gold outline for white team
-const STROKE_BLACK = "#A855F7";   // royal purple outline for opponent
-const FILL_WHITE   = "#FFF8E0";   // bright ivory (slightly brighter for contrast)
-const FILL_BLACK   = "#0A0A0F";   // pitch black for crisp contrast
+const STROKE_WHITE = "#E8C547";   // soft luminous gold (easier on eyes)
+const STROKE_BLACK = "#C4A1F0";   // soft lavender purple (easier on eyes)
+const FILL_WHITE   = "#FFF8E0";   // bright ivory
+const FILL_BLACK   = "#15151C";   // soft black (slightly lifted from pitch)
 // Inner accent fills (subtle, used for highlights)
 const HIGHLIGHT_WHITE = "#FFE08A"; // pale gold sheen
 const HIGHLIGHT_BLACK = "#3A1B5A"; // deep amethyst sheen
@@ -74,8 +74,8 @@ export default function ChessPieceSvg({ type, color, size }: ChessPieceSvgProps)
   const fill = color === "white" ? FILL_WHITE : FILL_BLACK;
   const stroke = color === "white" ? STROKE_WHITE : STROKE_BLACK;
   const paths = PATHS[type];
-  // Drop-shadow color matches team accent (gold / purple)
-  const shadowColor = color === "white" ? "rgba(184,134,11,0.55)" : "rgba(168,85,247,0.55)";
+  // Drop-shadow color matches team accent (soft gold / soft purple)
+  const shadowColor = color === "white" ? "rgba(232,197,71,0.45)" : "rgba(196,161,240,0.45)";
   return (
     <View style={{
       width: size, height: size,
