@@ -83,6 +83,22 @@ export default function DammaLobbyScreen() {
     { kind: "empty", name: "", avatar: "", ready: false },
   ]);
 
+  // Re-sync the host slot when AuthContext finishes hydrating user data.
+  useEffect(() => {
+    if (!user) return;
+    setSlots((prev) => {
+      const next = [...prev];
+      next[0] = {
+        ...next[0],
+        kind: "host",
+        name: user.nickname || user.username || (t("you") || "أنت"),
+        avatar: user.avatar || "avatar_ninja",
+        ready: true,
+      };
+      return next;
+    });
+  }, [user?.id, user?.nickname, user?.username, user?.avatar]);
+
   // Fill slot with a chosen kind. The naming pool depends on the kind.
   const fillSlot = useCallback((idx: number, kind: SlotKind) => {
     if (idx === 0 || kind === "host") return;
