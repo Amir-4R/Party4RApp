@@ -442,11 +442,22 @@ export default function RoomScreen() {
   // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
+  // Persistent ref to the chat input so we can manually re-focus after a
+  // send. react-native-web does NOT honour `blurOnSubmit={false}`, so the
+  // browser's native Enter behaviour blurs the input. We restore focus on
+  // the very next tick to keep the keyboard open and the conversation
+  // flowing without re-taps.
+  const chatInputRef = useRef<TextInput>(null);
+
   const sendChat = () => {
     const text = draft.trim();
     if (!text || !wsRef.current) return;
     wsRef.current.send(JSON.stringify({ type: "chat", text }));
     setDraft("");
+    // Restore focus so the keyboard stays open across consecutive sends.
+    requestAnimationFrame(() => {
+      try { chatInputRef.current?.focus(); } catch {}
+    });
   };
 
   const changeVideo = (videoIdOrUrl: string) => {
@@ -990,6 +1001,7 @@ export default function RoomScreen() {
                 <Ionicons name="image-outline" size={20} color={COLORS.brand} />
               </TouchableOpacity>
               <TextInput
+                ref={chatInputRef}
                 testID="chat-input"
                 value={draft}
                 onChangeText={setDraft}
