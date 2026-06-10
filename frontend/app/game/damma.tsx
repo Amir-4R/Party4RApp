@@ -11,7 +11,7 @@
 // All existing flows (engine, sound, stats, result overlay, countdown) intact.
 // =============================================================================
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Dimensions, Animated, Easing, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Animated, Easing, Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,7 +20,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import {
   createInitialState, playDomino, drawFromBoneyard, passTurn,
   getPlayerOptions, getPlayableSides,
-  DammaState, Domino, PlacedDomino, PlayerId,
+  DammaState, Domino, PlayerId,
 } from "@/src/games/damma/engine";
 import { pickDammaMove, DammaDifficulty } from "@/src/games/damma/ai";
 import { FUTURISTIC } from "@/src/theme/futuristic";
@@ -43,7 +43,6 @@ import HandTray from "@/src/games/damma/components/HandTray";
 import { GOLD } from "@/src/games/damma/components/theme";
 import { DAMMA_TEXTURES } from "@/src/games/damma/components/assets";
 
-const { width: SCREEN_W } = Dimensions.get("window");
 const DIFF_KEY = "damma_bot_difficulty";
 const MODE_KEY = "damma_player_count";
 const TURN_SECONDS = 60;
@@ -259,41 +258,11 @@ export default function DammaScreen() {
     return () => clearInterval(id);
   }, [counting, state, isMyTurn, turnTimeLeft, advanceAI]);
 
-  // ── Responsive tile scale for the chain ────────────────────────────────────
-  // The horizontal chrome that surrounds the chain depends on player count:
-  //   • 1v1: 16 (tableRow margin) + 4 (gap) + 56 (compact boneyard) +
-  //          20 (wood frame padding) + 32 (felt padding) + 16 (safe zone) = 144 px
-  //   • 4P : add 2× side column (42 each) + 2× side gap (4 each) = +92 px → 236 px
-  const CHAIN_HORIZONTAL_CHROME = playerCount === 4 ? 236 : 144;
-  const CHAIN_MIN_SCALE = 0.42;
-  const CHAIN_TILE_W = 72;
-  const CHAIN_GAP = 4;
+  // ── Chain layout is now OWNED by WoodenTable ────────────────────────────
+  // The board component measures its own playable felt area and does the
+  // snake-wrap + scaling internally. damma.tsx just hands it the raw board.
 
-  const chainScale = useMemo(() => {
-    const usableW = Math.max(220, SCREEN_W - CHAIN_HORIZONTAL_CHROME);
-    const need = state.board.length * (CHAIN_TILE_W + CHAIN_GAP);
-    if (need <= usableW) return 1;
-    return Math.max(CHAIN_MIN_SCALE, usableW / need);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.board.length]);
-
-  // Split the board into rows that fit horizontally (snake wrap) when scaled.
-  // We also subtract a small inner safe-zone so the outermost tiles never
-  // touch the wooden frame on either side.
-  const boardRows = useMemo(() => {
-    if (state.board.length === 0) return [] as PlacedDomino[][];
-    const tileW = CHAIN_TILE_W * chainScale + CHAIN_GAP;
-    const usableW = Math.max(220, SCREEN_W - CHAIN_HORIZONTAL_CHROME);
-    const perRow = Math.max(1, Math.floor(usableW / tileW));
-    const rows: PlacedDomino[][] = [];
-    for (let i = 0; i < state.board.length; i += perRow) {
-      const slice = state.board.slice(i, i + perRow);
-      // Snake direction: every other row reversed so the chain flows L→R then R→L
-      if (rows.length % 2 === 1) slice.reverse();
-      rows.push(slice);
-    }
-    return rows;
-  }, [state.board, chainScale]);
+  // (countdown removed for diff brevity — present below)
 
   const selectedDomino = state.hands[ME].find((d) => d.id === selectedTile);
   const playableSides = selectedDomino ? getPlayableSides(state, selectedDomino) : [];
@@ -424,12 +393,11 @@ export default function DammaScreen() {
           </View>
         )}
 
-        {/* Wooden frame + green felt + chain (extracted) */}
+        {/* Wooden frame + green felt + chain (self-measuring) */}
         <WoodenTable
-          boardRows={boardRows}
+          board={state.board}
           leftEnd={state.leftEnd}
           rightEnd={state.rightEnd}
-          chainScale={chainScale}
           pal={pal}
           endsLabel={t("ends") || "Ends"}
           emptyText={t("place_first_tile") || "ضع أول قطعة"}
