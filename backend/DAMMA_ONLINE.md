@@ -108,6 +108,34 @@ client.draw();
 client.pass();
 ```
 
+## Matchmaking Queue (Phase 3.5 — auto-match)
+
+For users who don't want to manually browse rooms:
+
+### `POST /api/damma/queue/join`
+```json
+{ "user_id": "u1", "name": "Ahmed", "avatar": "avatar_ninja", "num_players": 4 }
+```
+Returns: `{ position, queue_size, num_players }` immediately.
+
+### `GET /api/damma/queue/status?user_id=u1`
+Poll every 2s. Returns either:
+- `{ "matched": true, "rid": "abc123" }` — connect via WS!
+- `{ "matched": false, "position": 2, "queue_size": 3, "wait_seconds": 8 }`
+
+### `POST /api/damma/queue/leave`
+```json
+{ "user_id": "u1", "name": "Ahmed" }
+```
+
+### Behaviour
+- When **N players** are in the queue (N = num_players), a room is created
+  AUTOMATICALLY, all N players are placed inside, and the match auto-starts.
+- If a player has been waiting **>25 seconds** with no full lobby, the
+  remaining empty slots are filled with BOTS and the match starts anyway —
+  so impatient solo players still get a game.
+- Use `client.waitForMatch(user_id, onProgress)` in JS for one-shot polling.
+
 ## What's NOT done yet (deferred to Phase 4)
 
 - Frontend lobby & game screens still use **local** mock data. To integrate

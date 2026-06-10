@@ -64,6 +64,16 @@ ROOMS: Dict[str, "Room"] = {}
 TURN_SECONDS = 60
 DISCONNECT_GRACE_SEC = 30
 
+# ── Matchmaking queue (Phase 3.5) ───────────────────────────────────────────
+# Users who clicked "Find any match" wait here until enough players are
+# available, then a room is auto-created and they are bulk-assigned to it.
+# Keyed by num_players (2 or 4). Each entry: {user_id, name, avatar, joined_at}
+QUEUE: Dict[int, List[Dict[str, Any]]] = {2: [], 4: []}
+# user_id → {"rid": str, "matched_at": ts} once they are matched into a room.
+QUEUE_RESULTS: Dict[str, Dict[str, Any]] = {}
+# How long to wait for more players before filling the rest with bots
+QUEUE_FILL_WITH_BOTS_AFTER = 25.0  # seconds
+
 
 # ── Domino engine — server-authoritative duplicate of client rules ──────────
 def _full_set() -> List[Dict[str, int]]:
@@ -376,6 +386,126 @@ async def get_room(rid: str) -> Dict[str, Any]:
     if room is None:
         raise HTTPException(404, "room not found")
     return {"room": room.snapshot()}
+
+
+# ── Matchmaking queue endpoints ─────────────────────────────────────────────
+class QueueJoinBody(BaseModel):
+    user_id: str
+    name: str
+    avatar: str = "avatar_ninja"
+    num_players: int = 4
+
+
+@damma_online_router.post("/queue/join")
+async def queue_join(body: QueueJoinBody) -> Dict[str, Any]:
+    """Add user to the matchmaking queue. Returns immediately with queue
+    position; the client should then poll /queue/status until matched."""
+    np = body.num_players if body.num_players in (2, 4) else 4
+    q = QUEUE[np]
+    # De-duplicate: if user already queued, refresh their entry instead.
+    q[:] = [e for e in q if e["user_id"] != body.user_id]
+    QUEUE_RESULTS.pop(body.user_id, None)
+    entry = {
+        "user_id": body.user_id,
+        "name": body.name,
+        "avatar": body.avatar,
+        "joined_at": time.time(),
+        "num_players": np,
+    }
+    q.append(entry)
+    # Try to drain the queue immediately
+    await _drain_queue(np)
+    return {
+        "position": next((i + 1 for i, e in enumerate(q) if e["user_id"] == body.user_id), 0),
+        "queue_size": len(q),
+        "num_players": np,
+    }
+
+
+@damma_online_router.post("/queue/leave")
+async def queue_leave(body: QueueJoinBody) -> Dict[str, Any]:
+    for np in (2, 4):
+        QUEUE[np][:] = [e for e in QUEUE[np] if e["user_id"] != body.user_id]
+    QUEUE_RESULTS.pop(body.user_id, None)
+    return {"ok": True}
+
+
+@damma_online_router.get("/queue/status")
+async def queue_status(user_id: str) -> Dict[str, Any]:
+    """Poll endpoint. Returns:
+       - {matched: true, rid: "..."} when the user has been placed in a room
+       - {matched: false, position, queue_size, num_players, wait_seconds}
+    """
+    if user_id in QUEUE_RESULTS:
+        match = QUEUE_RESULTS[user_id]
+        return {"matched": True, "rid": match["rid"]}
+    # Try a drain pass; opportunistic
+    for np in (2, 4):
+        await _drain_queue(np)
+        if user_id in QUEUE_RESULTS:
+            return {"matched": True, "rid": QUEUE_RESULTS[user_id]["rid"]}
+    # Not yet matched — find position
+    for np in (2, 4):
+        q = QUEUE[np]
+        for i, e in enumerate(q):
+            if e["user_id"] == user_id:
+                return {
+                    "matched": False,
+                    "position": i + 1,
+                    "queue_size": len(q),
+                    "num_players": np,
+                    "wait_seconds": int(time.time() - e["joined_at"]),
+                }
+    return {"matched": False, "position": 0, "queue_size": 0, "num_players": 0}
+
+
+async def _drain_queue(num_players: int) -> None:
+    """Pop the first `num_players` from the queue and create a room for them.
+    If there are fewer than `num_players` BUT the oldest has been waiting
+    longer than `QUEUE_FILL_WITH_BOTS_AFTER`, fill the remaining slots with
+    bots so the impatient players get a game."""
+    q = QUEUE[num_players]
+    if not q:
+        return
+    enough = len(q) >= num_players
+    oldest_wait = time.time() - q[0]["joined_at"]
+    if not enough and oldest_wait < QUEUE_FILL_WITH_BOTS_AFTER:
+        return
+
+    # Take up to `num_players` entries
+    picks = q[:num_players]
+    del q[:num_players]
+
+    # Create a room owned by the FIRST player
+    host = picks[0]
+    rid = uuid.uuid4().hex[:8]
+    room = Room(rid, host["user_id"], host["name"], host["avatar"], "public", num_players)
+    ROOMS[rid] = room
+    # Place the rest into open slots
+    for entry in picks[1:]:
+        slot = room.find_open_slot()
+        if slot is None:
+            break
+        slot.user_id = entry["user_id"]
+        slot.name = entry["name"]
+        slot.avatar = entry["avatar"]
+        slot.ready = True
+    # Fill any remaining empties with bots (when timeout-driven)
+    for s in room.slots:
+        if s.user_id is None and not s.is_bot:
+            s.is_bot = True
+            s.name = f"🤖 Bot {s.pid[-1]}"
+            s.avatar = "BOT"
+            s.ready = True
+    # Auto-start (everyone is ready by construction)
+    room.state = _new_game(room.num_players)
+    room.started_at = time.time()
+    room.turn_deadline = time.time() + TURN_SECONDS
+
+    # Publish results so each picked user's /queue/status call resolves
+    matched_at = time.time()
+    for entry in picks:
+        QUEUE_RESULTS[entry["user_id"]] = {"rid": rid, "matched_at": matched_at}
 
 
 # ── WebSocket: live updates + moves ─────────────────────────────────────────

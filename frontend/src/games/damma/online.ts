@@ -107,6 +107,61 @@ export class DammaOnlineClient {
     return (await res.json()).rooms;
   }
 
+  // ── Matchmaking queue ────────────────────────────────────────────────────
+  // Use these to "Find any match" without manually picking a room.
+  async queueJoin(body: {
+    user_id: string; name: string; avatar?: string; num_players?: 2 | 4;
+  }): Promise<{ position: number; queue_size: number; num_players: number }> {
+    const res = await fetch(`${this.baseUrl}/api/damma/queue/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: body.user_id,
+        name: body.name,
+        avatar: body.avatar ?? "avatar_ninja",
+        num_players: body.num_players ?? 4,
+      }),
+    });
+    if (!res.ok) throw new Error("queueJoin failed");
+    return await res.json();
+  }
+
+  async queueStatus(user_id: string): Promise<
+    | { matched: true; rid: string }
+    | { matched: false; position: number; queue_size: number; num_players: number; wait_seconds?: number }
+  > {
+    const res = await fetch(`${this.baseUrl}/api/damma/queue/status?user_id=${encodeURIComponent(user_id)}`);
+    if (!res.ok) throw new Error("queueStatus failed");
+    return await res.json();
+  }
+
+  async queueLeave(user_id: string, name = ""): Promise<void> {
+    await fetch(`${this.baseUrl}/api/damma/queue/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id, name }),
+    });
+  }
+
+  /**
+   * Convenience: keep polling the queue every `intervalMs` (default 2 s)
+   * until a match is found OR `onProgress` returns false.
+   *  Resolves with the matched `rid`.
+   */
+  async waitForMatch(
+    user_id: string,
+    onProgress?: (status: { position: number; queue_size: number; wait_seconds?: number }) => boolean | void,
+    intervalMs = 2000,
+  ): Promise<string> {
+    while (true) {
+      const s = await this.queueStatus(user_id);
+      if (s.matched) return s.rid;
+      const keep = onProgress?.({ position: s.position, queue_size: s.queue_size, wait_seconds: s.wait_seconds });
+      if (keep === false) throw new Error("cancelled");
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+
   async setReady(rid: string, user_id: string, name: string, ready = true): Promise<RoomSnapshot> {
     const res = await fetch(`${this.baseUrl}/api/damma/rooms/${rid}/ready?ready=${ready}`, {
       method: "POST",
