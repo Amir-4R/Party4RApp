@@ -650,25 +650,6 @@ const styles = StyleSheet.create({
   // Floating compact boneyard (bottom-right of the board)
   chipBoneyard: { position: "absolute", right: 4, bottom: 4, zIndex: 10 },
 
-  // ── Legacy styles kept for reference (no longer used) ─────────────────
-  scoreBar:        { display: "none" },
-  scoreBarCompact: { display: "none" },
-  tableRow:        { display: "none" },
-  sideColumn:      { display: "none" },
-  sideColumnActive:{ display: "none" },
-  sideColumnAvatar:{ display: "none" },
-  sideColumnAvatarActive:{ display: "none" },
-  sideColumnName:  { display: "none" },
-  sideColumnBadge: { display: "none" },
-  sideColumnBadgeText:{ display: "none" },
-  oppHand:         { display: "none" },
-  tileBack:        { display: "none" },
-  topPlayerRow:    { display: "none" },
-  sidePlayersRow:  { display: "none" },
-  timerBox:        { display: "none" },
-  timerWarn:       { display: "none" },
-  timerText:       { display: "none" },
-
   // Flying tile (slides from hand → board)
   flyingTile: {
     position: "absolute",
