@@ -1,14 +1,18 @@
 // =============================================================================
 // app/game/lobby.tsx — Game Mode Selection → routes to real games
 // =============================================================================
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
+import { useAuth } from "@/src/context/AuthContext";
 import { GameType } from "@/src/api/games";
+import { loadStats } from "@/src/games/stats";
+import { rankForPoints } from "@/src/games/ranks";
+import RankBadge from "@/src/games/shared/ui/RankBadge";
 
 const GAME_INFO: Record<GameType, { nameKey: string; logo: any; route: string }> = {
   chess:  { nameKey: "play_chess",  logo: require("../../assets/images/games/chess_logo.jpg"),  route: "/game/chess" },
@@ -20,7 +24,16 @@ export default function GameLobby() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useT();
+  const { user } = useAuth();
   const { game } = useLocalSearchParams<{ game: GameType }>();
+
+  const [rankPoints, setRankPoints] = useState<number | null>(null);
+  useEffect(() => {
+    if (!game) return;
+    loadStats(user?.id || "guest", game)
+      .then((s) => setRankPoints(s.rankPoints))
+      .catch(() => {});
+  }, [game, user?.id]);
 
   const info = game ? GAME_INFO[game] : null;
   if (!info) {
@@ -41,13 +54,20 @@ export default function GameLobby() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={26} color={FUTURISTIC.text} />
+          <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>{t(info.nameKey)}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <Image source={info.logo} style={styles.cover} resizeMode="cover" />
+
+      {rankPoints !== null && (
+        <View style={styles.rankRow}>
+          <Text style={styles.rankRowLabel}>{t("your_rank") || "رتبتك"}</Text>
+          <RankBadge rankId={rankForPoints(rankPoints).id} points={rankPoints} size="md" />
+        </View>
+      )}
 
       <View style={styles.modes}>
         {modes.map((m) => (
@@ -66,9 +86,11 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: FUTURISTIC.bg },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: FUTURISTIC.text, fontSize: 18, fontWeight: "800" },
+  title: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "800" },
   cover: { width: "100%", height: 200, marginVertical: 16 },
+  rankRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 8 },
+  rankRowLabel: { color: FUTURISTIC.textMuted, fontSize: 13, fontWeight: "700" },
   modes: { paddingHorizontal: 16, gap: 12 },
-  modeBtn: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: FUTURISTIC.layer2, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: FUTURISTIC.border },
-  modeLabel: { flex: 1, color: FUTURISTIC.text, fontSize: 15, fontWeight: "700" },
+  modeBtn: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: FUTURISTIC.surface1, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: FUTURISTIC.border },
+  modeLabel: { flex: 1, color: FUTURISTIC.textPrimary, fontSize: 15, fontWeight: "700" },
 });

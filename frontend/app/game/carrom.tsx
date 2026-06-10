@@ -11,7 +11,7 @@
 // =============================================================================
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, PanResponder, Dimensions, Alert, Image,
+  View, Text, StyleSheet, TouchableOpacity, PanResponder, Dimensions, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,9 +26,15 @@ import {
 } from "@/src/games/carrom/engine";
 import { planBotShot } from "@/src/games/carrom/ai";
 import { FUTURISTIC } from "@/src/theme/futuristic";
+import { useTheme } from "@/src/context/ThemeContext";
+import { carromPalette, gameBackground, withAlpha } from "@/src/games/shared/gameTheme";
 import { useT } from "@/src/context/LanguageContext";
 import { useAuth } from "@/src/context/AuthContext";
 import { getAvatarUrl } from "@/src/constants/avatars";
+import GameResultOverlay from "@/src/games/shared/ui/GameResultOverlay";
+import Countdown from "@/src/games/shared/ui/Countdown";
+import { recordResult, RecordResult } from "@/src/games/stats";
+import { playSound } from "@/src/games/sound/SoundManager";
 
 const { width } = Dimensions.get("window");
 const DISPLAY = Math.min(width - 24, 380);
@@ -45,6 +51,11 @@ export default function CarromScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useT();
   const { user } = useAuth();
+  const { themeId } = useTheme();
+  // Themed palette + background derived from the active Party4R theme.
+  // Recomputed each render (cheap) and the screen re-mounts on theme change.
+  const pal = carromPalette();
+  const bg = gameBackground(themeId);
 
   const [state, setState] = useState<CarromState>(createInitialState);
   const [aimAngle, setAimAngle] = useState(-Math.PI / 2);
@@ -58,6 +69,12 @@ export default function CarromScreen() {
   const rafRef = useRef<number | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Unified framework: intro countdown + match-result recording.
+  const [counting, setCounting] = useState(true);
+  const countingRef = useRef(true);
+  countingRef.current = counting;
+  const [result, setResult] = useState<RecordResult | null>(null);
+  const recordedRef = useRef(false);
 
   // ── Physics loop ──────────────────────────────────────────────────────────
   const runSimulation = useCallback(() => {
@@ -66,18 +83,16 @@ export default function CarromScreen() {
       setState({ ...next });
       stateRef.current = next;
       if (settled) {
+        if (next.lastShotPockets.length > 0) playSound("carrom_pocket");
         const resolved = resolveTurn(next);
         setState(resolved);
         stateRef.current = resolved;
-        if (resolved.phase === "game_over") {
-          setTimeout(() => Alert.alert(
-            t("game_over") || "Game Over",
-            resolved.winner === "draw"
-              ? (t("its_a_draw") || "It's a draw!")
-              : resolved.winner === "player1"
-                ? (t("you_win") || "You win!")
-                : (t("opponent_wins") || "Opponent wins"),
-          ), 250);
+        // On game over, record the match into the unified stats/rank system
+        // (once). The result drives the unified GameResultOverlay.
+        if (resolved.phase === "game_over" && !recordedRef.current) {
+          recordedRef.current = true;
+          const outcome = resolved.winner === "draw" ? "draw" : resolved.winner === "player1" ? "win" : "loss";
+          recordResult(user?.id || "guest", "carrom", outcome).then(setResult).catch(() => {});
         }
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         return;
@@ -85,7 +100,7 @@ export default function CarromScreen() {
       rafRef.current = requestAnimationFrame(step);
     };
     rafRef.current = requestAnimationFrame(step);
-  }, [t]);
+  }, [t, user]);
 
   useEffect(() => () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -93,16 +108,16 @@ export default function CarromScreen() {
 
   // ── 60s turn countdown ────────────────────────────────────────────────────
   useEffect(() => {
-    if (state.phase !== "aiming") return;
+    if (state.phase !== "aiming" || counting) return;
     const id = setInterval(() => {
       setState((s) => tickTurnTimer(s, 1));
     }, 1000);
     return () => clearInterval(id);
-  }, [state.phase]);
+  }, [state.phase, counting]);
 
   // ── AI bot: plays automatically when it's player2's turn ──────────────────
   useEffect(() => {
-    if (state.phase !== "aiming") return;
+    if (state.phase !== "aiming" || counting) return;
     if (state.turn !== "player2") return;
     // Slight delay so the player can see the result of their own shot first.
     const id = setTimeout(() => {
@@ -119,7 +134,7 @@ export default function CarromScreen() {
       runSimulation();
     }, 2000);
     return () => clearTimeout(id);
-  }, [state.phase, state.turn, runSimulation]);
+  }, [state.phase, state.turn, runSimulation, counting]);
 
   // ── Drag to aim ───────────────────────────────────────────────────────────
   const boardOriginRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -149,11 +164,11 @@ export default function CarromScreen() {
       // relative to the striker's actual position.
       onStartShouldSetPanResponder: () => {
         const s = stateRef.current;
-        return s.phase === "aiming" && s.turn === "player1";
+        return !countingRef.current && s.phase === "aiming" && s.turn === "player1";
       },
       onMoveShouldSetPanResponder: () => {
         const s = stateRef.current;
-        return s.phase === "aiming" && s.turn === "player1";
+        return !countingRef.current && s.phase === "aiming" && s.turn === "player1";
       },
       onPanResponderGrant: () => {
         setDragOffset({ x: 0, y: 0 });
@@ -195,6 +210,7 @@ export default function CarromScreen() {
         stateRef.current = shot;
         setPower(0);
         powerRef.current = 0;
+        playSound("piece_move");
         runSimulation();
       },
       onPanResponderTerminate: () => {
@@ -209,6 +225,9 @@ export default function CarromScreen() {
     setState(createInitialState());
     setAimAngle(-Math.PI / 2);
     setPower(0);
+    setResult(null);
+    recordedRef.current = false;
+    setCounting(true);
   };
 
   const moveStriker = (dir: -1 | 1) => {
@@ -225,6 +244,13 @@ export default function CarromScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      {/* Themed background — follows the active Party4R theme */}
+      <LinearGradient
+        colors={bg}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
@@ -297,10 +323,20 @@ export default function CarromScreen() {
       )}
 
       {/* Board */}
-      <View style={styles.boardWrap}>
+      <View style={[styles.boardWrap, { shadowColor: pal.glow, shadowOpacity: 0.6, shadowRadius: 20 }]}>
         <View
           ref={boardRef}
-          style={[styles.board, { width: DISPLAY, height: DISPLAY }]}
+          style={[
+            styles.board,
+            {
+              width: DISPLAY,
+              height: DISPLAY,
+              backgroundColor: pal.felt,
+              borderColor: pal.frame,
+              borderTopColor: pal.frameLight,
+              borderBottomColor: pal.frameDark,
+            },
+          ]}
           {...panResponder.panHandlers}
           onLayout={() => {
             boardRef.current?.measure?.((_x, _y, _w, _h, pageX, pageY) => {
@@ -308,6 +344,16 @@ export default function CarromScreen() {
             });
           }}
         >
+          {/* Felt — radial-style vignette via diagonal gradient (themed) */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={[pal.felt, pal.felt, pal.feltEdge]}
+            start={{ x: 0.25, y: 0.2 }}
+            end={{ x: 0.85, y: 0.95 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Faint theme tint wash over the felt */}
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: pal.feltTint }]} />
           {/* Throw lines (all 4, but highlight the active one) */}
           {THROW_LINES.map((line, i) => {
             const isActive = activeLine.side === line.side;
@@ -319,7 +365,7 @@ export default function CarromScreen() {
                   top: line.start.y * SCALE - 1,
                   width: (line.end.x - line.start.x) * SCALE,
                   height: 2,
-                  backgroundColor: isActive ? FUTURISTIC.brand : "rgba(255,255,255,0.15)",
+                  backgroundColor: isActive ? pal.lineActive : pal.line,
                 }} />
               );
             }
@@ -330,7 +376,7 @@ export default function CarromScreen() {
                 top: line.start.y * SCALE,
                 width: 2,
                 height: (line.end.y - line.start.y) * SCALE,
-                backgroundColor: isActive ? FUTURISTIC.brand : "rgba(255,255,255,0.15)",
+                backgroundColor: isActive ? pal.lineActive : pal.line,
               }} />
             );
           })}
@@ -346,7 +392,7 @@ export default function CarromScreen() {
                 height: THROW_END_CIRCLE_RADIUS * 2 * SCALE,
                 borderRadius: THROW_END_CIRCLE_RADIUS * SCALE,
                 borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.25)",
+                borderColor: pal.line,
               }} />
             )),
           )}
@@ -361,7 +407,7 @@ export default function CarromScreen() {
               height: CENTER_CIRCLE_RADIUS * 2 * SCALE,
               borderRadius: CENTER_CIRCLE_RADIUS * SCALE,
               borderWidth: 1,
-              borderColor: "rgba(120,80,40,0.4)",
+              borderColor: pal.decor,
             }} />
           ))}
 
@@ -374,7 +420,7 @@ export default function CarromScreen() {
             height: CENTER_CIRCLE_RADIUS * 2 * SCALE,
             borderRadius: CENTER_CIRCLE_RADIUS * SCALE,
             borderWidth: 2,
-            borderColor: "rgba(120,80,40,0.6)",
+            borderColor: pal.decor,
           }} />
 
           {/* Decor outer ring */}
@@ -386,7 +432,7 @@ export default function CarromScreen() {
             height: DECOR_RING_RADIUS * 2 * SCALE,
             borderRadius: DECOR_RING_RADIUS * SCALE,
             borderWidth: 1,
-            borderColor: "rgba(120,80,40,0.2)",
+            borderColor: withAlpha(pal.decor, 0.4),
           }} />
 
           {/* Pockets — balanced (outer edge sits on inner wall) with subtle halo */}
@@ -483,12 +529,12 @@ export default function CarromScreen() {
                 width: size, height: size, borderRadius: size / 2,
                 left: state.striker.pos.x * SCALE - state.striker.radius * SCALE,
                 top: state.striker.pos.y * SCALE - state.striker.radius * SCALE,
-                backgroundColor: "#1B3A6B",
+                backgroundColor: pal.strikerLo,
                 padding: 2,
-                shadowColor: "#5BC0EB", shadowOpacity: 0.7, shadowRadius: 8,
+                shadowColor: pal.glow, shadowOpacity: 0.7, shadowRadius: 8,
               }}>
                 <LinearGradient
-                  colors={["#7DD3FF", "#5BC0EB", "#1B6FBA"]}
+                  colors={[pal.strikerHi, pal.strikerMid, pal.strikerLo]}
                   start={{ x: 0.3, y: 0.2 }}
                   end={{ x: 0.7, y: 0.85 }}
                   style={{
@@ -506,7 +552,7 @@ export default function CarromScreen() {
                   <View style={{
                     width: size * 0.42, height: size * 0.42,
                     borderRadius: size * 0.21,
-                    backgroundColor: "#0E2A4F",
+                    backgroundColor: pal.strikerJewel,
                     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.7)",
                     alignItems: "center", justifyContent: "center",
                   }}>
@@ -581,6 +627,25 @@ export default function CarromScreen() {
             <Ionicons name="chevron-forward" size={24} color={FUTURISTIC.brand} />
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* ── Pre-match countdown (3·2·1·GO) ── */}
+      {counting && <Countdown onDone={() => setCounting(false)} />}
+
+      {/* ── Unified end-of-match screen ── */}
+      {state.phase === "game_over" && (
+        <GameResultOverlay
+          outcome={state.winner === "draw" ? "draw" : state.winner === "player1" ? "win" : "loss"}
+          record={result}
+          score={{
+            you: state.scores.player1,
+            opp: state.scores.player2,
+            youLabel: user?.nickname || (t("you") || "أنت"),
+            oppLabel: `🤖 ${t("bot") || "Bot"}`,
+          }}
+          onPlayAgain={reset}
+          onExit={() => router.back()}
+        />
       )}
     </View>
   );
@@ -689,4 +754,40 @@ const styles = StyleSheet.create({
   hintBox: { alignItems: "center", minWidth: 180 },
   hint: { color: FUTURISTIC.textMuted, fontSize: 12 },
   powerHint: { color: FUTURISTIC.brand, fontSize: 11, fontWeight: "800", marginTop: 2 },
+
+  // ── Result overlay ──
+  resultOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center", justifyContent: "center",
+    zIndex: 50, paddingHorizontal: 28,
+  },
+  resultCard: {
+    width: "100%", maxWidth: 360,
+    backgroundColor: FUTURISTIC.surface1,
+    borderRadius: 24, borderWidth: 1.5,
+    paddingVertical: 28, paddingHorizontal: 24,
+    alignItems: "center", gap: 14,
+    shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  resultIcon: {
+    width: 84, height: 84, borderRadius: 42,
+    alignItems: "center", justifyContent: "center", borderWidth: 2,
+  },
+  resultTitle: { fontSize: 26, fontWeight: "900", letterSpacing: 1 },
+  resultScoreRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 20, marginVertical: 4,
+  },
+  resultScoreCol: { alignItems: "center", minWidth: 90 },
+  resultScoreLabel: { color: FUTURISTIC.textMuted, fontSize: 12, fontWeight: "700", marginBottom: 2 },
+  resultScoreVal: { fontSize: 34, fontWeight: "900" },
+  resultScoreDash: { color: FUTURISTIC.textMuted, fontSize: 24, fontWeight: "900" },
+  resultBtns: { flexDirection: "row", gap: 12, marginTop: 8, width: "100%" },
+  resultBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 14, borderRadius: 14,
+  },
+  resultBtnGhost: { borderWidth: 1, borderColor: FUTURISTIC.border, backgroundColor: "transparent" },
+  resultBtnText: { fontSize: 14, fontWeight: "800" },
 });

@@ -39,6 +39,9 @@ import { useGame } from "@/src/context/GameContext";
 import { useT } from "@/src/context/LanguageContext";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { GameType } from "@/src/api/games";
+import { loadAllStats, GameStats } from "@/src/games/stats";
+import { rankForPoints } from "@/src/games/ranks";
+import RankBadge from "@/src/games/shared/ui/RankBadge";
 
 // ---------------------------------------------------------------------------
 // Game catalog — static definitions (availability controlled by backend later)
@@ -101,6 +104,14 @@ export default function PlayScreen() {
   } = useGame();
 
   const [refreshing, setRefreshing] = useState(false);
+  // Local-first per-game stats (drives the rank badge on each card; works
+  // offline before the game backend is deployed).
+  const [localStats, setLocalStats] = useState<GameStats[]>([]);
+  useEffect(() => {
+    loadAllStats(user?.id || "guest", GAME_CATALOG.map((g) => g.id))
+      .then(setLocalStats)
+      .catch(() => {});
+  }, [user?.id, refreshing]);
 
   // Phase 2: flip this to true once game backend is deployed
   const isBackendReady = false;
@@ -244,12 +255,18 @@ export default function PlayScreen() {
                 </View>
               )}
               {game.available && (() => {
+                const local = localStats.find((s) => s.game === game.id);
+                if (local && local.games > 0) {
+                  return <RankBadge rankId={rankForPoints(local.rankPoints).id} size="sm" />;
+                }
                 const stat = myStats.find((s) => s.game_type === game.id);
                 return stat ? (
                   <Text style={styles.gameRating}>
                     ★ {stat.rating} · {stat.wins}W
                   </Text>
-                ) : null;
+                ) : (
+                  <RankBadge rankId="bronze" size="sm" />
+                );
               })()}
             </TouchableOpacity>
           ))}
@@ -357,7 +374,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: "900",
-    color: FUTURISTIC.text,
+    color: FUTURISTIC.textPrimary,
     letterSpacing: 1,
   },
   headerSub: {
@@ -378,7 +395,7 @@ const styles = StyleSheet.create({
   },
   inviteText: {
     flex: 1,
-    color: FUTURISTIC.text,
+    color: FUTURISTIC.textPrimary,
     fontSize: 14,
     fontWeight: "700",
   },
@@ -389,7 +406,7 @@ const styles = StyleSheet.create({
   gameCard: {
     flex: 1,
     alignItems: "center",
-    backgroundColor: FUTURISTIC.layer2,
+    backgroundColor: FUTURISTIC.surface1,
     borderRadius: 16,
     paddingVertical: 20,
     paddingHorizontal: 8,
@@ -433,7 +450,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   comingSoonBadge: {
-    backgroundColor: FUTURISTIC.layer3,
+    backgroundColor: FUTURISTIC.surface2,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -458,7 +475,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: FUTURISTIC.layer2,
+    backgroundColor: FUTURISTIC.surface1,
     borderRadius: 14,
     paddingVertical: 16,
     borderWidth: 1,
@@ -472,7 +489,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   missionsCard: {
-    backgroundColor: FUTURISTIC.layer2,
+    backgroundColor: FUTURISTIC.surface1,
     borderRadius: 16,
     padding: 16,
     gap: 10,
@@ -485,7 +502,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   missionsTitle: {
-    color: FUTURISTIC.text,
+    color: FUTURISTIC.textPrimary,
     fontSize: 15,
     fontWeight: "800",
   },
@@ -495,7 +512,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 4,
-    backgroundColor: FUTURISTIC.layer3,
+    backgroundColor: FUTURISTIC.surface2,
     borderRadius: 2,
     overflow: "hidden",
   },

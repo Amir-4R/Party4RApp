@@ -24,6 +24,10 @@ import { FUTURISTIC, TYPO, GRADIENTS } from "@/src/theme/futuristic";
 import LightBeam from "@/src/components/futuristic/LightBeam";
 import GlowDivider from "@/src/components/futuristic/GlowDivider";
 import { LinearGradient } from "expo-linear-gradient";
+import { loadAllStats, GameStats, winRate } from "@/src/games/stats";
+import { GAME_LIST, getGame } from "@/src/games/registry";
+import { rankForPoints, RANKS } from "@/src/games/ranks";
+import RankBadge from "@/src/games/shared/ui/RankBadge";
 
 function formatMemberSince(iso?: string): string {
   if (!iso) return "—";
@@ -67,11 +71,15 @@ export default function ProfileScreen() {
   const [busy, setBusy] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
+  const [gameStats, setGameStats] = useState<GameStats[]>([]);
 
   useFocusEffect(
     React.useCallback(() => {
       refresh();
-    }, [refresh])
+      loadAllStats(user?.id || "guest", GAME_LIST.map((g) => g.id))
+        .then(setGameStats)
+        .catch(() => {});
+    }, [refresh, user?.id])
   );
 
   const banner = getBanner(user?.banner_id);
@@ -337,6 +345,49 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Games — unified per-game stats + rank */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t("games_label") || "الألعاب"}</Text>
+          {gameStats.filter((s) => s.games > 0).length === 0 ? (
+            <View style={styles.gamesEmpty}>
+              <Ionicons name="game-controller-outline" size={26} color={FUTURISTIC.textMuted} />
+              <Text style={styles.gamesEmptyText}>
+                {t("no_games_yet") || "لم تلعب أي مباراة بعد — ابدأ من قسم العب!"}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {gameStats
+                .filter((s) => s.games > 0)
+                .sort((a, b) => b.rankPoints - a.rankPoints)
+                .map((s) => {
+                  const def = getGame(s.game);
+                  const rank = rankForPoints(s.rankPoints);
+                  const peak = RANKS.find((r) => r.id === s.peakRankId) || RANKS[0];
+                  const wr = Math.round(winRate(s) * 100);
+                  return (
+                    <View key={s.game} style={styles.gameStatCard}>
+                      <Image source={def?.logo} style={styles.gameStatLogo} resizeMode="cover" />
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <View style={styles.gameStatTopRow}>
+                          <Text style={styles.gameStatName}>{def ? t(def.nameKey) : s.game}</Text>
+                          <RankBadge rankId={rank.id} points={s.rankPoints} size="sm" />
+                        </View>
+                        <Text style={styles.gameStatLine}>
+                          {s.games} {t("matches") || "مباراة"} · {s.wins}{t("wins_short") || "ف"} / {s.losses}{t("losses_short") || "خ"} · {wr}% {t("winrate_short") || "فوز"}
+                        </Text>
+                        <Text style={styles.gameStatPeak}>
+                          {t("peak_rank") || "أعلى رتبة"}: {peak.nameAr}
+                          {s.currentStreak > 1 ? `  ·  🔥 ${s.currentStreak}` : ""}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+            </View>
+          )}
+        </View>
+
         {/* Badges */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{t("badges_label")}</Text>
@@ -514,6 +565,14 @@ const styles = StyleSheet.create({
     textShadowRadius: 6,
   },
   section: { paddingHorizontal: 20, marginTop: 24 },
+  gamesEmpty: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: FUTURISTIC.surface1, borderRadius: 14, borderWidth: 1, borderColor: FUTURISTIC.borderSoft, padding: 14 },
+  gamesEmptyText: { flex: 1, color: FUTURISTIC.textMuted, fontSize: 13, fontWeight: "600" },
+  gameStatCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: FUTURISTIC.surface1, borderRadius: 16, borderWidth: 1, borderColor: FUTURISTIC.borderSoft, padding: 10 },
+  gameStatLogo: { width: 52, height: 52, borderRadius: 12, backgroundColor: FUTURISTIC.surface2 },
+  gameStatTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  gameStatName: { color: FUTURISTIC.textPrimary, fontSize: 15, fontWeight: "900", flexShrink: 1 },
+  gameStatLine: { color: FUTURISTIC.textSecondary, fontSize: 12, fontWeight: "600" },
+  gameStatPeak: { color: FUTURISTIC.textMuted, fontSize: 11, fontWeight: "700" },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -4,8 +4,8 @@
 // Hand-drawn SVG silhouettes (Cburnett-style, public domain) so each piece
 // looks carved/sculpted rather than cartoon. Solid ivory/charcoal fills.
 // =============================================================================
-import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Modal, Pressable } from "react-native";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Modal, Pressable } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +19,13 @@ import ChessPieceSvg, { ChessTheme, CHESS_THEMES } from "@/src/games/chess/Chess
 import { pickBotMove, ChessDifficulty } from "@/src/games/chess/ai";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
+import { useTheme } from "@/src/context/ThemeContext";
+import { gameBackground } from "@/src/games/shared/gameTheme";
+import { useAuth } from "@/src/context/AuthContext";
+import GameResultOverlay from "@/src/games/shared/ui/GameResultOverlay";
+import Countdown from "@/src/games/shared/ui/Countdown";
+import { recordResult, RecordResult } from "@/src/games/stats";
+import { playSound } from "@/src/games/sound/SoundManager";
 
 const { width } = Dimensions.get("window");
 const BOARD = Math.min(width - 24, 360);
@@ -46,7 +53,14 @@ export default function ChessScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useT();
+  const { themeId } = useTheme();
+  const bg = gameBackground(themeId);
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ mode?: string }>();
+
+  const [counting, setCounting] = useState(true);
+  const [matchRecord, setMatchRecord] = useState<RecordResult | null>(null);
+  const recordedRef = useRef(false);
 
   const [state, setState] = useState<GameState>(createInitialState);
   const [selected, setSelected] = useState<Square | null>(null);
@@ -92,7 +106,7 @@ export default function ChessScreen() {
   // When bot is enabled and it's the bot's turn (black) and game not over →
   // ask the AI for a move after a short "thinking" delay.
   useEffect(() => {
-    if (botMode === "off") return;
+    if (botMode === "off" || counting) return;
     if (state.turn !== BOT_COLOR) return;
     if (result.status === "checkmate" || result.status === "stalemate" || result.status === "draw") return;
     setBotThinking(true);
@@ -104,21 +118,16 @@ export default function ChessScreen() {
         const next = makeMove(state, move.from, move.to, move.promotion);
         if (next) {
           setState(next);
-          const res = getGameResult(next);
-          if (res.status === "checkmate") {
-            setTimeout(() => Alert.alert(
-              "كش ملك!",
-              res.winner === "white" ? "أنت الفائز! 🏆" : "البوت فاز 🤖",
-            ), 300);
-          }
+          playSound("piece_move");
         }
       }
       setBotThinking(false);
     }, 400);
     return () => clearTimeout(handle);
-  }, [state, botMode, result.status]);
+  }, [state, botMode, result.status, counting]);
 
   const onCellPress = useCallback((row: number, col: number) => {
+    if (counting) return;
     // While bot is thinking or it's bot's turn, ignore taps
     if (botMode !== "off" && (state.turn === BOT_COLOR || botThinking)) return;
     const piece = state.board[row][col];
@@ -133,15 +142,7 @@ export default function ChessScreen() {
         const next = makeMove(state, selected, { row, col }, promotion);
         if (next) {
           setState(next);
-          const res = getGameResult(next);
-          if (res.status === "checkmate") {
-            setTimeout(() => Alert.alert(
-              t("checkmate") || "Checkmate!",
-              res.winner === "white" ? (t("white_wins") || "White wins") : (t("black_wins") || "Black wins"),
-            ), 300);
-          } else if (res.status === "stalemate") {
-            setTimeout(() => Alert.alert(t("stalemate") || "Stalemate", t("draw") || "Draw"), 300);
-          }
+          playSound("piece_move");
         }
         setSelected(null);
         setHighlights([]);
@@ -160,13 +161,26 @@ export default function ChessScreen() {
       setSelected({ row, col });
       setHighlights(legalMoves(state, { row, col }));
     }
-  }, [state, selected, highlights, t, botMode, botThinking]);
+  }, [state, selected, highlights, botMode, botThinking, counting]);
+
+  // Record finished game into the unified stats/rank system (once). The human
+  // plays White; in 2-player mode White is treated as "you".
+  useEffect(() => {
+    const over = result.status === "checkmate" || result.status === "stalemate" || result.status === "draw";
+    if (!over || recordedRef.current) return;
+    recordedRef.current = true;
+    const outcome = result.status === "checkmate" ? (result.winner === "white" ? "win" : "loss") : "draw";
+    recordResult(user?.id || "guest", "chess", outcome).then(setMatchRecord).catch(() => {});
+  }, [result.status, result.winner, user]);
 
   const reset = () => {
     setState(createInitialState());
     setSelected(null);
     setHighlights([]);
     setBotThinking(false);
+    setMatchRecord(null);
+    recordedRef.current = false;
+    setCounting(true);
   };
 
   const statusText = useMemo(() => {
@@ -183,6 +197,7 @@ export default function ChessScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <LinearGradient colors={bg} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
@@ -337,6 +352,19 @@ export default function ChessScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ── Pre-match countdown (3·2·1·GO) ── */}
+      {counting && <Countdown onDone={() => setCounting(false)} />}
+
+      {/* ── Unified end-of-match screen ── */}
+      {(result.status === "checkmate" || result.status === "stalemate" || result.status === "draw") && (
+        <GameResultOverlay
+          outcome={result.status === "checkmate" ? (result.winner === "white" ? "win" : "loss") : "draw"}
+          record={matchRecord}
+          onPlayAgain={reset}
+          onExit={() => router.back()}
+        />
+      )}
     </View>
   );
 }
