@@ -6,13 +6,14 @@
 // button. The parent owns all engine state — this component is purely visual.
 // =============================================================================
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ImageBackground } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { dammaPalette, withAlpha } from "@/src/games/shared/gameTheme";
 import type { Domino } from "@/src/games/damma/engine";
 import DominoTile from "./DominoTile";
+import { DAMMA_TEXTURES } from "./assets";
 import { GOLD, GOLD_SOFT, WOOD_DARK, WOOD_LIGHT, WOOD_MID } from "./theme";
 
 export interface HandTrayProps {
@@ -69,6 +70,13 @@ export default function HandTray({
       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={[styles.handTrayFrame, { paddingBottom: Math.max(8, bottomInset + 4) }]}
     >
+      {/* Photorealistic walnut overlay (the gradient remains as a fallback colour). */}
+      <ImageBackground
+        source={DAMMA_TEXTURES.wood}
+        resizeMode="cover"
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ opacity: 0.7, borderTopLeftRadius: 22, borderTopRightRadius: 22 }}
+      />
       <View pointerEvents="none" style={styles.handTrayGoldTrim} />
       <View style={styles.myHandArea}>
 
@@ -84,16 +92,30 @@ export default function HandTray({
         {showSideButtons && (
           <View style={styles.sideButtons}>
             {playableSides.includes("left") && (
-              <TouchableOpacity testID="damma-play-left" style={styles.sideBtn} onPress={() => onPlay("left")} activeOpacity={0.9}>
-                <Ionicons name="arrow-back" size={18} color={FUTURISTIC.bg} />
-                <Text style={styles.sideBtnText}>{leftText}</Text>
+              <TouchableOpacity testID="damma-play-left" style={styles.sideBtnWrap} onPress={() => onPlay("left")} activeOpacity={0.9}>
+                <ImageBackground
+                  source={DAMMA_TEXTURES.buttonGold}
+                  resizeMode="cover"
+                  style={styles.sideBtn}
+                  imageStyle={{ borderRadius: 14 }}
+                >
+                  <Ionicons name="arrow-back" size={18} color="#1A0E06" />
+                  <Text style={styles.sideBtnText}>{leftText}</Text>
+                </ImageBackground>
               </TouchableOpacity>
             )}
             <View style={{ width: 24 }} />
             {playableSides.includes("right") && (
-              <TouchableOpacity testID="damma-play-right" style={styles.sideBtn} onPress={() => onPlay("right")} activeOpacity={0.9}>
-                <Text style={styles.sideBtnText}>{rightText}</Text>
-                <Ionicons name="arrow-forward" size={18} color={FUTURISTIC.bg} />
+              <TouchableOpacity testID="damma-play-right" style={styles.sideBtnWrap} onPress={() => onPlay("right")} activeOpacity={0.9}>
+                <ImageBackground
+                  source={DAMMA_TEXTURES.buttonGold}
+                  resizeMode="cover"
+                  style={styles.sideBtn}
+                  imageStyle={{ borderRadius: 14 }}
+                >
+                  <Text style={styles.sideBtnText}>{rightText}</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#1A0E06" />
+                </ImageBackground>
               </TouchableOpacity>
             )}
           </View>
@@ -178,13 +200,15 @@ const styles = StyleSheet.create({
     paddingTop: 4, paddingBottom: 12,
     marginBottom: 6,
   },
-  sideBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: GOLD,
-    paddingHorizontal: 26, paddingVertical: 12,
+  sideBtnWrap: {
     borderRadius: 14,
+    overflow: "hidden",
     borderWidth: 1.5, borderColor: GOLD_SOFT,
     shadowColor: GOLD, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
+  },
+  sideBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 26, paddingVertical: 12,
   },
   sideBtnText: { color: "#1A0E06", fontWeight: "900", fontSize: 14 },
 

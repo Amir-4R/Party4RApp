@@ -6,11 +6,12 @@
 // board rows from the parent.
 // =============================================================================
 import React from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, ImageBackground } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { dammaPalette, withAlpha } from "@/src/games/shared/gameTheme";
 import type { PlacedDomino } from "@/src/games/damma/engine";
 import DominoTile from "./DominoTile";
+import { DAMMA_TEXTURES } from "./assets";
 import {
   FELT_CENTER, FELT_DEEP, FELT_EDGE,
   GOLD,
@@ -44,6 +45,14 @@ export default function WoodenTable({
       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={styles.woodFrame}
     >
+      {/* Photorealistic walnut wood texture overlay (multiplied at 70 % so the
+          colour gradient beneath shines through and keeps the warm tint). */}
+      <ImageBackground
+        source={DAMMA_TEXTURES.wood}
+        resizeMode="cover"
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ opacity: 0.7, borderRadius: 22 }}
+      />
       {/* Thin gold inner trim */}
       <View pointerEvents="none" style={styles.woodGoldTrim} />
 
@@ -54,6 +63,13 @@ export default function WoodenTable({
           end={{ x: 0.8, y: 1 }}
           style={[styles.table, { borderColor: "transparent" }]}
         >
+          {/* Photorealistic green velvet/felt texture overlay (subtle). */}
+          <ImageBackground
+            source={DAMMA_TEXTURES.felt}
+            resizeMode="repeat"
+            style={StyleSheet.absoluteFill}
+            imageStyle={{ opacity: 0.32, borderRadius: 14 }}
+          />
           {/* Soft radial-style highlight overlay on the felt (fabric look) */}
           <View pointerEvents="none" style={styles.feltHighlight} />
           {/* Inner stitched bevel — keeps the old elegant dashed inlay */}

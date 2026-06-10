@@ -11,7 +11,7 @@
 // All existing flows (engine, sound, stats, result overlay, countdown) intact.
 // =============================================================================
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Dimensions, Animated, Easing } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Dimensions, Animated, Easing, Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,6 +41,7 @@ import BoneyardPanel from "@/src/games/damma/components/BoneyardPanel";
 import WoodenTable from "@/src/games/damma/components/WoodenTable";
 import HandTray from "@/src/games/damma/components/HandTray";
 import { GOLD } from "@/src/games/damma/components/theme";
+import { DAMMA_TEXTURES } from "@/src/games/damma/components/assets";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const DIFF_KEY = "damma_bot_difficulty";
@@ -314,12 +315,22 @@ export default function DammaScreen() {
         <TouchableOpacity testID="damma-back-btn" onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
-        {/* Premium centered title pill with gold filigree */}
+        {/* Premium centered title pill with gold filigree (real generated ornament asset) */}
         <View style={styles.titleWrap}>
-          <View style={styles.titleOrnament} />
-          <Text style={styles.titleArabic}>ضمنة</Text>
-          <Text style={styles.titleSubtitle}>Classic Game</Text>
-          <View style={styles.titleOrnament} />
+          <Image
+            source={DAMMA_TEXTURES.ornament}
+            style={[styles.titleOrnamentImg, { transform: [{ scaleX: -1 }] }]}
+            resizeMode="contain"
+          />
+          <View style={{ alignItems: "center" }}>
+            <Text style={styles.titleArabic}>ضمنة</Text>
+            <Text style={styles.titleSubtitle}>Classic Game</Text>
+          </View>
+          <Image
+            source={DAMMA_TEXTURES.ornament}
+            style={styles.titleOrnamentImg}
+            resizeMode="contain"
+          />
         </View>
         <View style={{ flexDirection: "row" }}>
           <TouchableOpacity testID="damma-lobby-link" onPress={() => router.push("/game/damma-lobby")} style={styles.iconBtn}>
@@ -617,6 +628,10 @@ const styles = StyleSheet.create({
     backgroundColor: GOLD,
     borderRadius: 1,
     opacity: 0.8,
+  },
+  // Gold filigree ornament image (real generated PNG) flanking the title.
+  titleOrnamentImg: {
+    width: 64, height: 22,
   },
   titleArabic: {
     color: GOLD, fontSize: 20, fontWeight: "900",

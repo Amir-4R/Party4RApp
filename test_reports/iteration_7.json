@@ -1,0 +1,44 @@
+{
+  "summary": "FRONTEND-ONLY regression of the new 'premium luxury visual assets' wired into /game/damma — END-TO-END PASS. All 6 PNG textures load successfully in the live web preview (verified via DOM img scan: naturalWidth>0 on every <Image>/<ImageBackground>): felt_green.png (1 usage, table felt), wood_walnut.png (3 usages — table frame, boneyard panel, hand tray), gold_ornament.png (2 usages — mirrored title flanks), tile_back.png (3 usages — stacked boneyard pile when count>2), btn_gold_sheen.png (visible Left/Right side-play buttons after tile selection — confirmed via screenshot showing glossy gold 'Left' pill). tile_face_blank.png is bundled but currently unused — matches spec ('kept as future polish'). BUNDLER: clean — no compile errors, no red screen, no failed image loads. REGRESSION-GAMEPLAY confirmed: countdown clears in ~4 s, tapping the first hand-tile (damma-hand-tile-1-1) auto-plays onto the empty board (hand 7→6), 🤖 'Thinking…' indicator appears, after ~5–7 s the bot plays and Ends label updates to '2 / 1'. Selecting a non-first playable tile reveals damma-play-left button (gold-sheen ImageBackground) and pressing it plays the tile. Timer (damma-timer) ticks 57s → 54s in 2.5 s. REGRESSION-TESTIDs (all 9 base IDs exactly once): damma-back-btn ✓, damma-lobby-link ✓, damma-mode-picker ✓, damma-difficulty-picker ✓, damma-reset-btn ✓, damma-player-card-me ✓, damma-player-card-bot ✓, damma-timer ✓, damma-boneyard ✓; plus 7 damma-hand-tile-{L}-{R} at start ✓. PERFORMANCE: 6 PNGs on disk = 368 KB total (slightly over the 360 KB target but within practical budget). NOTE: I could not click damma-reset-btn through Playwright at 390×844 because Playwright reported 'Element is outside of the viewport' — the right-side icon group (lobby + mode + difficulty + reset = 4×40 px + the two 64-px-wide gold-ornament images flanking the title text) overflows horizontally on the narrowest mobile width, pushing the reset button off-screen. Visually only ~3 of the 4 right-side header icons are reachable on 390 px width. Tap still works via JS dispatch, so the click handler itself is fine — this is a layout/overflow regression introduced by the wider gold-ornament image asset.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "DammaScreen header (right-side icon row)",
+        "issue": "On a 390×844 mobile viewport the right-side header icon group (damma-lobby-link + damma-mode-picker + damma-difficulty-picker + damma-reset-btn = 4×40 px) plus the two 64-px-wide gold_ornament.png images flanking the title overflows past the screen edge. damma-reset-btn ends up outside the viewport and is not tappable without scrolling/dispatching a JS click. Playwright confirmed 'Element is outside of the viewport'. Reference: /app/frontend/app/game/damma.tsx:314-349 (header) and styles.titleOrnamentImg width=64 (line 634).",
+        "testID": "damma-reset-btn",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/game/damma",
+        "issues": [
+          "Gold filigree ornaments around the 'ضمنة' title look washed-out / desaturated when rendered at 64×22 px — the photoreal PNG has too much fine detail for that small size and appears as grey-ish smudges on a real device. Consider either (a) shrinking ornament width to ~48 px so the icon group fits AND the ornament reads as 'gold', or (b) adding tintColor or a slight gold-glow shadow under the Image so the gold pops against the dark background."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Reduce styles.titleOrnamentImg width from 64 → ~46 px (or wrap the right-side iconBtn group in flexShrink:1 + reduce iconBtn width to 36) so damma-reset-btn is reachable on 390-px-wide screens. Currently the reset button is pushed off-screen by the new ornament images.",
+    "(Optional polish) The bundled tile_face_blank.png is not referenced anywhere yet. Either wire it into DominoTile's pip face (matches the spec's 'future polish' note) or remove it from the bundle to save the ~7 KB."
+  ],
+  "critical_code_review_comments": [
+    "Asset bundling is well-structured: a single central registry (/app/frontend/src/games/damma/components/assets.ts) holds all 6 require()s and is consumed by WoodenTable, BoneyardPanel and HandTray. The LinearGradient fallbacks remain underneath every ImageBackground, so a future missing-asset failure would still leave the screen rendering (good defensive design).",
+    "Pre-existing console warnings (shadow*/textShadow*/pointerEvents deprecation) carried over from iteration_5/6 — not new regressions and not introduced by the asset wiring.",
+    "Total on-disk asset weight is 368 KB (felt_green 144 KB + wood_walnut 121 KB + gold_ornament 39 KB + tile_back 28 KB + btn_gold_sheen 17 KB + tile_face_blank 7 KB), 8 KB over the stated 360 KB target. felt_green.png is the largest at 144 KB — consider re-exporting at a smaller dimension or higher compression if size is critical."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only request)",
+    "frontend": "~95% — all 6 textures load, all 9 testIDs present (1 each), countdown→tap→side-buttons→bot-thinking→play flow works end-to-end, gold-sheen Left/Right buttons render correctly. One layout regression: damma-reset-btn is pushed off-screen at 390-px width by the wider gold ornament images."
+  },
+  "seed_data_creation": "Logged in as testuser1/pass1234. No persistent state mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iteration_7 wired 6 new PNG textures from /app/frontend/assets/damma/ into the existing premium UI (WoodenTable, BoneyardPanel, HandTray, title ornaments). All flows from iteration_6 still pass. The one new issue is that the gold_ornament.png images (64 px wide each) inflated the header center and pushed damma-reset-btn off-screen at 390 px viewport — it can still be clicked via JS dispatch_event('click') as a workaround. Use testuser1/pass1234 at /login, then router.push('/game/damma'), wait ~4 s for countdown.",
+  "rca_of_issue": "Header overflow on /game/damma at 390 px width: Header is flex-row space-between with three groups — (1) left back-btn 40 px, (2) center titleWrap = 64+8+~70+8+64 = ~214 px, (3) right group 4×40 = 160 px. Total ≈ 414 px > 390 − (paddingHorizontal 12 × 2 = 24) = 366 px usable. Net overflow ≈ 48 px, which is exactly where damma-reset-btn ends up. Mitigation: shrink titleOrnamentImg from 64×22 to ~46×22, OR shrink iconBtn from 40×40 to 34×40, OR add flexShrink:1 to the title group so the ornaments scale down. Engine logic and asset loading are entirely unaffected."
+}

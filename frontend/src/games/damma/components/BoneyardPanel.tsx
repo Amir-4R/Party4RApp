@@ -6,11 +6,11 @@
 // engine logic stays in the parent.
 // =============================================================================
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { dammaPalette, withAlpha } from "@/src/games/shared/gameTheme";
+import { DAMMA_TEXTURES } from "./assets";
 import { GOLD, WOOD_DARK, WOOD_LIGHT, WOOD_MID } from "./theme";
 
 export interface BoneyardPanelProps {
@@ -35,6 +35,13 @@ export default function BoneyardPanel({
       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={styles.boneyardWoodFrame}
     >
+      {/* Photorealistic walnut overlay over the wood gradient. */}
+      <ImageBackground
+        source={DAMMA_TEXTURES.wood}
+        resizeMode="cover"
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ opacity: 0.7, borderRadius: 18 }}
+      />
       <View pointerEvents="none" style={styles.boneyardGoldTrim} />
       <View style={styles.boneyard}>
         <Text style={styles.boneyardLabel}>{label}</Text>
@@ -53,24 +60,26 @@ export default function BoneyardPanel({
         >
           {count > 0 ? (
             <>
+              {/* Stacked tile backs using the photorealistic tile_back asset. */}
               {count > 2 && (
-                <LinearGradient
-                  colors={[pal.railLight, pal.rail]}
-                  style={[styles.boneyardCard, { transform: [{ translateX: -4 }, { translateY: -4 }] }]}
+                <Image
+                  source={DAMMA_TEXTURES.tileBack}
+                  style={[styles.boneyardCardImg, { transform: [{ translateX: -4 }, { translateY: -4 }] }]}
+                  resizeMode="cover"
                 />
               )}
               {count > 1 && (
-                <LinearGradient
-                  colors={[pal.railLight, pal.rail]}
-                  style={[styles.boneyardCard, { transform: [{ translateX: -2 }, { translateY: -2 }] }]}
+                <Image
+                  source={DAMMA_TEXTURES.tileBack}
+                  style={[styles.boneyardCardImg, { transform: [{ translateX: -2 }, { translateY: -2 }] }]}
+                  resizeMode="cover"
                 />
               )}
-              <LinearGradient
-                colors={[pal.railLight, pal.rail]}
-                style={styles.boneyardCard}
-              >
-                <Ionicons name="apps" size={20} color={withAlpha("#FFFFFF", 0.6)} />
-              </LinearGradient>
+              <Image
+                source={DAMMA_TEXTURES.tileBack}
+                style={styles.boneyardCardImg}
+                resizeMode="cover"
+              />
             </>
           ) : (
             <View style={[styles.boneyardCard, {
@@ -128,6 +137,12 @@ const styles = StyleSheet.create({
     width: 48, height: 70,
     borderRadius: 6, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
     alignItems: "center", justifyContent: "center",
+  },
+  // Image-based stacked tile back (uses the photorealistic tile_back asset)
+  boneyardCardImg: {
+    position: "absolute",
+    width: 48, height: 70,
+    borderRadius: 6,
   },
   boneyardBadge: {
     position: "absolute", top: -8, right: -8,
