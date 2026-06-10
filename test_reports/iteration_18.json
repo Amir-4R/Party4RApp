@@ -1,0 +1,72 @@
+{
+  "summary": "Re-verification of the Damma SnakeLayout right-edge clipping fix (`availW = playW - 2*(th + gap)`). Tested on 375x667 AND 412x844 mobile viewports, logged in as testuser1/pass1234, played 12+ tiles per viewport biased to the RIGHT side to stress the right-edge math, and measured EVERY placed tile's bounding rect against the snakeBox AND the wooden-felt frame. RESULT: the fix is PARTIAL. (1) On 375x667 the clipping IS resolved — at chain lengths n=5, n=9 and n=13 ZERO tiles overflow snakeBox or felt; the chain wraps cleanly with 3 horiz per row + 90deg corner. (2) On 412x844 clipping STILL occurs — the rightmost horizontal tile at n=5 overflows snakeBox by 16px and the felt frame by 4px; at n=9 the vertical corner tile overflows snakeBox by 17.5px and the felt by 5.5px. (3) Single-tile placement on 375x667 is NO LONGER properly centered — the lone first tile sits 12px to the RIGHT of the snakeBox horizontal center (tile center=199.5, snakeBox center=187.5). ROOT CAUSE: the `playSize` measured by `onSafeLayout` is the safeZone element's BORDER box width (351 on 375x667, 388 on 412x844), but the actual tile container (snakeBox) is the CONTENT box (327 and 364 respectively — 2 * SAFE_X=24px narrower). The layout algorithm sees a play area that is 24px wider than where it actually renders, so (a) the row is shifted right by 12px (the left padding) — breaking single-tile centering, and (b) on 412x844 `perRow` is computed as 4 from the inflated playW=388 instead of 3 from the true 364, allowing the rightmost tile to escape the felt. Side note: deprecation warnings for shadow*/textShadow*/pointerEvents and the useNativeDriver-missing warning from iter_17 are still present (pre-existing, informational).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "WoodenTable / SnakeLayout",
+        "issue": "RIGHT-EDGE CLIPPING STILL PRESENT on 412x844 viewport. At chain length 5 the rightmost horizontal tile overflows the wooden frame by ~4px (and the snakeBox by ~16px). At chain length 9 the vertical 90deg corner tile overflows the wooden frame by ~5.5px. The new `availW = playW - 2*(th + gap)` formula is correct in spirit but is fed an INFLATED `playW`: `onSafeLayout` returns the safeZone's BORDER box (includes the 12px SAFE_X padding on each side), so `playW` arrives as 388 instead of the real tile-container width 364. With perRow=floor((388-78)/75)=4 the centered row + right corner still escape the actual 364-wide snakeBox by ~12 to 18 px. File: /app/frontend/src/games/damma/components/WoodenTable.tsx lines 67-72 (onSafeLayout) and /app/frontend/src/games/damma/components/SnakeLayout.ts line 88.",
+        "testID": "no testID on placed tiles",
+        "priority": "HIGH"
+      },
+      {
+        "component": "WoodenTable single-tile centering",
+        "issue": "Single first tile is NO LONGER centered horizontally on the felt. Measured offset: +12px to the RIGHT of the snakeBox center on a 375x667 viewport (tile center 199.5 vs snakeBox center 187.5). Same root cause: layout uses safeZone padded width (351) for centering, then renders inside snakeBox (327) — origin is shifted 12px. This is a regression vs visible-centered behavior expected by the spec.",
+        "testID": "no testID on placed tiles",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Placed tiles",
+        "issue": "Placed-tile wrappers still have NO testID (carried from iter_17). Forces DOM heuristics to verify geometry. Recommend `damma-board-tile-{idx}` and `damma-board-tile-last`.",
+        "testID": "damma-board-tile-*",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/game/damma",
+        "issues": [
+          "On 375x667, even when the right-edge clipping is resolved, the LEFT corner tile sits flush against the felt's left rim (tile.left == feltRect.left == 12). It does not visually overflow but offers ZERO breathing room. Consider keeping at least 6-8px gap between any tile and the felt rim."
+        ]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "shadow*/textShadow*/pointerEvents (RN deprecations)",
+        "issue": "Pre-existing console warnings still emitted (carried from iter_17). Reference: /app/frontend/src/games/damma/components/WoodenTable.tsx and /app/frontend/app/game/damma.tsx (shadowColor/shadowOpacity/shadowRadius/shadowOffset)."
+      },
+      {
+        "component": "Animated.useNativeDriver",
+        "issue": "Pre-existing 'useNativeDriver is not supported' warning on RN-Web (informational, native builds unaffected)."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/iter18b_375x667_n5.png",
+    "/app/test_reports/screens/iter18b_375x667_n9.png",
+    "/app/test_reports/screens/iter18b_375x667_n13.png",
+    "/app/test_reports/screens/iter18b_412x844_n5.png",
+    "/app/test_reports/screens/iter18b_412x844_n9.png",
+    "/app/test_reports/screens/iter18_375_deep.png",
+    "/app/test_reports/screens/iter18_412_deep.png"
+  ],
+  "action_items": [
+    "PRIMARY FIX: move the `onLayout` handler from the `safeZone` View to the inner `snakeBox` View in /app/frontend/src/games/damma/components/WoodenTable.tsx so `playSize` reflects the actual tile-container content box (snakeBox = safeZone width - 2*SAFE_X, height - 2*SAFE_Y). This single change fixes BOTH remaining issues (right-edge clipping at 412x844 AND single-tile off-center).",
+    "ALTERNATIVE FIX (simpler 1-liner): in WoodenTable.tsx `onSafeLayout`, store `{ w: width - 2*SAFE_X, h: height - 2*SAFE_Y }` instead of the raw width/height (and stop relying on padding to clip absolute children).",
+    "After applying either fix above, re-verify at chain lengths {1, 5, 8, 12, 18, 24} on viewports 375x667 AND 412x844. Expected: 0 violations against felt AND snakeBox on both viewports, and the single first tile must be CENTERED (offset < 3px from snakeBox horizontal center).",
+    "OPTIONAL: add testIDs `damma-board-tile-{idx}` and `damma-board-tile-last` to the Animated.View wrappers in WoodenTable.tsx for future automated geometry assertions.",
+    "OPTIONAL: migrate deprecated shadow*/textShadow*/pointerEvents style props (still pending from iter_17)."
+  ],
+  "critical_code_review_comments": [
+    "The `availW = playW - 2*(th + gap)` change is CORRECT but its effect is masked/defeated because `playW` is wrong by 2*SAFE_X (24px). With the actual snakeBox width fed in, the math becomes: 375x667 -> playW=327, perRow=floor((327-78)/75)=3 (FIT), 412x844 -> playW=364, perRow=floor((364-78)/75)=3 (FIT). So fixing the measurement source (action item #1/#2) alone makes the layout correct on BOTH viewports.",
+    "Root issue is in WoodenTable.tsx line 67-72: `setPlaySize({ w: width, h: height })` from onSafeLayout uses the safeZone BORDER box. The snakeBox content box is smaller by `2*SAFE_X` / `2*SAFE_Y`. Either move the onLayout to snakeBox or subtract the SAFE_* constants before passing to buildSnakeLayout."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (skipped per request)", "frontend": "50% (375x667 right-edge fixed; 412x844 right-edge STILL clipping; single-tile centering REGRESSED on both viewports — offset +12px)" },
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After applying the onLayout-on-snakeBox fix (or the equivalent subtract-padding fix), re-run the same script: login as testuser1/pass1234, open /game/damma, play ~12 moves preferring 'damma-play-right' on each turn, and after each turn measure every absolute-positioned child of the snakeBox div for L < snakeBox.left or R > snakeBox.right. Expected: zero violations on viewports 375x667 AND 412x844. Also verify a SINGLE-tile chain places its center within 3px of snakeBox horizontal center.",
+  "rca_of_issue": "`onSafeLayout` is attached to the safeZone View which has `paddingHorizontal: SAFE_X (12)` and `paddingVertical: SAFE_Y (12)`. React Native's onLayout reports the element's BORDER box dimensions (width=351, height=~500 on 375x667; width=388 on 412x844). The actual tile container is `snakeBox` — a `flex:1, position:relative` child INSIDE the padding — whose content area is `safeZone_width - 2*SAFE_X` (=327 on 375, 364 on 412). The layout algorithm in SnakeLayout.ts is fed the inflated `playW`, so (1) the centered row anchor `playW/2` is 12px to the right of the actual snakeBox center -> single-tile offset 12px right, (2) `perRow = floor((playW - 2*(th+gap)) / (tw+gap))` rounds UP to 4 on 412x844 instead of the safe 3, allowing the rightmost horizontal tile and the trailing vertical corner to escape the snakeBox/felt by 4-18px. The fix `availW = playW - 2*(th+gap)` is correct geometry but operates on the wrong `playW`; correcting the measurement (move onLayout to snakeBox OR subtract 2*SAFE_X from the measured width before storing) resolves all three observed defects."
+}

@@ -79,10 +79,13 @@ function tryFit(
   const gap = Math.max(2, TILE_GAP * scale);
   const rowGap = Math.max(4, ROW_GAP * scale);
 
-  // "perRow" = max number of horizontal tiles per row, leaving room on one
-  // side for the corner tile. We reserve roughly th + gap (the corner's
-  // bounding box width) on the leading side of each row.
-  const availW = playW - (th + gap);
+  // "perRow" = max number of horizontal tiles per row. We must reserve
+  // enough room on BOTH sides of the centered row for a vertical corner
+  // tile (one corner per row, but rows alternate which side they're on so
+  // we reserve symmetrically to keep the layout neat across rows).
+  // A corner has bounding box (th wide × tw tall). Need (th + gap) of
+  // clearance on each side of the centered horizontal run.
+  const availW = playW - 2 * (th + gap);
   const perRow = Math.max(1, Math.floor(availW / (tw + gap)));
 
   // Each full "segment" = perRow horizontal tiles + 1 corner (vertical).
