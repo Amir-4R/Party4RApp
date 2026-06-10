@@ -12,8 +12,11 @@
 // "Find Public Player" instantly fill the slot with a randomised bot
 // labelled appropriately so the host can see the UI flow.
 // =============================================================================
-import React, { useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import {
+  View, Text, StyleSheet, TouchableOpacity, Image, ScrollView,
+  Modal, ActivityIndicator, Animated, Easing, Alert,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +25,7 @@ import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useAuth } from "@/src/context/AuthContext";
 import { useT } from "@/src/context/LanguageContext";
 import { getAvatarUrl } from "@/src/constants/avatars";
+import { getDammaClient } from "@/src/games/damma/online";
 
 const GOLD = "#D4AF37";
 const GOLD_SOFT = "#B8860B";
@@ -53,6 +57,18 @@ export default function DammaLobbyScreen() {
   const { user } = useAuth();
   const { t } = useT();
   const [fillMode, setFillMode] = useState<FillMode>("bots");
+
+  // ── Phase 4: Online matchmaking state ─────────────────────────────────────
+  const [searching, setSearching]   = useState(false);   // queue request in flight
+  const [queuePosition, setQueuePosition] = useState<number>(0);
+  const [queueSize, setQueueSize]   = useState<number>(0);
+  const [elapsedSec, setElapsedSec] = useState<number>(0);
+  const [matchedRid, setMatchedRid] = useState<string | null>(null);
+  const searchCancelRef = useRef<boolean>(false);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Spinner / pulse animations for the modal
+  const spinAnim  = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Slot 0 is always the host (current user)
   const [slots, setSlots] = useState<Slot[]>(() => [
@@ -137,6 +153,108 @@ export default function DammaLobbyScreen() {
 
   const allFilled = slots.every((s) => s.kind !== "empty");
   const allReady = slots.every((s) => s.ready);
+
+  // ── Phase 4: Spin + pulse animations for searching modal ──────────────────
+  useEffect(() => {
+    if (!searching && !matchedRid) return;
+    const spinLoop = Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.18, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.0,  duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    spinLoop.start();
+    pulseLoop.start();
+    return () => { spinLoop.stop(); pulseLoop.stop(); spinAnim.setValue(0); pulseAnim.setValue(1); };
+  }, [searching, matchedRid]);
+
+  // ── Phase 4: Find Match via backend matchmaking queue ─────────────────────
+  const findMatchOnline = useCallback(async () => {
+    if (!user) {
+      Alert.alert("تسجيل الدخول مطلوب", "يجب تسجيل الدخول للعب أونلاين.");
+      return;
+    }
+    const client = getDammaClient();
+    const uid     = user.id;
+    const uname   = user.nickname || user.username || "Player";
+    const uavatar = user.avatar || "avatar_ninja";
+
+    // Reset state
+    searchCancelRef.current = false;
+    setSearching(true);
+    setMatchedRid(null);
+    setQueuePosition(0);
+    setQueueSize(0);
+    setElapsedSec(0);
+    if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    elapsedTimerRef.current = setInterval(() => setElapsedSec((s) => s + 1), 1000);
+
+    try {
+      // Join the queue
+      const j = await client.queueJoin({
+        user_id: uid, name: uname, avatar: uavatar, num_players: 4,
+      });
+      setQueuePosition(j.position);
+      setQueueSize(j.queue_size);
+
+      // Poll until matched or cancelled
+      const rid = await client.waitForMatch(
+        uid,
+        ({ position, queue_size }) => {
+          setQueuePosition(position);
+          setQueueSize(queue_size);
+          if (searchCancelRef.current) return false;
+        },
+        1800,
+      );
+
+      if (searchCancelRef.current) return;
+      setMatchedRid(rid);
+    } catch (e: any) {
+      if (e?.message !== "cancelled") {
+        Alert.alert("تعذر العثور على مباراة", String(e?.message || e));
+      }
+    } finally {
+      if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
+      setSearching(false);
+    }
+  }, [user]);
+
+  const cancelMatchmaking = useCallback(async () => {
+    searchCancelRef.current = true;
+    setSearching(false);
+    setMatchedRid(null);
+    if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
+    if (user) {
+      try { await getDammaClient().queueLeave(user.id, user.nickname || user.username || ""); } catch {}
+    }
+  }, [user]);
+
+  const enterMatchedRoom = useCallback(() => {
+    if (!matchedRid) return;
+    // Phase 5 will hook this room into damma-online gameplay. For now we
+    // forward the room id as a query param so damma.tsx can read it later.
+    router.replace({ pathname: "/game/damma", params: { rid: matchedRid, online: "1" } });
+  }, [matchedRid, router]);
+
+  // Cleanup on unmount: leave queue if still searching
+  useEffect(() => {
+    return () => {
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      if (searching && user) {
+        try { getDammaClient().queueLeave(user.id, user.nickname || user.username || ""); } catch {}
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startMatch = () => {
     // For Phase 2 we only need to land on the damma screen in 4-player mode.
@@ -260,7 +378,124 @@ export default function DammaLobbyScreen() {
           <Ionicons name="sparkles" size={16} color={GOLD} />
           <Text style={styles.autoFillText}>ملء المقاعد تلقائيًا بنمط: {MODE_OPTIONS.find((m) => m.id === fillMode)?.label}</Text>
         </TouchableOpacity>
+
+        {/* Phase 4: Find online match via backend matchmaking queue */}
+        <TouchableOpacity
+          onPress={findMatchOnline}
+          style={styles.findMatchBtn}
+          activeOpacity={0.9}
+          disabled={searching}
+        >
+          <LinearGradient
+            colors={["#7C3AED", "#4F46E5"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.findMatchGrad}
+          >
+            <Ionicons name="globe-outline" size={18} color="#FFF" />
+            <Text style={styles.findMatchText}>
+              {searching ? "جاري البحث..." : "🌐 ابحث عن مباراة أونلاين (4 لاعبين)"}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        <Text style={styles.findMatchHint}>
+          ينضم إلى طابور المباريات العامة على السيرفر — تبدأ المباراة فور انضمام 4 لاعبين.
+        </Text>
       </ScrollView>
+
+      {/* ── Searching / Matched modal overlay ─────────────────────────────── */}
+      <Modal
+        visible={searching || !!matchedRid}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelMatchmaking}
+      >
+        <View style={styles.modalBackdrop}>
+          <LinearGradient
+            colors={["#0F1F18", "#070C0A"]}
+            style={styles.modalCard}
+          >
+            {!matchedRid ? (
+              <>
+                {/* Animated pulsing/spinning ring */}
+                <Animated.View
+                  style={[
+                    styles.spinnerRing,
+                    {
+                      transform: [
+                        { scale: pulseAnim },
+                        { rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) },
+                      ],
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[GOLD, "transparent", GOLD_SOFT, "transparent"]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.spinnerRingInner}
+                  />
+                </Animated.View>
+                <View style={styles.spinnerCenter}>
+                  <Ionicons name="search" size={34} color={GOLD} />
+                </View>
+
+                <Text style={styles.modalTitle}>🔍 البحث عن مباراة...</Text>
+                <Text style={styles.modalSubtitle}>
+                  جاري البحث عن 3 لاعبين آخرين للانضمام إليك
+                </Text>
+
+                <View style={styles.statRow}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statValue}>#{queuePosition || "–"}</Text>
+                    <Text style={styles.statLabel}>موقعك</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statValue}>{queueSize}</Text>
+                    <Text style={styles.statLabel}>في الطابور</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statValue}>{formatMmSs(elapsedSec)}</Text>
+                    <Text style={styles.statLabel}>المدة</Text>
+                  </View>
+                </View>
+
+                <ActivityIndicator color={GOLD} style={{ marginTop: 12 }} />
+
+                <TouchableOpacity onPress={cancelMatchmaking} style={styles.modalCancelBtn} activeOpacity={0.85}>
+                  <Ionicons name="close-circle" size={18} color="#EF4444" />
+                  <Text style={styles.modalCancelText}>إلغاء البحث</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {/* Match Found state */}
+                <Animated.View style={[styles.successBadge, { transform: [{ scale: pulseAnim }] }]}>
+                  <Ionicons name="checkmark-circle" size={64} color="#4ADE80" />
+                </Animated.View>
+                <Text style={styles.matchedTitle}>✅ تم العثور على مباراة!</Text>
+                <Text style={styles.matchedSubtitle}>
+                  4 لاعبين جاهزون. اضغط للدخول إلى الطاولة.
+                </Text>
+                <Text style={styles.ridText}>غرفة: {matchedRid.slice(0, 8)}…</Text>
+
+                <TouchableOpacity onPress={enterMatchedRoom} style={styles.enterBtn} activeOpacity={0.9}>
+                  <LinearGradient
+                    colors={[GOLD, GOLD_SOFT]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={styles.enterBtnGrad}
+                  >
+                    <Ionicons name="play" size={20} color="#000" />
+                    <Text style={styles.enterBtnText}>ادخل المباراة</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={cancelMatchmaking} style={styles.modalCancelBtn} activeOpacity={0.85}>
+                  <Text style={styles.modalCancelText}>إلغاء</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </LinearGradient>
+        </View>
+      </Modal>
 
       {/* Footer bar */}
       <View style={[styles.footer, { paddingBottom: Math.max(12, insets.bottom + 6) }]}>
@@ -316,6 +551,11 @@ function kindColor(k: SlotKind): string {
 function withAlphaLocal(hex: string, alpha: number): string {
   const a = Math.round(alpha * 255).toString(16).padStart(2, "0");
   return hex.length === 7 ? `${hex}${a}` : hex;
+}
+function formatMmSs(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 const styles = StyleSheet.create({
@@ -426,6 +666,116 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: withAlphaLocal(GOLD, 0.45),
   },
   autoFillText: { color: GOLD, fontSize: 12, fontWeight: "800" },
+
+  // ── Phase 4: Find Match button + searching modal styles ───────────────────
+  findMatchBtn: {
+    marginHorizontal: 16, marginTop: 10,
+    borderRadius: 14, overflow: "hidden",
+    shadowColor: "#7C3AED", shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  findMatchGrad: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 14,
+  },
+  findMatchText: { color: "#FFF", fontSize: 14, fontWeight: "900", letterSpacing: 0.3 },
+  findMatchHint: {
+    color: FUTURISTIC.textMuted, fontSize: 11,
+    paddingHorizontal: 24, marginTop: 6, marginBottom: 6,
+    fontStyle: "italic", textAlign: "center",
+  },
+
+  modalBackdrop: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.78)",
+    alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: "100%", maxWidth: 380,
+    borderRadius: 22, padding: 24,
+    alignItems: "center",
+    borderWidth: 1, borderColor: withAlphaLocal(GOLD, 0.4),
+    shadowColor: GOLD, shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  spinnerRing: {
+    width: 130, height: 130, borderRadius: 65,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: -100, // overlap with center icon
+  },
+  spinnerRingInner: {
+    width: 130, height: 130, borderRadius: 65,
+    borderWidth: 3, borderColor: "transparent",
+  },
+  spinnerCenter: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: withAlphaLocal(GOLD, 0.10),
+    borderWidth: 1.5, borderColor: withAlphaLocal(GOLD, 0.5),
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "900",
+    marginTop: 8, letterSpacing: 0.3,
+  },
+  modalSubtitle: {
+    color: FUTURISTIC.textMuted, fontSize: 12,
+    marginTop: 6, textAlign: "center", lineHeight: 18,
+  },
+  statRow: {
+    flexDirection: "row", gap: 10,
+    marginTop: 18, width: "100%",
+    justifyContent: "space-between",
+  },
+  statBox: {
+    flex: 1, paddingVertical: 12,
+    backgroundColor: withAlphaLocal(GOLD, 0.08),
+    borderRadius: 12,
+    borderWidth: 1, borderColor: withAlphaLocal(GOLD, 0.30),
+    alignItems: "center",
+  },
+  statValue: { color: GOLD, fontSize: 18, fontWeight: "900" },
+  statLabel: { color: FUTURISTIC.textMuted, fontSize: 10, fontWeight: "700", marginTop: 3 },
+
+  modalCancelBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "rgba(239,68,68,0.10)",
+    borderWidth: 1, borderColor: "rgba(239,68,68,0.4)",
+    marginTop: 18,
+  },
+  modalCancelText: { color: "#EF4444", fontSize: 12, fontWeight: "800" },
+
+  // Matched-found state
+  successBadge: {
+    width: 100, height: 100, borderRadius: 50,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(74,222,128,0.10)",
+    borderWidth: 2, borderColor: "rgba(74,222,128,0.45)",
+    marginBottom: 16,
+  },
+  matchedTitle: {
+    color: "#4ADE80", fontSize: 20, fontWeight: "900", letterSpacing: 0.3,
+  },
+  matchedSubtitle: {
+    color: FUTURISTIC.textMuted, fontSize: 12,
+    marginTop: 6, textAlign: "center", lineHeight: 18,
+  },
+  ridText: {
+    color: FUTURISTIC.textMuted, fontSize: 11,
+    fontFamily: "monospace", marginTop: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6,
+  },
+  enterBtn: {
+    width: "100%", borderRadius: 12, overflow: "hidden", marginTop: 18,
+  },
+  enterBtnGrad: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 14,
+  },
+  enterBtnText: { color: "#000", fontSize: 14, fontWeight: "900" },
 
   footer: {
     flexDirection: "row", alignItems: "center", gap: 12,

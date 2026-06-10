@@ -1,0 +1,50 @@
+{
+  "summary": "Phase 4 Damma online lobby — END-TO-END PASS. Backend 6/6 queue tests green via public ingress. Frontend lobby renders, purple 'Find Match Online' button works, modal shows spinner + 3 stat boxes (موقعك / في الطابور / المدة) + cancel, elapsed timer increments (00:02 → 00:05), position/queue_size update from backend, cancel button closes modal cleanly, and with 3 pre-queued mock users the modal transitions to '✅ تم العثور على مباراة!' showing rid (b17b2fca…) and 'ادخل المباراة' button which correctly navigates to /game/damma?rid=<rid>&online=1.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "damma-lobby P1 slot name",
+        "issue": "P1 host slot displays 'You' instead of the logged-in user's nickname ('Tester'). Slots are initialized in `useState(() => [...])` once on first render — when AuthContext hydrates `user` asynchronously, the slot is never re-set. Add a useEffect that updates slots[0].name/avatar whenever `user` changes, OR use `useMemo` derived from `user`. Reference: /app/frontend/app/game/damma-lobby.tsx:74-84. Does NOT affect online matchmaking (correct user.id is still used in queueJoin), purely a cosmetic mismatch in the P1 card.",
+        "testID": "(none — text inside slot card)",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_damma_queue.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional UI polish) Sync P1 lobby slot name with AuthContext user — currently shows 'You' even when logged in. /app/frontend/app/game/damma-lobby.tsx:74-84 — add useEffect on `user` that updates slots[0].",
+    "(Optional UX) When `findMatchOnline` rejects with anything other than 'cancelled' the elapsed timer interval is cleaned but if `queueJoin` throws before setSearching(false) runs, the modal stays open with stale state. Currently safe because the catch falls through finally; double-check if Alert is dismissed first.",
+    "(Phase 5 reminder) /game/damma?rid=...&online=1 currently loads the OFFLINE 4-player damma screen — Phase 5 must implement damma-online.tsx that connects to /api/damma/ws/{rid} using the rid query param. This is BY DESIGN for Phase 4 per the agent-to-agent note."
+  ],
+  "critical_code_review_comments": [
+    "damma_online.py queue/join validates `num_players in (2,4)` and defaults invalid values to 4 — good.",
+    "queue_status calls `_drain_queue` for BOTH 2- and 4-player buckets on every poll — this is opportunistic and self-healing, nice.",
+    "QUEUE / QUEUE_RESULTS are in-memory only — survives the Phase 4 scope but will desync if multiple backend replicas exist. Recommend Redis-backed queue for production.",
+    "Lobby useEffect cleanup (lines 249-257) calls queueLeave on unmount when `searching` is true — good defensive cleanup so users that hard-close the lobby don't leave stale queue entries.",
+    "client.queueJoin/queueStatus/queueLeave/waitForMatch in /app/frontend/src/games/damma/online.ts properly normalises baseUrl and uses encodeURIComponent for user_id — solid.",
+    "Phase-4 lobby file already 800 lines — getting close to the 700-line guideline. Consider extracting the searching/matched Modal into its own component before adding Phase 5 wiring."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_damma_queue.py (new — 6 queue tests)",
+    "/app/test_reports/pytest/pytest_results.xml (regenerated)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 queue tests via public ingress).",
+    "frontend": "100% — lobby render, login-gated alert path inferred from code, modal stats, elapsed timer increment, cancel, full 4-player drain, match-found state, navigation to /game/damma?rid=...&online=1 all verified."
+  },
+  "seed_data_creation": "Each backend test creates fresh TEST_q4_<rand> user_ids and cleans them via /api/damma/queue/leave in the cleanup_users fixture. The e2e UI flow uses fixed mock IDs mock_u1/mock_u2/mock_u3 — drained both before and after each run. One leftover Damma room (rid=b17b2fca) created during the e2e flow remains in memory; harmless because it auto-evicts when the host (testuser1) disconnects from its WS, and it is not in the public-rooms list (state != None).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run `pytest /app/backend/tests/test_damma_queue.py -v` for Damma Phase 4 — expects 6/6 in ~5s. For the UI e2e: log in as testuser1/pass1234 (/login), goto /game/damma-lobby, click 'ابحث عن مباراة أونلاين'. To force the match-found state, POST to /api/damma/queue/join three times with arbitrary user_ids (mock_u1..3). Always drain those three IDs before AND after the run, otherwise the next test will short-circuit (stale entries cause instant match). Note: damma-lobby.tsx still shows 'You' in P1 even when logged in — minor cosmetic bug, not blocking. Note: damma-online.tsx does not exist yet; Phase 5 will build it. Until then /game/damma?rid=...&online=1 loads the offline 4-player game (this is expected).",
+  "rca_of_issue": "N/A — Phase 4 wiring works end-to-end. The only minor issue (P1 slot name='You') is a useState initializer that captures the AuthContext user before it hydrates."
+}
