@@ -139,7 +139,9 @@ const styles = StyleSheet.create({
   table: {
     flex: 1, borderRadius: 14,
     borderWidth: 0,
-    paddingVertical: 14, paddingHorizontal: 12,
+    // Increased internal safe-zone padding so the played tiles can never touch
+    // the wooden frame on any side, regardless of how long the chain is.
+    paddingVertical: 18, paddingHorizontal: 16,
     overflow: "hidden",
   },
   feltHighlight: {

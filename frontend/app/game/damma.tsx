@@ -260,25 +260,31 @@ export default function DammaScreen() {
   }, [counting, state, isMyTurn, turnTimeLeft, advanceAI]);
 
   // ── Responsive tile scale for the chain ────────────────────────────────────
-  // Reserve some horizontal padding; tiles are ~72px each plus 3px gap.
-  // When the chain grows long, shrink linearly until min 0.55× to keep the
-  // chain readable while still fitting more tiles per row.
+  // Take into account ALL the horizontal chrome around the board:
+  //   tableRow horizontal margin (16) + gap to boneyard (6) + boneyard width
+  //   (84) + wood-frame padding (20) + felt padding (24) + internal safe-zone
+  //   (16). When the chain grows long we shrink linearly down to a 0.42×
+  //   floor so tiles never bleed past the safe area.
+  const CHAIN_HORIZONTAL_CHROME = 16 + 6 + 84 + 20 + 24 + 16; // = 166 px
+  const CHAIN_MIN_SCALE = 0.42;
+  const CHAIN_TILE_W = 72;
+  const CHAIN_GAP = 4;
+
   const chainScale = useMemo(() => {
-    const usableW = Math.max(280, SCREEN_W - 56);
-    const TILE_W = 72;
-    const GAP = 3;
-    const need = state.board.length * (TILE_W + GAP);
+    const usableW = Math.max(220, SCREEN_W - CHAIN_HORIZONTAL_CHROME);
+    const need = state.board.length * (CHAIN_TILE_W + CHAIN_GAP);
     if (need <= usableW) return 1;
-    // tiles per row at full scale that fit
-    const ratio = usableW / need;
-    return Math.max(0.55, ratio);
+    return Math.max(CHAIN_MIN_SCALE, usableW / need);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.board.length]);
 
   // Split the board into rows that fit horizontally (snake wrap) when scaled.
+  // We also subtract a small inner safe-zone so the outermost tiles never
+  // touch the wooden frame on either side.
   const boardRows = useMemo(() => {
     if (state.board.length === 0) return [] as PlacedDomino[][];
-    const tileW = 72 * chainScale + 3;
-    const usableW = Math.max(280, SCREEN_W - 56);
+    const tileW = CHAIN_TILE_W * chainScale + CHAIN_GAP;
+    const usableW = Math.max(220, SCREEN_W - CHAIN_HORIZONTAL_CHROME);
     const perRow = Math.max(1, Math.floor(usableW / tileW));
     const rows: PlacedDomino[][] = [];
     for (let i = 0; i < state.board.length; i += perRow) {
@@ -348,8 +354,12 @@ export default function DammaScreen() {
         </View>
       </View>
 
-      {/* Scores + Turn timer  ── with avatars & usernames for BOTH players */}
-      <View style={styles.scoreBar}>
+      {/* ── Score-bar row ──
+          In 1v1 mode: shows the big ME card + timer + big BOT card.
+          In 4P mode: the big BOT card is HIDDEN — player2 is rendered as the
+          left side card instead, so we keep this row to just ME + timer (slim).
+      */}
+      <View style={[styles.scoreBar, playerCount === 4 && styles.scoreBarCompact]}>
         {/* Player card (you) — variant=me, large card */}
         <PlayerCard
           testID="damma-player-card-me"
@@ -374,20 +384,34 @@ export default function DammaScreen() {
           </Text>
         </View>
 
-        {/* Opponent card (bot) — variant=bot, large card */}
-        <PlayerCard
-          testID="damma-player-card-bot"
-          variant="bot"
-          name={`🤖 ${diffMeta.label}`}
-          score={state.scores.player2}
-          iconColor={diffMeta.color}
-          active={!isMyTurn}
-        />
+        {/* Opponent card (bot) — 1v1 ONLY (in 4P it'd duplicate the side card). */}
+        {playerCount === 2 && (
+          <PlayerCard
+            testID="damma-player-card-bot"
+            variant="bot"
+            name={`🤖 ${diffMeta.label}`}
+            score={state.scores.player2}
+            iconColor={diffMeta.color}
+            active={!isMyTurn}
+          />
+        )}
       </View>
 
-      {/* Opponent hand (face down) — top player (player2 in 2P, player3 in 4P) */}
-      <View style={styles.oppHand}>
-        {playerCount === 4 && state.hands.player3 && (
+      {/* Opponent hand (face down) — 1v1 only.
+          In 4P mode opponent hands are shown as tile-count badges on each side
+          card, so we drop the face-down row entirely to give the board more
+          vertical room. */}
+      {playerCount === 2 && (
+        <View style={styles.oppHand}>
+          {state.hands.player2.map((_, i) => (
+            <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
+          ))}
+        </View>
+      )}
+
+      {/* Top player card (4P only) — single compact card above the board. */}
+      {playerCount === 4 && state.hands.player3 && (
+        <View style={styles.topPlayerRow}>
           <PlayerCard
             testID="damma-player-card-top"
             variant="top"
@@ -396,14 +420,8 @@ export default function DammaScreen() {
             tileCount={state.hands.player3.length}
             active={state.turn === "player3"}
           />
-        )}
-        {playerCount === 2 && state.hands.player2.map((_, i) => (
-          <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
-        ))}
-        {playerCount === 4 && state.hands.player3?.map((_, i) => (
-          <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
-        ))}
-      </View>
+        </View>
+      )}
 
       {/* Side player cards (for 4-player mode) */}
       {playerCount === 4 && (
@@ -646,6 +664,8 @@ const styles = StyleSheet.create({
 
   // ── Score-bar row (parent layout only — PlayerCard owns its visuals) ────
   scoreBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  // 4-Player variant: slimmer (no bot-card on the right, so use less vertical chrome)
+  scoreBarCompact: { paddingVertical: 4 },
   timerBox: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12,
@@ -656,11 +676,16 @@ const styles = StyleSheet.create({
   timerText: { color: GOLD, fontWeight: "900", fontSize: 14 },
 
   // ── Opponent face-down hand row + 4-Player side cards row ───────────────
-  oppHand: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 10, flexWrap: "wrap" },
+  oppHand: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 6, flexWrap: "wrap" },
   tileBack: { width: 22, height: 40, borderRadius: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  // 4P top player card row — minimal vertical chrome, just enough room.
+  topPlayerRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 12, paddingTop: 2, paddingBottom: 0,
+  },
   sidePlayersRow: {
     flexDirection: "row", justifyContent: "space-between",
-    paddingHorizontal: 10, paddingVertical: 4, gap: 8,
+    paddingHorizontal: 10, paddingVertical: 2, gap: 8,
   },
 
   // Table row container — WoodenTable + BoneyardPanel are siblings here.

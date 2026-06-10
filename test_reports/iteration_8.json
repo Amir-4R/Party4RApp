@@ -1,0 +1,28 @@
+{
+  "summary": "FRONTEND-ONLY regression of the Damma (damma) 4-Player layout overhaul — END-TO-END PASS. All 7 acceptance criteria from the request are verified live at 390x844: (1) 1v1 BASELINE renders ME + timer + BOT large card, 7 face-down tileBack views (22x40) in oppHand, 7 hand tiles, and 0 of [damma-player-card-top|left|right]. (2) 4P MODE (via damma-mode-picker -> damma-mode-4) renders: ME + slim timer (no BOT large card -> damma-player-card-bot count = 0), one damma-player-card-top, plus damma-player-card-left + damma-player-card-right side row; the face-down opponent tile row is COMPLETELY GONE (tileBack 22x40 count = 0); board (WoodenTable woodFrame) measures 284x457 px at y=231 -> 688, leaving full screen below for hand tray. (3) Returning to 1v1 via damma-mode-2 restores damma-player-card-bot=1 and clears all top/left/right cards (each = 0). (4) CHAIN OVERFLOW after starting the chain and letting the bot play several rounds in 4P (waited ~60 s total -> 7-tile chain rendered across 2 rows): leftmost tile is 46.3 px inside the wooden frame on the left, rightmost is 46.3 px inside on the right (well above the 8-px minimum). The new internal felt padding (18/16 px) + the corrected chain horizontal chrome (166 px instead of 56 px) + min-scale 0.42 are doing the job. (5) REGRESSION: timer reads '—' before countdown finishes then becomes '59s' once human turn starts (tick verified 59s -> ...), bot 'Thinking…' indicator appears during 4P bot turns and a ~5 s delay is observed before chain grows, boneyard is rendered (damma-boneyard count=1 in both modes), damma-reset-btn is now CLICKABLE (was off-screen in iteration_7 — clicking it succeeded without JS dispatch fallback, since titleOrnamentImg was reduced from 64 -> 46 px wide in this iteration), damma-lobby-link navigates to /game/damma-lobby. (6) TESTIDS: all base IDs present exactly once — damma-back-btn, damma-lobby-link, damma-mode-picker, damma-difficulty-picker, damma-reset-btn, damma-player-card-me, damma-timer, damma-boneyard, plus 7 damma-hand-tile-{L}-{R} in 1v1 at start (5 in 4P at start, which matches engine deal). 4P-only adds top/left/right (1 each); 1v1-only adds damma-player-card-bot (1). (7) SAFE AREA on 390x844: damma-player-card-me top = 64 px (clearly below the notch / insets.top), hand-tile bottom = 824 px (>= 20 px clearance above the iOS home indicator at 844, respecting insets.bottom). No React Native red-screen, no new bundler errors, no broken images. Pre-existing console deprecation warnings (pointerEvents) carried over from earlier iterations; the English 'Your Turn / Opponent's Turn / Place the first tile' strings appear as flagged in the request and were explicitly told to be skipped.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "The 4P JSX is clean: three discrete conditional blocks (playerCount === 4 / playerCount === 2) make the layout difference explicit and easy to follow. The face-down opp-hand row + the bot large card are guarded by `playerCount === 2`, and the new top + side cards by `playerCount === 4`.",
+    "Chain horizontal chrome constant (CHAIN_HORIZONTAL_CHROME = 16 + 6 + 84 + 20 + 24 + 16 = 166) is now an honest accounting of every horizontal pad/gap on either side of the board; combined with the felt's 18/16 internal padding (WoodenTable.styles.table) and the 0.42 min scale, tiles cannot bleed past the wooden frame at any chain length.",
+    "Reset-btn off-screen issue from iteration_7 is now resolved — titleOrnamentImg width was reduced from 64 -> 46 px (styles.titleOrnamentImg line 652) and the right-side icon group fits within the 390-px viewport without JS-dispatch workarounds.",
+    "Minor i18n drift remains (English 'Your Turn' / 'Opponent's Turn' / 'Place the first tile' under an Arabic-titled screen) — request explicitly asked to skip this; flagging only for future polish."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only request)",
+    "frontend": "100% — every bullet under features_or_bugs_to_test verified live; no new bugs introduced."
+  },
+  "seed_data_creation": "Logged in as testuser1/pass1234 (from /app/memory/test_credentials.md). No persistent state mutated; AsyncStorage damma_player_count toggled between 2 and 4 during the test (will persist as last selected — 2 after final reset).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iteration_8 = layout fix for 4P Damma. Engine/AI/timer untouched. All flows from iteration_7 still PASS and the iteration_7 known issue (damma-reset-btn pushed off-screen by 64-px gold-ornaments) is now resolved (ornaments shrunk to 46 px). To repro: login testuser1/pass1234 -> /game/damma -> wait ~5 s for countdown -> tap damma-mode-picker -> tap damma-mode-4. Verify damma-player-card-bot count = 0 and damma-player-card-{top,left,right} = 1 each. Switch back via damma-mode-2 to confirm 1v1 baseline.",
+  "rca_of_issue": "N/A — verification run only. The fix in iteration_8 correctly: (a) gates the duplicate BOT large card and the face-down opp row behind `playerCount === 2`, (b) adds a compact top/side player-card layer for 4P, (c) corrects the chain usable-width math (chrome 56 -> 166 px) so wide tiles never compute as overflow, and (d) bumps WoodenTable felt padding to 18/16 px so tiles stay >= 8 px inside the wooden frame at every chain length (verified at 7-tile chain: 46.3 px on each side)."
+}
