@@ -16,6 +16,7 @@ import {
   GameState, Square, PieceType,
 } from "@/src/games/chess/engine";
 import ChessPieceSvg, { ChessTheme, CHESS_THEMES } from "@/src/games/chess/ChessPieceSvg";
+import { pickBotMove, ChessDifficulty } from "@/src/games/chess/ai";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
 
@@ -25,11 +26,21 @@ const CELL = BOARD / 8;
 
 // Persisted theme key
 const THEME_KEY = "chess_piece_theme";
+const BOT_KEY = "chess_bot_config";
 const THEME_OPTIONS: { id: ChessTheme; label: string; emoji: string }[] = [
   { id: "classic", label: "كلاسيكي", emoji: "🪵" },
   { id: "royal",   label: "ملكي",    emoji: "👑" },
   { id: "ocean",   label: "محيطي",   emoji: "🌊" },
 ];
+const BOT_OPTIONS: { id: ChessDifficulty | "off"; label: string; emoji: string; color: string }[] = [
+  { id: "off",    label: "إيقاف البوت (لاعبَين)", emoji: "👥", color: "#888"   },
+  { id: "easy",   label: "سهل",   emoji: "🌱", color: "#4ADE80" },
+  { id: "medium", label: "متوسط", emoji: "🔥", color: "#F59E0B" },
+  { id: "hard",   label: "صعب",   emoji: "💀", color: "#EF4444" },
+];
+
+// Bot always plays as BLACK; human plays as WHITE (standard convention).
+const BOT_COLOR = "black";
 
 export default function ChessScreen() {
   const router = useRouter();
@@ -42,12 +53,20 @@ export default function ChessScreen() {
   const [highlights, setHighlights] = useState<Square[]>([]);
   const [theme, setTheme] = useState<ChessTheme>("royal");
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [botMode, setBotMode] = useState<ChessDifficulty | "off">("off");
+  const [showBotPicker, setShowBotPicker] = useState(false);
+  const [botThinking, setBotThinking] = useState(false);
 
-  // Load saved theme on mount
+  // Load saved theme + bot config on mount
   useEffect(() => {
     AsyncStorage.getItem(THEME_KEY).then((v) => {
       if (v && (v === "classic" || v === "royal" || v === "ocean")) {
         setTheme(v as ChessTheme);
+      }
+    }).catch(() => {});
+    AsyncStorage.getItem(BOT_KEY).then((v) => {
+      if (v && (v === "off" || v === "easy" || v === "medium" || v === "hard")) {
+        setBotMode(v as ChessDifficulty | "off");
       }
     }).catch(() => {});
   }, []);
@@ -58,9 +77,50 @@ export default function ChessScreen() {
     setShowThemePicker(false);
   }, []);
 
+  const pickBot = useCallback((id: ChessDifficulty | "off") => {
+    setBotMode(id);
+    AsyncStorage.setItem(BOT_KEY, id).catch(() => {});
+    setShowBotPicker(false);
+    // Clear selection when bot mode changes
+    setSelected(null);
+    setHighlights([]);
+  }, []);
+
   const result = useMemo(() => getGameResult(state), [state]);
 
+  // ─── Bot auto-play ────────────────────────────────────────────────────────
+  // When bot is enabled and it's the bot's turn (black) and game not over →
+  // ask the AI for a move after a short "thinking" delay.
+  useEffect(() => {
+    if (botMode === "off") return;
+    if (state.turn !== BOT_COLOR) return;
+    if (result.status === "checkmate" || result.status === "stalemate" || result.status === "draw") return;
+    setBotThinking(true);
+    // setTimeout lets the UI render the human's move first before the bot
+    // blocks the main thread with minimax.
+    const handle = setTimeout(() => {
+      const move = pickBotMove(state, botMode);
+      if (move) {
+        const next = makeMove(state, move.from, move.to, move.promotion);
+        if (next) {
+          setState(next);
+          const res = getGameResult(next);
+          if (res.status === "checkmate") {
+            setTimeout(() => Alert.alert(
+              "كش ملك!",
+              res.winner === "white" ? "أنت الفائز! 🏆" : "البوت فاز 🤖",
+            ), 300);
+          }
+        }
+      }
+      setBotThinking(false);
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [state, botMode, result.status]);
+
   const onCellPress = useCallback((row: number, col: number) => {
+    // While bot is thinking or it's bot's turn, ignore taps
+    if (botMode !== "off" && (state.turn === BOT_COLOR || botThinking)) return;
     const piece = state.board[row][col];
     if (selected) {
       const isLegal = highlights.some((h) => h.row === row && h.col === col);
@@ -100,12 +160,13 @@ export default function ChessScreen() {
       setSelected({ row, col });
       setHighlights(legalMoves(state, { row, col }));
     }
-  }, [state, selected, highlights, t]);
+  }, [state, selected, highlights, t, botMode, botThinking]);
 
   const reset = () => {
     setState(createInitialState());
     setSelected(null);
     setHighlights([]);
+    setBotThinking(false);
   };
 
   const statusText = useMemo(() => {
@@ -113,8 +174,12 @@ export default function ChessScreen() {
     if (result.status === "stalemate") return t("stalemate") || "Stalemate";
     if (result.status === "check") return t("check") || "Check!";
     if (result.status === "draw") return t("draw") || "Draw";
+    if (botMode !== "off" && botThinking) return "🤖 البوت يفكر...";
+    if (botMode !== "off") {
+      return state.turn === "white" ? "دورك ♔" : "🤖 دور البوت";
+    }
     return state.turn === "white" ? (t("white_turn") || "White's turn") : (t("black_turn") || "Black's turn");
-  }, [result, state.turn, t]);
+  }, [result, state.turn, t, botMode, botThinking]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -124,6 +189,9 @@ export default function ChessScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_chess") || "Chess"}</Text>
         <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity onPress={() => setShowBotPicker(true)} style={styles.iconBtn}>
+            <Ionicons name="hardware-chip-outline" size={22} color={botMode === "off" ? FUTURISTIC.textPrimary : "#4ADE80"} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowThemePicker(true)} style={styles.iconBtn}>
             <Ionicons name="color-palette-outline" size={22} color={FUTURISTIC.textPrimary} />
           </TouchableOpacity>
@@ -232,6 +300,43 @@ export default function ChessScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Bot picker modal */}
+      <Modal
+        visible={showBotPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBotPicker(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowBotPicker(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>🤖 صعوبة البوت</Text>
+            <Text style={styles.modalSubtitle}>أنت تلعب بالأبيض، البوت يلعب بالأسود</Text>
+            {BOT_OPTIONS.map((opt) => {
+              const sel = botMode === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.themeRow, sel && styles.themeRowActive]}
+                  onPress={() => pickBot(opt.id)}
+                >
+                  <Text style={styles.themeEmoji}>{opt.emoji}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.themeLabel}>{opt.label}</Text>
+                    <Text style={[styles.themeHint, { color: opt.color }]}>
+                      {opt.id === "off" && "بدون ذكاء اصطناعي"}
+                      {opt.id === "easy" && "حركات شبه عشوائية مع تفضيل الأخذ"}
+                      {opt.id === "medium" && "تفكير بحركتين للأمام (Minimax)"}
+                      {opt.id === "hard" && "تفكير بـ 3 حركات + تقييم متقدم"}
+                    </Text>
+                  </View>
+                  {sel && <Ionicons name="checkmark-circle" size={24} color="#4ADE80" />}
+                </TouchableOpacity>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -284,8 +389,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: "#FFF", fontSize: 18, fontWeight: "800",
-    textAlign: "center", marginBottom: 16,
+    textAlign: "center", marginBottom: 6,
   },
+  modalSubtitle: {
+    color: "#9CA3AF", fontSize: 12, textAlign: "center", marginBottom: 14,
+  },
+  themeHint: { fontSize: 12, marginTop: 2 },
   themeRow: {
     flexDirection: "row", alignItems: "center",
     padding: 12, borderRadius: 12,
