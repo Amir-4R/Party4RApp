@@ -37,6 +37,7 @@ import { playSound } from "@/src/games/sound/SoundManager";
 // ── Refactored sub-components (UI only) ─────────────────────────────────────
 import DominoTile from "@/src/games/damma/components/DominoTile";
 import PlayerCard from "@/src/games/damma/components/PlayerCard";
+import PlayerChip from "@/src/games/damma/components/PlayerChip";
 import BoneyardPanel from "@/src/games/damma/components/BoneyardPanel";
 import WoodenTable from "@/src/games/damma/components/WoodenTable";
 import HandTray from "@/src/games/damma/components/HandTray";
@@ -322,78 +323,13 @@ export default function DammaScreen() {
         </View>
       </View>
 
-      {/* ── Compact top status row ────────────────────────────────────────
-          A minimal strip with:
-            • 1v1 mode → BOT chip on the right.
-            • 4P  mode → P3 compact card centered.
-          The big ME card has been moved into the HandTray header to free
-          up vertical space for the board.                                    */}
-      <View style={[styles.scoreBar, playerCount === 4 && styles.scoreBarCompact]}>
-        {/* In 4P: P3 (top opposite) chip occupies the centre; in 1v1: empty
-            spacer keeps the timer on the right. */}
-        {playerCount === 4 && state.hands.player3 ? (
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <PlayerCard
-              testID="damma-player-card-top"
-              variant="top"
-              name="🤖 لاعب 3"
-              score={state.scores.player3 ?? 0}
-              tileCount={state.hands.player3.length}
-              active={state.turn === "player3"}
-            />
-          </View>
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
-
-        {/* Turn timer (always shown) */}
-        <View testID="damma-timer" style={[styles.timerBox, isMyTurn && turnTimeLeft <= 10 && styles.timerWarn]}>
-          <Ionicons
-            name="time-outline" size={16}
-            color={isMyTurn && turnTimeLeft <= 10 ? "#FF5C5C" : FUTURISTIC.brand}
-          />
-          <Text style={[
-            styles.timerText,
-            isMyTurn && turnTimeLeft <= 10 && { color: "#FF5C5C" },
-          ]}>
-            {isMyTurn ? `${turnTimeLeft}s` : "—"}
-          </Text>
-        </View>
-
-        {/* 1v1 BOT compact chip (replaces the old large BOT card). */}
-        {playerCount === 2 && (
-          <PlayerCard
-            testID="damma-player-card-bot"
-            variant="bot"
-            name={`🤖 ${diffMeta.label}`}
-            score={state.scores.player2}
-            iconColor={diffMeta.color}
-            active={!isMyTurn}
-          />
-        )}
-      </View>
-
-      {/* (Opponent face-down tile row REMOVED in both modes — was using up
-          vertical space without adding gameplay value. Tile counts are now
-          shown as badges on each compact player card.) */}
-
-      {/* Table row (4P wraps the table with vertical side indicators). */}
-      <View style={styles.tableRow}>
-        {playerCount === 4 && (
-          <View style={[styles.sideColumn, state.turn === "player2" && styles.sideColumnActive]} testID="damma-player-card-left">
-            <Image
-              source={{ uri: getAvatarUrl("avatar_robot") }}
-              style={[styles.sideColumnAvatar, state.turn === "player2" && styles.sideColumnAvatarActive]}
-            />
-            <Text style={styles.sideColumnName}>P2</Text>
-            <View style={styles.sideColumnBadge}>
-              <Ionicons name="apps" size={9} color={GOLD} />
-              <Text style={styles.sideColumnBadgeText}>{state.hands.player2?.length ?? 0}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Wooden frame + green felt + chain (self-measuring) */}
+      {/* ── GAME FOCUS MODE LAYOUT ─────────────────────────────────────────
+          Board is fixed-position centerpiece. Player chips + boneyard float
+          on top as absolute-positioned edge indicators. Nothing pushes or
+          resizes the wooden frame. */}
+      <View style={styles.boardArea}>
+        {/* Wooden frame + green felt + chain (self-measuring). It fills the
+            ENTIRE board area; nothing else reduces its size. */}
         <WoodenTable
           board={state.board}
           leftEnd={state.leftEnd}
@@ -403,30 +339,84 @@ export default function DammaScreen() {
           emptyText={t("place_first_tile") || "ضع أول قطعة"}
         />
 
-        {playerCount === 4 && (
-          <View style={[styles.sideColumn, state.turn === "player4" && styles.sideColumnActive]} testID="damma-player-card-right">
-            <Image
-              source={{ uri: getAvatarUrl("avatar_tiger") }}
-              style={[styles.sideColumnAvatar, state.turn === "player4" && styles.sideColumnAvatarActive]}
+        {/* ── Floating top chip: 4P → P3 (opposite), 1v1 → BOT chip ─────── */}
+        <View style={styles.chipTop} pointerEvents="box-none">
+          {playerCount === 4 && state.hands.player3 ? (
+            <PlayerChip
+              testID="damma-player-card-top"
+              name="P3"
+              tileCount={state.hands.player3.length}
+              score={state.scores.player3 ?? 0}
+              active={state.turn === "player3"}
+              popupDirection="bottom"
+              subLabel="Bot — Top"
             />
-            <Text style={styles.sideColumnName}>P4</Text>
-            <View style={styles.sideColumnBadge}>
-              <Ionicons name="apps" size={9} color={GOLD} />
-              <Text style={styles.sideColumnBadgeText}>{state.hands.player4?.length ?? 0}</Text>
+          ) : playerCount === 2 ? (
+            <PlayerChip
+              testID="damma-player-card-bot"
+              name={diffMeta.label}
+              tileCount={state.hands.player2.length}
+              score={state.scores.player2}
+              active={!isMyTurn}
+              popupDirection="bottom"
+              subLabel={`Bot — ${diffMeta.label}`}
+            />
+          ) : null}
+        </View>
+
+        {/* ── Floating side chips (4P only) ──────────────────────────────── */}
+        {playerCount === 4 && (
+          <>
+            <View style={styles.chipLeft} pointerEvents="box-none">
+              <PlayerChip
+                testID="damma-player-card-left"
+                name="P2"
+                tileCount={state.hands.player2?.length ?? 0}
+                score={state.scores.player2}
+                active={state.turn === "player2"}
+                popupDirection="right"
+                subLabel="Bot — Left"
+              />
             </View>
-          </View>
+            <View style={styles.chipRight} pointerEvents="box-none">
+              <PlayerChip
+                testID="damma-player-card-right"
+                name="P4"
+                tileCount={state.hands.player4?.length ?? 0}
+                score={state.scores.player4 ?? 0}
+                active={state.turn === "player4"}
+                popupDirection="left"
+                subLabel="Bot — Right"
+              />
+            </View>
+          </>
         )}
 
-        {/* Boneyard pile (extracted) */}
-        <BoneyardPanel
-          count={state.boneyard.length}
-          canDraw={isMyTurn && options.mustDraw}
-          onDraw={handleDraw}
-          pal={pal}
-          label={t("boneyard") || "السحب"}
-          hint={t("tap_to_draw") || "اضغط للسحب"}
-          emptyLabel="فارغ"
-        />
+        {/* ── Floating turn timer (top-right of the board) ───────────────── */}
+        <View testID="damma-timer" style={[styles.chipTimer, isMyTurn && turnTimeLeft <= 10 && styles.chipTimerWarn]} pointerEvents="box-none">
+          <Ionicons
+            name="time-outline" size={13}
+            color={isMyTurn && turnTimeLeft <= 10 ? "#FF5C5C" : GOLD}
+          />
+          <Text style={[styles.chipTimerText, isMyTurn && turnTimeLeft <= 10 && { color: "#FF5C5C" }]}>
+            {isMyTurn ? `${turnTimeLeft}s` : "—"}
+          </Text>
+        </View>
+
+        {/* ── Floating compact Boneyard (bottom-right of the board) ──────── */}
+        <View style={styles.chipBoneyard} pointerEvents="box-none">
+          <View style={{ height: 92 }}>
+            <BoneyardPanel
+              count={state.boneyard.length}
+              canDraw={isMyTurn && options.mustDraw}
+              onDraw={handleDraw}
+              pal={pal}
+              label={t("boneyard") || "السحب"}
+              hint={t("tap_to_draw") || "اضغط للسحب"}
+              emptyLabel="فارغ"
+            />
+          </View>
+        </View>
       </View>
 
       {/* My hand — premium wooden tray (extracted) */}
@@ -624,65 +614,60 @@ const styles = StyleSheet.create({
     letterSpacing: 1, marginTop: 3,
   },
 
-  // ── Score-bar row (parent layout only — PlayerCard owns its visuals) ────
-  scoreBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  // 4-Player variant: slimmer (no bot-card on the right, so use less vertical chrome)
-  scoreBarCompact: { paddingVertical: 4 },
-  timerBox: {
+  // ── Game Focus Mode: board area is the dominant centerpiece. ─────────────
+  // The wooden frame fills this area; chips and the boneyard FLOAT on top
+  // via absolute positioning so they never reduce the board's usable size.
+  boardArea: {
+    flex: 1,                        // Takes ALL remaining vertical space.
+    marginHorizontal: 6,
+    marginTop: 28,                  // Space reserved for the floating top chip.
+    marginBottom: 2,
+    position: "relative",
+  },
+  // Floating chips around the board edges (absolute over the wooden frame).
+  // The top chip sits in the marginTop reserved space, ABOVE the wood frame.
+  chipTop: {
+    position: "absolute", top: -28, left: 0, right: 0,
+    alignItems: "center", zIndex: 10,
+  },
+  chipLeft:  { position: "absolute", left: 4, top: "50%", marginTop: -16, zIndex: 10 },
+  chipRight: { position: "absolute", right: 4, top: "50%", marginTop: -16, zIndex: 10 },
+
+  // Floating turn timer pill (top-right of the board, also above the wood).
+  chipTimer: {
+    position: "absolute", top: -26, right: 6,
     flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 999,
     backgroundColor: "rgba(20,22,28,0.92)",
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.4), minWidth: 70, justifyContent: "center",
-  },
-  timerWarn: { borderColor: "#FF5C5C", backgroundColor: "#FF5C5C15" },
-  timerText: { color: GOLD, fontWeight: "900", fontSize: 14 },
-
-  // ── Opponent face-down hand row + 4-Player side cards row ───────────────
-  oppHand: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 6, flexWrap: "wrap" },
-  tileBack: { width: 22, height: 40, borderRadius: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
-  // 4P top player card row — minimal vertical chrome, just enough room.
-  topPlayerRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 12, paddingTop: 2, paddingBottom: 0,
-  },
-  sidePlayersRow: {
-    flexDirection: "row", justifyContent: "space-between",
-    paddingHorizontal: 10, paddingVertical: 2, gap: 8,
-  },
-
-  // Table row container — WoodenTable + BoneyardPanel are siblings here.
-  tableRow: { flex: 1, flexDirection: "row", marginHorizontal: 6, marginVertical: 2, gap: 4 },
-
-  // 4-Player: vertical compact column flanking the table (P2 left, P4 right).
-  // Replaces the wide horizontal sidePlayerCard so the board can stretch.
-  sideColumn: {
-    width: 42,
-    alignItems: "center", justifyContent: "center",
-    paddingVertical: 6, gap: 4,
-    borderRadius: 12,
-    backgroundColor: "rgba(20,22,28,0.85)",
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.30),
-  },
-  sideColumnActive: {
-    borderColor: "#4ADE80",
-    backgroundColor: "rgba(74,222,128,0.10)",
-  },
-  sideColumnAvatar: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: "#1F2530",
-  },
-  sideColumnAvatarActive: {
-    borderWidth: 2, borderColor: "#4ADE80",
-  },
-  sideColumnName: { color: "#FFF", fontSize: 9, fontWeight: "800" },
-  sideColumnBadge: {
-    flexDirection: "row", alignItems: "center", gap: 2,
-    backgroundColor: withAlpha(GOLD, 0.18),
-    paddingHorizontal: 5, paddingVertical: 1,
-    borderRadius: 8,
     borderWidth: 1, borderColor: withAlpha(GOLD, 0.45),
+    zIndex: 10,
+    shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
   },
-  sideColumnBadgeText: { color: GOLD, fontSize: 9, fontWeight: "900" },
+  chipTimerWarn: { borderColor: "#FF5C5C", backgroundColor: "rgba(255,92,92,0.18)" },
+  chipTimerText: { color: GOLD, fontSize: 11, fontWeight: "900" },
+
+  // Floating compact boneyard (bottom-right of the board)
+  chipBoneyard: { position: "absolute", right: 4, bottom: 4, zIndex: 10 },
+
+  // ── Legacy styles kept for reference (no longer used) ─────────────────
+  scoreBar:        { display: "none" },
+  scoreBarCompact: { display: "none" },
+  tableRow:        { display: "none" },
+  sideColumn:      { display: "none" },
+  sideColumnActive:{ display: "none" },
+  sideColumnAvatar:{ display: "none" },
+  sideColumnAvatarActive:{ display: "none" },
+  sideColumnName:  { display: "none" },
+  sideColumnBadge: { display: "none" },
+  sideColumnBadgeText:{ display: "none" },
+  oppHand:         { display: "none" },
+  tileBack:        { display: "none" },
+  topPlayerRow:    { display: "none" },
+  sidePlayersRow:  { display: "none" },
+  timerBox:        { display: "none" },
+  timerWarn:       { display: "none" },
+  timerText:       { display: "none" },
 
   // Flying tile (slides from hand → board)
   flyingTile: {
