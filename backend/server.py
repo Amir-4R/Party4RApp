@@ -940,6 +940,10 @@ from notifications import (
 # ───────────────────────────────────────────────────────────────────────────
 import importlib
 
+# ── Damma online multiplayer (Phase 3) ─────────────────────────────────────
+from damma_online import damma_online_router  # noqa: E402
+app.include_router(damma_online_router)
+
 def _safe_import(name):
     try:
         return importlib.import_module(name)
