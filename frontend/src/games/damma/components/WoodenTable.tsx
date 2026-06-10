@@ -63,11 +63,16 @@ export default function WoodenTable({
   entrySide = null,
 }: WoodenTableProps) {
   // Measured play area (the safe zone IS the real board).
+  // NOTE: `safeZone` has paddingHorizontal/Vertical so the onLayout we get
+  // is the BORDER box. We subtract the padding so the snake layout works
+  // against the CONTENT box (where tiles are actually rendered).
   const [playSize, setPlaySize] = useState({ w: 0, h: 0 });
   const onSafeLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
+    const w = Math.max(0, width - 2 * SAFE_X);
+    const h = Math.max(0, height - 2 * SAFE_Y);
     setPlaySize((prev) =>
-      prev.w === width && prev.h === height ? prev : { w: width, h: height }
+      prev.w === w && prev.h === h ? prev : { w, h }
     );
   }, []);
 
