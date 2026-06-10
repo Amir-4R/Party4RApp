@@ -45,7 +45,17 @@ const ME: PlayerId = "player1";
 // Premium gold accent palette
 const GOLD = "#D4AF37";
 const GOLD_SOFT = "#B8860B";
+const GOLD_DARK = "#7A5C18";
 const GOLD_GLOW = "rgba(212,175,55,0.35)";
+
+// ── Premium "luxury table" palette (UI only — no engine changes) ─────────────
+const WOOD_OUTER  = "#1A0E06";   // deep mahogany outer rim
+const WOOD_MID    = "#4A2E16";   // rich walnut frame
+const WOOD_LIGHT  = "#6E4520";   // upper highlight on the wood
+const WOOD_DARK   = "#1F0E05";   // shadow side of the wood
+const FELT_CENTER = "#0E5A2D";   // center of the green felt
+const FELT_EDGE   = "#063318";   // outer felt (darker for vignette)
+const FELT_DEEP   = "#02180B";   // deepest shadow under the rim
 
 // ── Pip-dot layouts on a 3×3 grid (true domino faces) ────────────────────────
 const PIP_MAP: Record<number, number[]> = {
@@ -374,15 +384,30 @@ export default function DammaScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Themed background */}
-      <LinearGradient colors={bg} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
+      {/* ── Premium dark luxury backdrop (UI only) ─────────────────────────
+          Layered: deep charcoal base + soft brand-tinted radial glow at
+          top-center + edge vignette. No image asset → lightweight. */}
+      <LinearGradient
+        colors={["#0B0F0C", "#06080A", "#000000"]}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View pointerEvents="none" style={styles.bgRadialGlow} />
+      <View pointerEvents="none" style={styles.bgVignetteTop} />
+      <View pointerEvents="none" style={styles.bgVignetteBottom} />
 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.title}>{t("play_damma") || "Damma"}</Text>
+        {/* Premium centered title pill with gold filigree */}
+        <View style={styles.titleWrap}>
+          <View style={styles.titleOrnament} />
+          <Text style={styles.titleArabic}>ضمنة</Text>
+          <Text style={styles.titleSubtitle}>Classic Game</Text>
+          <View style={styles.titleOrnament} />
+        </View>
         <View style={{ flexDirection: "row" }}>
           <TouchableOpacity onPress={() => router.push("/game/damma-lobby")} style={styles.iconBtn}>
             <Ionicons name="people-circle-outline" size={24} color={GOLD} />
@@ -503,19 +528,29 @@ export default function DammaScreen() {
 
       {/* Table row */}
       <View style={styles.tableRow}>
-        <View style={[styles.tableWrap, { shadowColor: pal.glow }]}>
-          <LinearGradient
-            colors={[pal.feltCenter, pal.feltEdge]}
-            start={{ x: 0.3, y: 0.1 }}
-            end={{ x: 0.8, y: 1 }}
-            style={[styles.table, { borderColor: pal.rail }]}
-          >
-            {/* Inner stitched bevel */}
-            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tableInlay, { borderColor: withAlpha(pal.railLight, 0.45) }]} />
-            {/* Ambient corner glow (top-left) */}
-            <View pointerEvents="none" style={[styles.tableGlow, { backgroundColor: withAlpha(pal.glow, 0.18) }]} />
-            {/* Ambient corner glow (bottom-right, opposite tint) */}
-            <View pointerEvents="none" style={[styles.tableGlowB, { backgroundColor: withAlpha("#000000", 0.15) }]} />
+        {/* Wooden frame outer wrap (UI only — wraps the existing felt) */}
+        <LinearGradient
+          colors={[WOOD_LIGHT, WOOD_MID, WOOD_DARK]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.woodFrame}
+        >
+          {/* Thin gold inner trim */}
+          <View pointerEvents="none" style={styles.woodGoldTrim} />
+          <View style={[styles.tableWrap, { shadowColor: pal.glow }]}>
+            <LinearGradient
+              colors={[FELT_CENTER, FELT_EDGE, FELT_DEEP]}
+              start={{ x: 0.3, y: 0.1 }}
+              end={{ x: 0.8, y: 1 }}
+              style={[styles.table, { borderColor: "transparent" }]}
+            >
+              {/* Subtle radial felt highlight (fabric look) */}
+              <View pointerEvents="none" style={styles.feltHighlight} />
+              {/* Inner stitched bevel — keeps the old elegant dashed inlay */}
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tableInlay, { borderColor: withAlpha(pal.railLight, 0.45) }]} />
+              {/* Ambient corner glow (top-left) */}
+              <View pointerEvents="none" style={[styles.tableGlow, { backgroundColor: withAlpha(pal.glow, 0.18) }]} />
+              {/* Ambient corner glow (bottom-right, opposite tint) */}
+              <View pointerEvents="none" style={[styles.tableGlowB, { backgroundColor: withAlpha("#000000", 0.15) }]} />
 
             <Text style={[styles.endsLabel, { color: withAlpha("#FFFFFF", 0.75) }]}>
               {t("ends") || "Ends"}: {state.leftEnd ?? "—"} / {state.rightEnd ?? "—"}
@@ -554,10 +589,18 @@ export default function DammaScreen() {
             )}
           </LinearGradient>
         </View>
+        </LinearGradient>
+        {/* end wooden frame wrap */}
 
-        {/* Dedicated Boneyard pile (always visible count + tap to draw) */}
-        <View style={styles.boneyard}>
-          <Text style={styles.boneyardLabel}>{t("boneyard") || "السحب"}</Text>
+        {/* Dedicated Boneyard pile (always visible count + tap to draw) — now wrapped in a premium wooden panel */}
+        <LinearGradient
+          colors={[WOOD_LIGHT, WOOD_MID, WOOD_DARK]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.boneyardWoodFrame}
+        >
+          <View pointerEvents="none" style={styles.boneyardGoldTrim} />
+          <View style={styles.boneyard}>
+            <Text style={styles.boneyardLabel}>{t("boneyard") || "السحب"}</Text>
           <TouchableOpacity
             disabled={!isMyTurn || !options.mustDraw}
             onPress={handleDraw}
@@ -605,10 +648,18 @@ export default function DammaScreen() {
             <Text style={styles.boneyardHint}>{t("tap_to_draw") || "اضغط للسحب"}</Text>
           )}
         </View>
+        </LinearGradient>
+        {/* end boneyard wooden frame */}
       </View>
 
-      {/* My hand */}
-      <View style={[styles.myHandArea, { backgroundColor: FUTURISTIC.surface1, borderTopColor: FUTURISTIC.borderSoft }]}>
+      {/* My hand — premium wooden tray look */}
+      <LinearGradient
+        colors={[WOOD_LIGHT, WOOD_MID, WOOD_DARK]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[styles.handTrayFrame, { paddingBottom: Math.max(8, insets.bottom + 4) }]}
+      >
+        <View pointerEvents="none" style={styles.handTrayGoldTrim} />
+        <View style={styles.myHandArea}>
         {/* Bot "Thinking..." indicator (5-second delay before AI plays) */}
         {botThinking && (
           <View style={styles.thinkingBox}>
@@ -680,7 +731,9 @@ export default function DammaScreen() {
             <Text style={styles.actionText}>{t("pass") || "تخطي"}</Text>
           </TouchableOpacity>
         )}
-      </View>
+        </View>
+      </LinearGradient>
+      {/* end wooden hand tray */}
 
       {/* ── Flying tile (slides from hand → board) ─────────────────────────── */}
       {flying && (
@@ -796,56 +849,128 @@ export default function DammaScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: FUTURISTIC.bg },
+  root: { flex: 1, backgroundColor: "#000" },
+  // ── Premium dark luxury background layers ───────────────────────────────
+  bgRadialGlow: {
+    position: "absolute", top: -120, left: "20%", right: "20%", height: 360,
+    borderRadius: 999,
+    backgroundColor: "rgba(212,175,55,0.04)", // very faint warm gold halo
+  },
+  bgVignetteTop: {
+    position: "absolute", top: 0, left: 0, right: 0, height: 130,
+    backgroundColor: "transparent",
+    borderBottomWidth: 0,
+    // soft top vignette via shadow
+    shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 30, shadowOffset: { width: 0, height: -10 },
+  },
+  bgVignetteBottom: {
+    position: "absolute", bottom: 0, left: 0, right: 0, height: 160,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   title: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "800" },
 
+  // ── Premium centered title with gold filigree ────────────────────────────
+  titleWrap: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingHorizontal: 10,
+  },
+  titleOrnament: {
+    width: 22, height: 2,
+    backgroundColor: GOLD,
+    borderRadius: 1,
+    opacity: 0.8,
+  },
+  titleArabic: {
+    color: GOLD, fontSize: 20, fontWeight: "900",
+    letterSpacing: 1,
+    textShadowColor: "rgba(212,175,55,0.55)",
+    textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 },
+  },
+  titleSubtitle: {
+    color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "700",
+    letterSpacing: 1, marginTop: 3,
+  },
+
+  // ── Score / player cards ─────────────────────────────────────────────────
   scoreBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
   playerScoreCard: {
     flex: 1, flexDirection: "row", alignItems: "center",
     paddingHorizontal: 10, paddingVertical: 8,
     borderRadius: 14,
-    backgroundColor: FUTURISTIC.surface1,
-    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+    backgroundColor: "rgba(20,22,28,0.92)",
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.18),
     minHeight: 56,
+    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
   },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: FUTURISTIC.surface2 },
-  avatarActive: { borderWidth: 2, borderColor: FUTURISTIC.brand },
+  avatarActive: { borderWidth: 2, borderColor: "#4ADE80" },
   botAvatarBox: {
     alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
   },
   playerName: { color: FUTURISTIC.textPrimary, fontSize: 12, fontWeight: "800", maxWidth: 110 },
   scoreBox: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 12, backgroundColor: FUTURISTIC.surface1, borderWidth: 1, borderColor: FUTURISTIC.borderSoft, alignItems: "center", minWidth: 100 },
-  scoreActive: { borderColor: FUTURISTIC.brand, backgroundColor: withAlpha(FUTURISTIC.brand, 0.08) },
+  // ✅ Active player: rich green glow (you / human turn). Opponent uses a softer gold tint.
+  scoreActive: {
+    borderColor: "#4ADE80",
+    backgroundColor: "rgba(74,222,128,0.08)",
+    shadowColor: "#4ADE80", shadowOpacity: 0.55, shadowRadius: 10, shadowOffset: { width: 0, height: 0 },
+  },
   scoreLabel: { color: FUTURISTIC.textMuted, fontSize: 11, fontWeight: "700" },
-  scoreVal: { color: FUTURISTIC.brand, fontSize: 22, fontWeight: "900", marginTop: 1 },
+  scoreVal: { color: GOLD, fontSize: 22, fontWeight: "900", marginTop: 1 },
 
   timerBox: {
     flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10,
-    backgroundColor: FUTURISTIC.surface1,
-    borderWidth: 1, borderColor: FUTURISTIC.brandEdge, minWidth: 70, justifyContent: "center",
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12,
+    backgroundColor: "rgba(20,22,28,0.92)",
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.4), minWidth: 70, justifyContent: "center",
   },
   timerWarn: { borderColor: "#FF5C5C", backgroundColor: "#FF5C5C15" },
-  timerText: { color: FUTURISTIC.brand, fontWeight: "900", fontSize: 14 },
+  timerText: { color: GOLD, fontWeight: "900", fontSize: 14 },
 
   oppHand: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 10, flexWrap: "wrap" },
   tileBack: { width: 22, height: 40, borderRadius: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
 
-  // ── Table row (felt + boneyard) ────────────────────────────────────────────
+  // ── Table row (felt + boneyard) ──────────────────────────────────────────
   tableRow: { flex: 1, flexDirection: "row", marginHorizontal: 8, marginVertical: 4, gap: 6 },
-  tableWrap: { flex: 1, shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
-  table: {
-    flex: 1, borderRadius: 18,
-    borderWidth: 8,
-    paddingVertical: 10, paddingHorizontal: 8,
+
+  // Wooden frame around the felt table — gives the premium "real domino table" feel.
+  woodFrame: {
+    flex: 1,
+    borderRadius: 22,
+    padding: 10,
+    shadowColor: "#000", shadowOpacity: 0.8, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+    position: "relative",
     overflow: "hidden",
-    // Premium gold double-edge: outer wooden frame + inner gold trim via shadow
-    shadowColor: GOLD, shadowOpacity: 0.4, shadowRadius: 10,
   },
-  tableInlay: { margin: 4, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
+  // Thin gold trim line just inside the wood
+  woodGoldTrim: {
+    ...StyleSheet.absoluteFillObject,
+    margin: 6,
+    borderRadius: 16,
+    borderWidth: 1.2,
+    borderColor: withAlpha(GOLD, 0.55),
+  },
+
+  tableWrap: { flex: 1, shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, borderRadius: 14, overflow: "hidden" },
+  table: {
+    flex: 1, borderRadius: 14,
+    borderWidth: 0,
+    paddingVertical: 14, paddingHorizontal: 12,
+    overflow: "hidden",
+  },
+  // Soft radial-style highlight overlay on the felt (gives a fabric/light glow)
+  feltHighlight: {
+    position: "absolute",
+    top: -40, left: "10%", right: "10%", height: 240,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 9999,
+  },
+  tableInlay: { margin: 4, borderRadius: 10, borderWidth: 1, borderStyle: "dashed" },
   tableGlow: { position: "absolute", top: -40, left: -40, width: 180, height: 180, borderRadius: 999, opacity: 0.8 },
   tableGlowB: { position: "absolute", bottom: -50, right: -50, width: 200, height: 200, borderRadius: 999 },
   endsLabel: { fontSize: 12, fontWeight: "700", textAlign: "center", marginBottom: 6 },
@@ -855,13 +980,29 @@ const styles = StyleSheet.create({
   boardRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginVertical: 2 },
   emptyBoard: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontStyle: "italic" },
 
-  // ── Boneyard pile ──────────────────────────────────────────────────────────
+  // ── Boneyard pile (now wrapped in its own wooden panel) ─────────────────
+  boneyardWoodFrame: {
+    width: 84,
+    borderRadius: 18,
+    padding: 6,
+    shadowColor: "#000", shadowOpacity: 0.7, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    position: "relative",
+    overflow: "hidden",
+  },
+  boneyardGoldTrim: {
+    ...StyleSheet.absoluteFillObject,
+    margin: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: withAlpha(GOLD, 0.5),
+  },
   boneyard: {
-    width: 70, alignItems: "center", justifyContent: "flex-start",
-    paddingTop: 18, gap: 4,
+    flex: 1, alignItems: "center", justifyContent: "flex-start",
+    paddingTop: 12, gap: 4,
   },
   boneyardLabel: {
-    color: FUTURISTIC.textMuted, fontSize: 10, fontWeight: "700",
+    color: GOLD, fontSize: 10, fontWeight: "800",
     textTransform: "uppercase", letterSpacing: 1,
   },
   boneyardPile: {
@@ -870,6 +1011,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
     position: "relative",
+    marginTop: 10,
   },
   boneyardCard: {
     position: "absolute",
@@ -880,17 +1022,17 @@ const styles = StyleSheet.create({
   boneyardBadge: {
     position: "absolute", top: -8, right: -8,
     minWidth: 24, height: 24, borderRadius: 12,
-    backgroundColor: FUTURISTIC.brand,
+    backgroundColor: GOLD,
     alignItems: "center", justifyContent: "center",
     paddingHorizontal: 6,
-    borderWidth: 2, borderColor: FUTURISTIC.bg,
+    borderWidth: 2, borderColor: WOOD_DARK,
   },
-  boneyardCount: { color: FUTURISTIC.bg, fontSize: 11, fontWeight: "900" },
-  boneyardHint: { color: FUTURISTIC.brand, fontSize: 9, fontWeight: "700", textAlign: "center", marginTop: 4 },
+  boneyardCount: { color: "#1A0E06", fontSize: 11, fontWeight: "900" },
+  boneyardHint: { color: GOLD, fontSize: 9, fontWeight: "700", textAlign: "center", marginTop: 4 },
 
   // Tiles
   tile: {
-    padding: 2, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 1, height: 2 },
+    padding: 2, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4, shadowOffset: { width: 1, height: 2 },
   },
   tileInner: { flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "space-around", paddingVertical: 3 },
   tileInnerH: { flexDirection: "row", paddingVertical: 0, paddingHorizontal: 3 },
@@ -899,9 +1041,7 @@ const styles = StyleSheet.create({
   pipFace: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center" },
   pipCell: { width: "33.33%", height: "33.33%", alignItems: "center", justifyContent: "center" },
 
-  // Side buttons — sit INSIDE myHandArea ABOVE the hand row, with strong
-  // vertical spacing so they never overlap the felt board (which is in a
-  // sibling above) and an explicit middle spacer separates them.
+  // ── Side buttons (Left / Right) — now premium gold pill style ─────────────
   sideButtons: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     paddingTop: 4, paddingBottom: 12,
@@ -909,27 +1049,28 @@ const styles = StyleSheet.create({
   },
   sideBtn: {
     flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: FUTURISTIC.brand,
+    backgroundColor: GOLD,
     paddingHorizontal: 26, paddingVertical: 12,
     borderRadius: 14,
-    shadowColor: FUTURISTIC.brand, shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1.5, borderColor: GOLD_SOFT,
+    shadowColor: GOLD, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
   },
-  sideBtnText: { color: FUTURISTIC.bg, fontWeight: "800", fontSize: 14 },
+  sideBtnText: { color: "#1A0E06", fontWeight: "900", fontSize: 14 },
 
   // Bot "Thinking…" indicator
   thinkingBox: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     paddingVertical: 8, paddingHorizontal: 14, marginHorizontal: 60,
-    backgroundColor: withAlpha(FUTURISTIC.brand, 0.12),
+    backgroundColor: withAlpha(GOLD, 0.12),
     borderRadius: 999,
-    borderWidth: 1, borderColor: withAlpha(FUTURISTIC.brand, 0.4),
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.4),
     marginBottom: 6,
   },
   thinkingDot: {
     width: 8, height: 8, borderRadius: 4,
-    backgroundColor: FUTURISTIC.brand,
+    backgroundColor: GOLD,
   },
-  thinkingText: { color: FUTURISTIC.brand, fontSize: 12, fontWeight: "800" },
+  thinkingText: { color: GOLD, fontSize: 12, fontWeight: "800" },
 
   // Animated flying tile (slides from hand row up to the board area)
   flyingTile: {
@@ -937,16 +1078,35 @@ const styles = StyleSheet.create({
     bottom: 120,
     alignSelf: "center",
     left: "50%",
-    marginLeft: -36, // center a 72-wide horizontal tile
+    marginLeft: -36,
     zIndex: 100,
     elevation: 12,
   },
 
-  myHandArea: { paddingVertical: 12, paddingHorizontal: 8, borderTopWidth: 1 },
-  turnText: { color: FUTURISTIC.textPrimary, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 8 },
+  // ── Wooden hand tray (bottom) ────────────────────────────────────────────
+  handTrayFrame: {
+    paddingHorizontal: 6, paddingTop: 6,
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    shadowColor: "#000", shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: -4 },
+    elevation: 10,
+    overflow: "hidden",
+    position: "relative",
+  },
+  handTrayGoldTrim: {
+    position: "absolute", top: 4, left: 4, right: 4, bottom: 4,
+    borderTopLeftRadius: 18, borderTopRightRadius: 18,
+    borderWidth: 1.2,
+    borderColor: withAlpha(GOLD, 0.55),
+  },
+  myHandArea: {
+    paddingVertical: 12, paddingHorizontal: 8,
+    backgroundColor: "rgba(8,4,2,0.55)",
+    borderRadius: 16,
+  },
+  turnText: { color: GOLD, fontSize: 14, fontWeight: "800", textAlign: "center", marginBottom: 8, letterSpacing: 0.5 },
   handScroll: { gap: 6, paddingHorizontal: 8, paddingTop: 12, alignItems: "flex-end", minHeight: 90 },
-  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: FUTURISTIC.brand, marginTop: 12, marginHorizontal: 40, paddingVertical: 12, borderRadius: 12 },
-  actionText: { color: FUTURISTIC.bg, fontWeight: "800", fontSize: 14 },
+  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: GOLD, marginTop: 12, marginHorizontal: 40, paddingVertical: 12, borderRadius: 12 },
+  actionText: { color: "#1A0E06", fontWeight: "900", fontSize: 14 },
 
   // Difficulty picker modal
   modalBackdrop: {
@@ -984,16 +1144,18 @@ const styles = StyleSheet.create({
   sidePlayerCard: {
     flex: 1, flexDirection: "row", alignItems: "center",
     paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12,
-    backgroundColor: FUTURISTIC.surface1,
-    borderWidth: 1, borderColor: GOLD_SOFT,
+    backgroundColor: "rgba(20,22,28,0.92)",
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.30),
     minHeight: 44,
+    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4,
   },
   topPlayerCard: {
     flexDirection: "row", alignItems: "center", gap: 8,
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
-    backgroundColor: FUTURISTIC.surface1,
-    borderWidth: 1, borderColor: GOLD_SOFT,
+    backgroundColor: "rgba(20,22,28,0.92)",
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.30),
     marginBottom: 6,
+    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4,
   },
   smallAvatar: {
     width: 30, height: 30, borderRadius: 15,
