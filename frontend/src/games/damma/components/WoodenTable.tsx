@@ -369,6 +369,9 @@ const styles = StyleSheet.create({
   emptyBoard: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontStyle: "italic" },
 
   // Snake box fills the safe zone; children are absolute-positioned.
+  // The new DominoTile uses pure absolute positioning everywhere with NO
+  // flex rows, so RTL cannot affect any pip placement. No need for an
+  // (invalid in RN) `direction: "ltr"` override here.
   snakeBox: { flex: 1, position: "relative" },
 
   // ── Tiles ────────────────────────────────────────────────────────────────

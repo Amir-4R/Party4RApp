@@ -1573,3 +1573,111 @@ agent_communication:
       5. Switch language back to ENGLISH (LTR) and confirm no regression.
       
       Backend untouched. Skip backend retest.
+
+#====================================================================================================
+# 2026-06-10 — DAMMA: FULL ARCHITECTURAL REBUILD per user's spec
+#====================================================================================================
+
+frontend:
+  - task: "Damma — IMMUTABLE 28-tile DS6 set extracted to its own module"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/domino-set.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Per user spec: "أحجار ثابتة بعدد وقيم صحيحة، لا يتم إنشاء أحجار
+          جديدة أثناء المباراة إلا من المجموعة الأصلية". The canonical 28
+          Double-Six tiles are built ONCE at module load and `Object.freeze`d
+          so no code path can mutate them. `shuffleDS6()` returns a fresh
+          Fisher-Yates copy of REFERENCES — never creates new tile objects.
+          
+  - task: "Damma — engine uses the frozen set"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/engine.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          engine.ts now imports from domino-set.ts. Every new round shuffles
+          the same canonical 28 tiles. Engine still stores placed tiles in
+          VISUAL order (board[i].right === board[i+1].left invariant).
+          
+  - task: "Damma — DominoTile rebuilt with PURE ABSOLUTE positioning (RTL-immune)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/components/DominoTile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          REAL fix per user spec: "عزل Domino Board عن Directionality / RTL".
+          The previous DominoTile used `flexDirection: "row"` (which RN
+          AUTO-MIRRORS in RTL mode) AND a nested `PipFace` with another
+          flex-row + flex-wrap (also auto-mirrored). So under Arabic, BOTH
+          the tile halves AND the pip dots inside each half were mirrored
+          — multiple layers of RTL flipping. We previously tried to
+          conditionally reverse children (works for one layer) and tried
+          `direction: "ltr"` (NOT a valid RN style — it logs warnings but
+          does nothing).
+          
+          New approach: build the tile with ZERO flex direction. Every
+          element (tile shell, divider, left face wrapper, right face
+          wrapper, individual pip dots) is positioned by explicit numeric
+          `left` and `top`. React Native does NOT mirror physical `left`
+          / `top` values, so the layout is identical in LTR and RTL.
+          
+          Side benefit: faster rendering (no flex layout work) and exact
+          pixel control over pip positions.
+          
+          The PipFace is also rebuilt with absolute positioning — each dot
+          on its 3×3 grid cell center.
+
+  - task: "Damma — Bot think time lowered to 1.5 s for snappier offline play"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/game/damma.tsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "BOT_THINK_MS: 5000 → 1500 ms. Better for testing + UX."
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Complete Damma architectural rebuild applied per user's detailed spec:
+      
+      1. Immutable 28-tile set extracted (domino-set.ts) — Object.freeze'd.
+      2. Engine uses frozen set; shuffles a fresh array of references each
+         match.
+      3. DominoTile completely rewritten with PURE ABSOLUTE positioning —
+         NO flex anywhere — so it renders identically in LTR and RTL.
+      4. RTL no longer affects tile/pip layout in any way.
+      5. Engine still stores tiles in visual order so board[i].right ===
+         board[i+1].left and the chain is value-continuous.
+      
+      Validation needed (FRONTEND ONLY):
+      - Switch app language to ARABIC. Visit /game/damma.
+      - Play 10-15 tiles vs bot. Verify pip values display correctly
+        AND adjacent tiles in any row have matching values
+        (board[i].right_visible === board[i+1].left_visible).
+      - Switch back to ENGLISH and verify identical behavior (no regression).
+      - Verify pip patterns: 0 = blank, 1 = center, 2 = top-left+bottom-
+        right, 3 = diagonal, 4 = four corners, 5 = corners + center,
+        6 = two columns of three.
+      
+      Backend untouched. Skip backend testing.

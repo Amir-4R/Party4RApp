@@ -49,7 +49,7 @@ import { useGamePersistence } from "@/src/comms/useGamePersistence";
 const DIFF_KEY = "damma_bot_difficulty";
 const MODE_KEY = "damma_player_count";
 const TURN_SECONDS = 60;
-const BOT_THINK_MS = 5000;        // ← Bot thinks for 5 s before playing.
+const BOT_THINK_MS = 1500;        // ← Bot thinks for ~1.5 s before playing.
 const PLAY_ANIM_MS = 450;         // ← Tile slide animation duration (300–600 ms).
 const ME: PlayerId = "player1";
 

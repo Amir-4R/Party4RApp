@@ -1,18 +1,35 @@
 // =============================================================================
-// damma/components/DominoTile.tsx — single domino face renderer (UI only)
+// damma/components/DominoTile.tsx — RTL-IMMUNE domino face renderer
 // =============================================================================
-// Pure presentation. Renders a domino as two pip faces separated by a divider,
-// with an optional `selected` glow and optional `onPress` handler.
-// No engine/AI logic here.
+// CRITICAL: This component MUST be 100% independent of the app's text
+// direction (LTR/RTL). All pip faces and the divider use ABSOLUTE positioning
+// with explicit numeric left/top, so React Native's automatic mirroring of
+// `flexDirection: "row"` under `I18nManager.forceRTL(true)` cannot affect the
+// rendered output. The tile is also wrapped in `direction: "ltr"` as a belt-
+// and-suspenders safety net.
+//
+// Conventions:
+//   • `horizontal = true`  →  tile is laid out as [LEFT | RIGHT].
+//      tile dims: TILE_W × TILE_H
+//   • `horizontal = false` →  tile is laid out vertically (top = left value,
+//      bottom = right value). tile dims: TILE_H × TILE_W.
+//
+// `domino.left` is ALWAYS rendered on the left/top half of the tile.
+// `domino.right` is ALWAYS rendered on the right/bottom half.
 // =============================================================================
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, I18nManager } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { dammaPalette } from "@/src/games/shared/gameTheme";
 import type { Domino, PlacedDomino } from "@/src/games/damma/engine";
 
-// ── Pip-dot layouts on a 3×3 grid (true domino faces) ────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
+export const TILE_W = 72;
+export const TILE_H = 36;
+
+// ── Pip-dot positions on a 3×3 grid (canonical domino faces) ─────────────────
+// Cell index 0 is top-left, 8 is bottom-right.
 const PIP_MAP: Record<number, number[]> = {
   0: [],
   1: [4],
@@ -23,18 +40,41 @@ const PIP_MAP: Record<number, number[]> = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-export function PipFace({ value, size, color }: { value: number; size: number; color: string }) {
+/**
+ * Render a single pip face with N dots, using ABSOLUTE positioning so RTL
+ * cannot mirror them. The face is a perfect square of given size.
+ */
+export function PipFace({
+  value, size, color,
+}: { value: number; size: number; color: string }) {
   const cells = PIP_MAP[value] || [];
   const dot = Math.max(2.5, size * 0.16);
+  // Each cell is size/3 wide. Cell center = (col + 0.5) * cellSize.
+  const cellSize = size / 3;
   return (
-    <View style={[styles.pipFace, { width: size, height: size }]}>
-      {Array.from({ length: 9 }).map((_, i) => (
-        <View key={i} style={styles.pipCell}>
-          {cells.includes(i) && (
-            <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color }} />
-          )}
-        </View>
-      ))}
+    // The PipFace uses pure ABSOLUTE positioning for every dot, so no flex
+    // direction is involved and RTL cannot affect placement.
+    <View style={{ width: size, height: size, position: "relative" }}>
+      {cells.map((i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const cx = (col + 0.5) * cellSize;
+        const cy = (row + 0.5) * cellSize;
+        return (
+          <View
+            key={i}
+            style={{
+              position: "absolute",
+              left: cx - dot / 2,
+              top: cy - dot / 2,
+              width: dot,
+              height: dot,
+              borderRadius: dot / 2,
+              backgroundColor: color,
+            }}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -47,81 +87,175 @@ export interface DominoTileProps {
   pal: ReturnType<typeof dammaPalette>;
   scale?: number;
   testID?: string;
+  /** Optional override style (e.g. for HandTray to apply margin). */
+  style?: ViewStyle;
 }
 
 export default function DominoTile({
-  domino, onPress, selected, horizontal, pal, scale = 1, testID,
+  domino, onPress, selected, horizontal = true, pal, scale = 1, testID, style,
 }: DominoTileProps) {
-  const W = (horizontal ? 72 : 40) * scale;
-  const H = (horizontal ? 40 : 72) * scale;
-  const faceSize = (horizontal ? 30 : 28) * scale;
-  return (
-    <TouchableOpacity
-      testID={testID}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={0.85}
+  // Outer bounding box (does not change with RTL).
+  const W = (horizontal ? TILE_W : TILE_H) * scale;
+  const H = (horizontal ? TILE_H : TILE_W) * scale;
+
+  // The DIVIDER is a thin line running perpendicular to the tile's long axis.
+  // - Horizontal tile: divider is vertical, at x = W/2.
+  // - Vertical tile:   divider is horizontal, at y = H/2.
+  const dividerThickness = Math.max(1, 1.5 * scale);
+  const dividerInset = horizontal ? H * 0.18 : W * 0.18;
+
+  // Each pip face occupies a square in the appropriate half of the tile.
+  // For a horizontal tile, the face is sized as min(halfWidth, height) so it
+  // is square. We center it in its half.
+  const halfMajor = (horizontal ? W : H) / 2;
+  const minor = horizontal ? H : W;
+  const faceSize = Math.min(halfMajor, minor) * 0.78;
+
+  // Half-rectangle bounds (top-left corner) for the LEFT/TOP face.
+  const halfRectA = horizontal
+    ? { left: 0, top: 0, width: W / 2, height: H }
+    : { left: 0, top: 0, width: W, height: H / 2 };
+
+  // Half-rectangle bounds for the RIGHT/BOTTOM face.
+  const halfRectB = horizontal
+    ? { left: W / 2, top: 0, width: W / 2, height: H }
+    : { left: 0, top: H / 2, width: W, height: H / 2 };
+
+  const faceCenterOffset = horizontal
+    ? { x: W / 4 - faceSize / 2, y: H / 2 - faceSize / 2 }
+    : { x: W / 2 - faceSize / 2, y: H / 4 - faceSize / 2 };
+
+  const TileBody = (
+    <View
+      // PURE ABSOLUTE POSITIONING throughout — no flex direction is used, so
+      // React Native's RTL auto-mirror has nothing to flip here.
       style={[
-        styles.tile,
+        styles.tileShell,
         {
-          width: W, height: H,
-          backgroundColor: pal.tileFace, borderColor: pal.tileBorder,
-          borderRadius: 8 * scale, borderWidth: Math.max(1, 1.5 * scale),
+          width: W,
+          height: H,
+          borderRadius: 8 * scale,
+          borderWidth: Math.max(1, 1.5 * scale),
+          borderColor: pal.tileBorder,
         },
-        selected && {
-          borderColor: FUTURISTIC.brand, borderWidth: 2.5,
-          shadowColor: FUTURISTIC.brand, shadowOpacity: 0.7, shadowRadius: 8,
-          transform: [{ translateY: -10 }],
-        },
+        selected && styles.tileSelected,
+        style,
       ]}
     >
+      {/* Background gradient — absolute fill, doesn't push content around. */}
       <LinearGradient
         colors={[pal.tileFace, pal.tileFaceEdge]}
         start={{ x: 0.2, y: 0.1 }}
         end={{ x: 0.9, y: 1 }}
+        style={[StyleSheet.absoluteFill, { borderRadius: 6 * scale }]}
+      />
+
+      {/* Divider line in the middle of the tile (NEVER moves with RTL). */}
+      <View
         style={[
-          styles.tileInner,
-          horizontal && styles.tileInnerH,
-          { borderRadius: 6 * scale },
+          styles.divider,
+          horizontal
+            ? {
+                left: W / 2 - dividerThickness / 2,
+                top: dividerInset,
+                width: dividerThickness,
+                height: H - 2 * dividerInset,
+              }
+            : {
+                left: dividerInset,
+                top: H / 2 - dividerThickness / 2,
+                width: W - 2 * dividerInset,
+                height: dividerThickness,
+              },
+          { backgroundColor: pal.divider },
+        ]}
+      />
+
+      {/* LEFT (or TOP) pip face — pins to halfRectA. */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.faceWrap,
+          halfRectA,
         ]}
       >
-        {/* RTL FIX — In Arabic mode `flexDirection: "row"` is mirrored by
-            React Native, which would swap `domino.left` to the screen-right.
-            We compensate by manually reversing children when isRTL is true,
-            so domino.left ALWAYS appears at the visual screen-LEFT. */}
-        {horizontal && I18nManager.isRTL ? (
-          <>
-            <PipFace value={domino.right} size={faceSize} color={pal.pip} />
-            <View style={[
-              styles.dividerV,
-              { backgroundColor: pal.divider, height: "62%", width: Math.max(1, 1.5 * scale) },
-            ]} />
-            <PipFace value={domino.left} size={faceSize} color={pal.pip} />
-          </>
-        ) : (
-          <>
-            <PipFace value={domino.left} size={faceSize} color={pal.pip} />
-            <View style={[
-              horizontal ? styles.dividerV : styles.dividerH,
-              { backgroundColor: pal.divider, height: horizontal ? "62%" : Math.max(1, 1.5 * scale), width: horizontal ? Math.max(1, 1.5 * scale) : "62%" },
-            ]} />
-            <PipFace value={domino.right} size={faceSize} color={pal.pip} />
-          </>
-        )}
-      </LinearGradient>
-    </TouchableOpacity>
+        <View
+          style={{
+            position: "absolute",
+            left: horizontal ? (W / 4 - faceSize / 2) : faceCenterOffset.x,
+            top: horizontal ? faceCenterOffset.y : (H / 4 - faceSize / 2),
+          }}
+        >
+          <PipFace value={domino.left} size={faceSize} color={pal.pip} />
+        </View>
+      </View>
+
+      {/* RIGHT (or BOTTOM) pip face — pins to halfRectB. */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.faceWrap,
+          halfRectB,
+        ]}
+      >
+        <View
+          style={{
+            position: "absolute",
+            left: horizontal ? (W / 4 - faceSize / 2) : faceCenterOffset.x,
+            top: horizontal ? faceCenterOffset.y : (H / 4 - faceSize / 2),
+          }}
+        >
+          <PipFace value={domino.right} size={faceSize} color={pal.pip} />
+        </View>
+      </View>
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        testID={testID}
+        onPress={onPress}
+        activeOpacity={0.85}
+        style={selected ? styles.touchableSelected : undefined}
+      >
+        {TileBody}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View testID={testID}>
+      {TileBody}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tile: {
-    padding: 2,
-    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4, shadowOffset: { width: 1, height: 2 },
+  tileShell: {
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: "#FAEBD7",
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    shadowOffset: { width: 1, height: 2 },
   },
-  tileInner: { flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "space-around", paddingVertical: 3 },
-  tileInnerH: { flexDirection: "row", paddingVertical: 0, paddingHorizontal: 3 },
-  dividerH: { width: "62%", height: 1.5, borderRadius: 1 },
-  dividerV: { height: "62%", width: 1.5, borderRadius: 1 },
-  pipFace: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center" },
-  pipCell: { width: "33.33%", height: "33.33%", alignItems: "center", justifyContent: "center" },
+  tileSelected: {
+    borderColor: FUTURISTIC.brand,
+    borderWidth: 2.5,
+    shadowColor: FUTURISTIC.brand,
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+  },
+  touchableSelected: {
+    transform: [{ translateY: -10 }],
+  },
+  divider: {
+    position: "absolute",
+    borderRadius: 1,
+  },
+  faceWrap: {
+    position: "absolute",
+  },
 });

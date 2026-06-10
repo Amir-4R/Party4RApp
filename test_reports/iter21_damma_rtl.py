@@ -1,2 +1,2 @@
-# Iteration 21 — Damma RTL (Arabic) adjacency verification test
-# Run from inside the browser_automation tool (page is provided)
+# Iter 21 — Damma RTL pip/adjacency verification
+# Run inside browser_automation tool (page provided)

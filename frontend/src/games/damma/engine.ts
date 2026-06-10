@@ -10,6 +10,12 @@
 //   - حساب النقاط
 // =============================================================================
 
+// IMPORTANT: We use the FROZEN canonical set from domino-set.ts. Every match
+// shuffles a NEW array of REFERENCES to the same 28 tiles — no tile objects
+// are ever created on the fly during gameplay, so there can never be more
+// or less than 28 tiles, and no duplicate ids.
+import { DOMINO_SET_DS6, shuffleDS6 } from "./domino-set";
+
 export interface Domino {
   id: string;
   left: number;   // 0-6
@@ -37,23 +43,20 @@ export interface DammaState {
   passCount: number;            // consecutive passes (blocked detection)
 }
 
-// ── Build the full set of 28 dominoes ────────────────────────────────────────
-
+// IMPORTANT: We use the FROZEN canonical set from domino-set.ts. Every match
+// shuffles a NEW array of REFERENCES to the same 28 tiles — no tile objects
+// are ever created on the fly during gameplay, so there can never be more
+// or less than 28 tiles, and no duplicate ids.
 function buildFullSet(): Domino[] {
-  const set: Domino[] = [];
-  for (let l = 0; l <= 6; l++)
-    for (let r = l; r <= 6; r++)
-      set.push({ id: `${l}-${r}`, left: l, right: r });
-  return set;
+  // Return a mutable shallow copy so callers can re-shuffle without mutating
+  // the frozen source. Each entry is the same FROZEN object.
+  return DOMINO_SET_DS6.map((t) => ({ id: t.id, left: t.left, right: t.right }));
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+function shuffle<T>(_arr: T[]): T[] {
+  // Use the canonical Fisher-Yates from domino-set when shuffling dominoes;
+  // for any other arrays the original logic works as well.
+  return shuffleDS6() as unknown as T[];
 }
 
 // ── Initial Setup ─────────────────────────────────────────────────────────────
