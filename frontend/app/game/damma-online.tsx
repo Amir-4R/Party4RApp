@@ -15,7 +15,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator,
-  Alert, Modal, Pressable,
+  Modal, Pressable,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -81,6 +81,9 @@ export default function DammaOnlineScreen() {
   // ── Tile selection (local UI state) ─────────────────────────────────────
   const [selectedTile, setSelectedTile] = useState<string | null>(null);
   useEffect(() => { setSelectedTile(null); }, [state?.turn]);
+
+  // ── Exit-confirmation modal (cross-platform — Alert.alert is silent on web)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
   // ── Local chat overlay (in addition to GameCommsBar) ────────────────────
   const [chatBubbles, setChatBubbles] = useState<ChatBubble[]>([]);
@@ -156,14 +159,16 @@ export default function DammaOnlineScreen() {
   }, [online, router]);
 
   const confirmExit = useCallback(() => {
-    Alert.alert(
-      "الخروج من المباراة",
-      "هل أنت متأكد من الخروج؟ سيُعتبر هذا انسحاباً.",
-      [
-        { text: "إلغاء", style: "cancel" },
-        { text: "خروج", style: "destructive", onPress: exitMatch },
-      ],
-    );
+    setExitConfirmOpen(true);
+  }, []);
+
+  const cancelExit = useCallback(() => {
+    setExitConfirmOpen(false);
+  }, []);
+
+  const confirmExitAndLeave = useCallback(() => {
+    setExitConfirmOpen(false);
+    exitMatch();
   }, [exitMatch]);
 
   // ── Compute seat order so MY pid is always at the bottom ────────────────
@@ -434,6 +439,49 @@ export default function DammaOnlineScreen() {
           fromMe: m.from === (user?.nickname || user?.username || "Player"),
         }))}
       />
+
+      {/* Exit confirmation — cross-platform Modal (Alert.alert is silent on web) */}
+      <Modal
+        visible={exitConfirmOpen}
+        transparent animationType="fade"
+        onRequestClose={cancelExit}
+      >
+        <Pressable
+          testID="damma-online-exit-backdrop"
+          style={styles.modalBackdrop}
+          onPress={cancelExit}
+        >
+          <Pressable
+            testID="damma-online-exit-card"
+            style={styles.exitCard}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Ionicons name="exit-outline" size={42} color="#EF4444" />
+            <Text style={styles.exitTitle}>الخروج من المباراة</Text>
+            <Text style={styles.exitSubtitle}>
+              هل أنت متأكد من الخروج؟ سيُعتبر هذا انسحاباً.
+            </Text>
+            <View style={styles.exitActions}>
+              <TouchableOpacity
+                testID="damma-online-exit-cancel"
+                onPress={cancelExit}
+                style={[styles.exitBtn, styles.exitBtnCancel]}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.exitBtnCancelText}>إلغاء</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="damma-online-exit-confirm"
+                onPress={confirmExitAndLeave}
+                style={[styles.exitBtn, styles.exitBtnDestructive]}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.exitBtnDestructiveText}>خروج</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -554,4 +602,33 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(239,68,68,0.5)",
   },
   errorBtnText: { color: "#EF4444", fontSize: 13, fontWeight: "800" },
+
+  // Exit-confirmation modal (cross-platform replacement for Alert.alert)
+  exitCard: {
+    width: "100%", maxWidth: 340,
+    borderRadius: 18, padding: 24,
+    backgroundColor: "#0F1419",
+    borderWidth: 1, borderColor: "rgba(239,68,68,0.45)",
+    alignItems: "center",
+  },
+  exitTitle: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "900", marginTop: 12 },
+  exitSubtitle: { color: FUTURISTIC.textMuted, fontSize: 13, marginTop: 8, textAlign: "center", lineHeight: 20 },
+  exitActions: {
+    flexDirection: "row", gap: 12, marginTop: 22, width: "100%",
+  },
+  exitBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 12,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1,
+  },
+  exitBtnCancel: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  exitBtnCancelText: { color: FUTURISTIC.textPrimary, fontSize: 14, fontWeight: "800" },
+  exitBtnDestructive: {
+    backgroundColor: "rgba(239,68,68,0.16)",
+    borderColor: "rgba(239,68,68,0.55)",
+  },
+  exitBtnDestructiveText: { color: "#FF6B6B", fontSize: 14, fontWeight: "900" },
 });

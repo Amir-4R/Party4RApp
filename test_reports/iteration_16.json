@@ -1,0 +1,32 @@
+{
+  "summary": "Phase 5 Damma online RETEST — BOTH iter_15 follow-up fixes are CONFIRMED WORKING. (1) Cross-platform exit Modal: tapping the back chevron (testID='damma-online-back') on web preview now opens a custom React Native Modal (NOT a silent Alert.alert) with title 'الخروج من المباراة' and both action buttons present. Cancel (testID='damma-online-exit-cancel') closes the modal and the URL stays at /game/damma-online?rid={rid}. Backdrop tap (testID='damma-online-exit-backdrop') closes the modal without exiting. Card tap (testID='damma-online-exit-card') correctly invokes event.stopPropagation and keeps the modal open. Confirm (testID='damma-online-exit-confirm') correctly fires router.back() — verified by the console warning 'The action GO_BACK was not handled by any navigator' that appeared because the test direct-loaded /game/damma-online (no history), but the handler is wired correctly and would navigate back in the real lobby→online flow. (2) Chat send: tapping testID='comms-chat-button' opens GameChatSheet; both testID='comms-chat-input' and testID='comms-chat-send' are reachable; typing 'مرحبا من اللاعب' and tapping send clears the input (value==''), the message bubble appears in the chat list, and its parent row has alignSelf='flex-end' + flexDirection='row-reverse' (the rowMine style) confirming the bubble is rendered with fromMe styling on the right. No JS errors fired in the console during chat send (the only console-errors observed were unrelated 401/404 from background calls). Skipped backend testing per request.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Exit modal flow", "issue": "ALL three sub-flows verified end-to-end on web preview: open → cancel, open → backdrop, open → confirm. Modal opens reliably on every back-chevron tap.", "affected_testIDs": ["damma-online-back","damma-online-exit-card","damma-online-exit-backdrop","damma-online-exit-cancel","damma-online-exit-confirm"]},
+      {"flow": "Online chat send via WS → echo → fromMe bubble", "issue": "Verified end-to-end. GameCommsBar.handleSend correctly routes through onSendInGame (line 81 short-circuit) — does NOT add a local bubble — the message comes back via online.chatMsgs → externalMessages with fromMe=true (damma-online.tsx:438 comparison m.from === nickname). Bubble rendered with rowMine style.", "affected_testIDs": ["comms-chat-button","comms-chat-input","comms-chat-send"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Carry-over deprecation warnings", "issue": "Still present from prior iterations (shadow*/textShadow*/pointerEvents on damma-online.tsx; Animated.useNativeDriver on damma-lobby.tsx). Benign on web preview but noisy. Reference: /app/frontend/app/game/damma-online.tsx styles.connDotOn and styles.titleArabic; /app/frontend/app/game/damma-lobby.tsx:181,186."}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Both targeted fixes (cross-platform exit Modal + chat-flow testIDs) are verified — NO further action required for these two issues.",
+    "OPTIONAL carry-over: migrate shadow*/textShadow*/pointerEvents to new style API and gate Animated useNativeDriver on web in damma-lobby.tsx to silence console warnings (already noted in iter_15)."
+  ],
+  "critical_code_review_comments": [
+    "damma-online.tsx exit Modal — clean implementation: Pressable backdrop with onPress=cancelExit, inner Pressable card with onPress=(e)=>e.stopPropagation(); two TouchableOpacity buttons with onPress=cancelExit and confirmExitAndLeave. Matches the same pattern already used by the Error overlay (lines 397-407). Good consistency.",
+    "GameCommsBar.handleSend (line 78-100) — short-circuit on onSendInGame is correct (no local-bubble add); server-echo via externalMessages prevents double-rendering. fromMe flag comes from damma-online.tsx:438 string comparison against (user.nickname || user.username || 'Player') — verified working with nickname='Tester'.",
+    "GameChatSheet renderItem (line 51-63) — rowMine style applies alignSelf:flex-end + flexDirection:row-reverse for fromMe messages. Verified in DOM via getComputedStyle."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (3/3, carry-over from iter_14)", "frontend": "100% — all three explicitly requested verifications pass"},
+  "seed_data_creation": "None — reused testuser1 (Tester) from /app/memory/test_credentials.md. One ephemeral room (rid=b86558b8) auto-created via queue timeout-fill.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 5 Damma online frontend is now FULLY VERIFIED on web preview: lobby→online navigation (iter_15), exit-Modal flow (this iter), chat send with fromMe bubble (this iter). The only residual notes are cosmetic console warnings (shadow*/textShadow*/pointerEvents/useNativeDriver) that do NOT impact functionality. If next iter touches the game-play loop, also exercise: (a) tapping a playable tile + left/right placement, (b) bot auto-play chain, (c) GameResultOverlay on game_over. Backend pytest at /app/backend/tests/test_damma_online.py is stable (~25-30s per run because of queue timeout-fill).",
+  "rca_of_issue": "Both iter_15 follow-up bugs resolved: (i) Alert.alert silent on react-native-web → replaced with custom Modal containing Pressable backdrop + Pressable card + cancel/confirm TouchableOpacity (damma-online.tsx:443-484); modal observed and dismissable on web. (ii) Missing testIDs on chat UI → testID='comms-chat-button' added to GameCommsBar.tsx:107, testID='comms-chat-input' and 'comms-chat-send' added to GameChatSheet.tsx:98,109. Automated chat-send is now possible from Playwright."
+}

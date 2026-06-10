@@ -1294,3 +1294,35 @@ agent_communication:
       3. Frontend: log in as testuser1 → /game/damma-lobby → press "ابحث عن
          مباراة أونلاين" → wait ~25s for the bot-fill timeout → confirms it
          navigates to /game/damma-online and shows board + hand + opponents.
+
+  - task: "Phase 5 web-compat fixes (exit modal + comms testIDs)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/game/damma-online.tsx, /app/frontend/src/comms/ui/GameCommsBar.tsx, /app/frontend/src/comms/ui/GameChatSheet.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Iter_15 follow-ups:
+          1. Replaced Alert.alert with cross-platform <Modal> (Alert.alert is
+             silent on react-native-web). New testIDs: damma-online-exit-confirm,
+             damma-online-exit-cancel, damma-online-exit-card,
+             damma-online-exit-backdrop.
+          2. Added testID="comms-chat-button" + "comms-friends-button" to
+             GameCommsBar buttons.
+          3. Added testID="comms-chat-input" + "comms-chat-send" to GameChatSheet.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Iter_15 fixes applied. Please re-test FRONTEND-ONLY:
+      1. End-to-end lobby → online screen handoff (verified working in iter_15).
+      2. Tap back chevron — confirm the new Modal appears with title "الخروج
+         من المباراة" and two buttons (إلغاء + خروج). Tapping "خروج" should
+         disconnect and pop back to /game/damma-lobby.
+      3. Open chat sheet via the new testID comms-chat-button, type "مرحبا"
+         in comms-chat-input, tap comms-chat-send. Verify message bubble
+         appears on the right side (fromMe=true). No crash.

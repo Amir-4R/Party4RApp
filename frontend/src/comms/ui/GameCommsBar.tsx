@@ -104,14 +104,14 @@ export default function GameCommsBar({
   return (
     <>
       <View style={[styles.bar, { top: insets.top + 120 }, style]} pointerEvents="box-none">
-        <TouchableOpacity style={styles.btn} onPress={openChat} activeOpacity={0.85}>
+        <TouchableOpacity testID="comms-chat-button" style={styles.btn} onPress={openChat} activeOpacity={0.85}>
           <Ionicons name="chatbubbles" size={20} color={FUTURISTIC.brand} />
           {unread > 0 && (
             <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text></View>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btn} onPress={() => setFriendsOpen(true)} activeOpacity={0.85}>
+        <TouchableOpacity testID="comms-friends-button" style={styles.btn} onPress={() => setFriendsOpen(true)} activeOpacity={0.85}>
           <Ionicons name="people" size={20} color={FUTURISTIC.brand} />
         </TouchableOpacity>
 

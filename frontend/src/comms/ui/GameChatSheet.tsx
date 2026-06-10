@@ -95,6 +95,7 @@ export default function GameChatSheet({
 
           <View style={styles.inputRow}>
             <TextInput
+              testID="comms-chat-input"
               value={draft}
               onChangeText={setDraft}
               placeholder={t("type_message") || "اكتب رسالة…"}
@@ -105,7 +106,7 @@ export default function GameChatSheet({
               blurOnSubmit={false}
               multiline
             />
-            <TouchableOpacity style={[styles.sendBtn, { opacity: draft.trim() ? 1 : 0.5 }]} onPress={send} disabled={!draft.trim()} activeOpacity={0.85}>
+            <TouchableOpacity testID="comms-chat-send" style={[styles.sendBtn, { opacity: draft.trim() ? 1 : 0.5 }]} onPress={send} disabled={!draft.trim()} activeOpacity={0.85}>
               <Ionicons name="send" size={18} color={FUTURISTIC.bg} />
             </TouchableOpacity>
           </View>
