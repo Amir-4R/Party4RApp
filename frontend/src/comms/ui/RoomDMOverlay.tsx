@@ -213,6 +213,7 @@ export default function RoomDMOverlay({
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
+                  testID={`dm-conv-${item.friend.id}`}
                   style={styles.convRow}
                   activeOpacity={0.85}
                   onPress={() => openChat(item.friend)}

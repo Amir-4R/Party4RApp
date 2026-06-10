@@ -1956,3 +1956,57 @@ agent_communication:
           out of scope here).
 
       No backend changes. No other files touched.
+
+  - agent: "main"
+    message: |
+      Universal keyboard / chat-input refactor — SHIPPED ✅
+
+      USER REQUEST: "Want a fundamental solution that makes the keyboard
+      work on all supported devices (Samsung, Pixel, Xiaomi, Android 12-16,
+      iOS, RTL), not just the device under test."
+
+      IMPLEMENTATION:
+        1. Installed `react-native-keyboard-controller@1.18.6` (industry
+           standard 2026, supports new architecture, replaces the unreliable
+           core RN `KeyboardAvoidingView`).
+        2. Wrapped the entire app with `<KeyboardProvider>` in
+           /app/frontend/app/_layout.tsx.
+        3. Created a NEW universal memoized composer:
+           /app/frontend/src/comms/ui/ChatComposer.tsx
+            - React.memo so unrelated parent re-renders (WS messages,
+              presence updates, vote toasts, mic toggles) do NOT cause the
+              input to re-render or lose focus.
+            - Internal draft state via useState — parent never re-renders
+              on keystrokes.
+            - blurOnSubmit={false} + requestAnimationFrame auto-refocus
+              after every send (cross-platform: iOS / Android / web).
+            - RTL support: dir="auto", textAlign="right" on native.
+            - useImperativeHandle exposes focus / blur / clear / getValue.
+            - Built-in send button, optional attach button (image).
+        4. Refactored all 3 chat surfaces to use the universal composer +
+           keyboard-controller's KeyboardAvoidingView with the recommended
+           chat behavior: iOS `padding`, Android `translate-with-padding`:
+            - /app/frontend/app/room/[id].tsx (main room chat)
+            - /app/frontend/src/comms/ui/RoomDMOverlay.tsx (DM overlay)
+            - /app/frontend/src/comms/ui/GameChatSheet.tsx (in-game chat)
+        5. Added testID to DM conversation rows for future E2E coverage.
+
+      VERIFICATION (testing_agent — iteration_26):
+        - 6 consecutive rapid sends in the room composer: focus stayed on
+          chat-input every time; input cleared every time; all 6 bubbles
+          rendered. ✅
+        - Parent re-render via mic toggle: composer NEVER unmounts or
+          loses focus (React.memo equality is correct). ✅
+        - DM overlay opens & closes without tearing down the room WS;
+          subsequent room chat sends still work. ✅
+        - Zero pageerror, zero TDZ errors, zero KeyboardProvider warnings.
+
+      DEVICE COVERAGE EXPECTATION:
+        - The keyboard-controller library uses native iOS / Android APIs
+          (UIKeyboardLayoutGuide on iOS, WindowInsets on Android) so the
+          same code path runs on Samsung, Google Pixel, Xiaomi, OnePlus,
+          Huawei, etc., across Android 12 / 13 / 14 / 15 / 16, including
+          edge-to-edge and predictive-back screens.
+
+      No backend changes. No other file changes.
+
