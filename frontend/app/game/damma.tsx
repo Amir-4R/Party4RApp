@@ -43,6 +43,8 @@ import WoodenTable from "@/src/games/damma/components/WoodenTable";
 import HandTray from "@/src/games/damma/components/HandTray";
 import { GOLD } from "@/src/games/damma/components/theme";
 import { DAMMA_TEXTURES } from "@/src/games/damma/components/assets";
+import GameCommsBar from "@/src/comms/ui/GameCommsBar";
+import { useGamePersistence } from "@/src/comms/useGamePersistence";
 
 const DIFF_KEY = "damma_bot_difficulty";
 const MODE_KEY = "damma_player_count";
@@ -564,6 +566,9 @@ export default function DammaScreen() {
           onExit={() => router.back()}
         />
       )}
+
+      {/* In-game comms: opponent chat + friends + mic */}
+      <GameCommsBar opponentName={`🤖 ${diffMeta.label}`} />
     </View>
   );
 }

@@ -35,6 +35,8 @@ import GameResultOverlay from "@/src/games/shared/ui/GameResultOverlay";
 import Countdown from "@/src/games/shared/ui/Countdown";
 import { recordResult, RecordResult } from "@/src/games/stats";
 import { playSound } from "@/src/games/sound/SoundManager";
+import GameCommsBar from "@/src/comms/ui/GameCommsBar";
+import { useGamePersistence } from "@/src/comms/useGamePersistence";
 
 const { width } = Dimensions.get("window");
 const DISPLAY = Math.min(width - 24, 380);
@@ -75,6 +77,21 @@ export default function CarromScreen() {
   countingRef.current = counting;
   const [result, setResult] = useState<RecordResult | null>(null);
   const recordedRef = useRef(false);
+
+  // ── Game persistence + in-game comms (resume after temporary exit) ─────
+  const persist = useGamePersistence<CarromState>({
+    key: "carrom",
+    userId: user?.id,
+    getState: () => stateRef.current,
+    restore: (s) => { setState(s); stateRef.current = s; setCounting(false); },
+    paused: state.phase === "game_over",
+  });
+  const exitGame = useCallback(() => { persist.clear(); router.back(); }, [persist, router]);
+
+  // Once the match is over, drop the resume snapshot so it isn't restored later.
+  useEffect(() => {
+    if (state.phase === "game_over") persist.clear();
+  }, [state.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Physics loop ──────────────────────────────────────────────────────────
   const runSimulation = useCallback(() => {
@@ -252,7 +269,7 @@ export default function CarromScreen() {
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+        <TouchableOpacity onPress={exitGame} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_carrom") || "Carrom"}</Text>
@@ -644,9 +661,12 @@ export default function CarromScreen() {
             oppLabel: `🤖 ${t("bot") || "Bot"}`,
           }}
           onPlayAgain={reset}
-          onExit={() => router.back()}
+          onExit={exitGame}
         />
       )}
+
+      {/* In-game comms: opponent chat + friends + mic */}
+      <GameCommsBar opponentName={`🤖 ${t("bot") || "Bot"}`} />
     </View>
   );
 }

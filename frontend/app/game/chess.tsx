@@ -26,6 +26,8 @@ import GameResultOverlay from "@/src/games/shared/ui/GameResultOverlay";
 import Countdown from "@/src/games/shared/ui/Countdown";
 import { recordResult, RecordResult } from "@/src/games/stats";
 import { playSound } from "@/src/games/sound/SoundManager";
+import GameCommsBar from "@/src/comms/ui/GameCommsBar";
+import { useGamePersistence } from "@/src/comms/useGamePersistence";
 
 const { width } = Dimensions.get("window");
 const BOARD = Math.min(width - 24, 360);
@@ -70,6 +72,23 @@ export default function ChessScreen() {
   const [botMode, setBotMode] = useState<ChessDifficulty | "off">("off");
   const [showBotPicker, setShowBotPicker] = useState(false);
   const [botThinking, setBotThinking] = useState(false);
+
+  // ── Game persistence + Comms bar (in-game chat + mic) ──────────────────
+  const gameIsOver = (s: GameState) => {
+    const r = getGameResult(s);
+    return r.status === "checkmate" || r.status === "stalemate" || r.status === "draw";
+  };
+  const persist = useGamePersistence<GameState>({
+    key: "chess",
+    userId: user?.id,
+    getState: () => state,
+    restore: (s) => { setState(s); setCounting(false); },
+    paused: gameIsOver(state),
+  });
+  const exitGame = () => { persist.clear(); router.back(); };
+  useEffect(() => {
+    if (gameIsOver(state)) persist.clear();
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load saved theme + bot config on mount
   useEffect(() => {
@@ -362,9 +381,12 @@ export default function ChessScreen() {
           outcome={result.status === "checkmate" ? (result.winner === "white" ? "win" : "loss") : "draw"}
           record={matchRecord}
           onPlayAgain={reset}
-          onExit={() => router.back()}
+          onExit={exitGame}
         />
       )}
+
+      {/* In-game comms: opponent chat + friends + mic */}
+      <GameCommsBar opponentName={botMode === "off" ? (t("opponent") || "الخصم") : `🤖 ${t("bot") || "Bot"}`} />
     </View>
   );
 }
