@@ -1079,9 +1079,49 @@ async def download_backend_bundle_api():
     return _serve_bundle("backend.zip")
 
 
+# ─── Generic source-code download endpoint ──────────────────────────────────
+# Lets the user pull text files from /app/exports/. Used to deliver code copies
+# (e.g. carrom.txt) directly from the app. Path traversal is blocked.
+_EXPORTS_DIR = "/app/exports"
+
+
+@api.get("/exports/{filename}")
+async def download_export_file(filename: str):
+    # Reject any path-traversal attempt
+    if "/" in filename or "\\" in filename or filename.startswith(".."):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    path = os.path.join(_EXPORTS_DIR, filename)
+    if not os.path.exists(path) or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="file not found")
+    # Plain-text payload with a forced download
+    return FileResponse(
+        path,
+        media_type="text/plain; charset=utf-8",
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/api/download/backend.zip")
 async def download_backend_bundle_direct():
     return _serve_bundle("backend.zip")
+
+
+# Direct-on-app twin for the exports endpoint — needed because @api routes
+# added after `app.include_router(api)` are NOT auto-mounted.
+@app.get("/api/exports/{filename}")
+async def download_export_file_direct(filename: str):
+    if "/" in filename or "\\" in filename or filename.startswith(".."):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    path = os.path.join(_EXPORTS_DIR, filename)
+    if not os.path.exists(path) or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="file not found")
+    return FileResponse(
+        path,
+        media_type="text/plain; charset=utf-8",
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/download/frontend.zip")
