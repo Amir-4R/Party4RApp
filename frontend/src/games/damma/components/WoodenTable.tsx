@@ -25,7 +25,7 @@ import {
   GOLD,
   WOOD_DARK, WOOD_LIGHT, WOOD_MID,
 } from "./theme";
-import { buildSnakeLayout, TILE_W, TILE_H, type SnakePos } from "./SnakeLayout";
+import { buildSnakeLayout, pickScaleTier, SCALE_TIERS, TILE_W, TILE_H, type SnakePos } from "./SnakeLayout";
 
 // Internal padding so corner tiles never touch the wooden frame.
 const SAFE_X = 12;
@@ -76,10 +76,49 @@ export default function WoodenTable({
     );
   }, []);
 
-  // ── Compute snake positions (one entry per board tile) ─────────────────
+  // ── Stepped zoom-out: pick the LARGEST scale tier that fits the chain ─
+  // We only ever step DOWN (zoom further out). This makes the visual
+  // "few zooms per match, each by a large amount" rather than tiny
+  // continuous shrinks every turn.
+  const [tierIdx, setTierIdx] = useState(0);
+  const currentScale = SCALE_TIERS[tierIdx];
+
+  // Compute snake positions for the CURRENT tier. Positions are stable
+  // within a tier.
   const layout = useMemo(() => {
-    return buildSnakeLayout(board.length, playSize.w, playSize.h);
-  }, [board.length, playSize.w, playSize.h]);
+    return buildSnakeLayout(board.length, playSize.w, playSize.h, currentScale);
+  }, [board.length, playSize.w, playSize.h, currentScale]);
+
+  // When the chain at the current tier overflows, bump to the next
+  // smaller tier. We compute the IDEAL tier directly (in case multiple
+  // jumps are needed) so a long catch-up never lags behind.
+  useEffect(() => {
+    if (playSize.w <= 0 || playSize.h <= 0 || board.length === 0) return;
+    const ideal = pickScaleTier(board.length, playSize.w, playSize.h, tierIdx);
+    if (ideal > tierIdx) setTierIdx(ideal);
+  }, [board.length, playSize.w, playSize.h, tierIdx]);
+
+  // ── Smooth animated zoom-out when the tier changes ────────────────────
+  // We render tiles at the NEW tier's positions but apply a temporary
+  // transform-scale of (oldScale / newScale) → 1.0 so the visual effect
+  // is the WHOLE chain gradually shrinking into place. 700 ms ease-out.
+  const zoomAnim = useRef(new Animated.Value(1)).current;
+  const prevScaleRef = useRef(currentScale);
+  useEffect(() => {
+    const prev = prevScaleRef.current;
+    if (prev !== currentScale) {
+      // Start "zoomed in" relative to the new layout, then ease down to 1.0.
+      const ratio = prev / currentScale;
+      zoomAnim.setValue(ratio);
+      Animated.timing(zoomAnim, {
+        toValue: 1,
+        duration: 700,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        useNativeDriver: true,
+      }).start();
+      prevScaleRef.current = currentScale;
+    }
+  }, [currentScale, zoomAnim]);
 
   // ── Entrance animations: track which tile ids have already animated in.
   const animMap = useRef<Map<string, AnimatedEntry>>(new Map());
@@ -229,7 +268,17 @@ export default function WoodenTable({
                 <Text style={styles.emptyBoard}>{emptyText}</Text>
               </View>
             ) : (
-              <View style={styles.snakeBox} pointerEvents="none">
+              // The snakeBox wraps the chain. The Animated.View `zoomAnim`
+              // applies a temporary uniform scale transform during tier
+              // transitions, so the visual effect of "zoom out" is gradual
+              // (ease-out 700 ms) rather than instant.
+              <Animated.View
+                style={[
+                  styles.snakeBox,
+                  { transform: [{ scale: zoomAnim }] },
+                ]}
+                pointerEvents="none"
+              >
                 {layout.positions.map((pos) => {
                   const tile = board[pos.idx];
                   if (!tile) return null;
@@ -314,7 +363,7 @@ export default function WoodenTable({
                     </Animated.View>
                   );
                 })}
-              </View>
+              </Animated.View>
             )}
           </View>
         </LinearGradient>

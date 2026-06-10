@@ -1,0 +1,2578 @@
+[
+  {
+    "n": 0,
+    "s": {
+      "snakeRect": null,
+      "snakeTransform": null,
+      "tiles": []
+    }
+  },
+  {
+    "n": 1,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L0-R4-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L4-R5-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        }
+      ]
+    }
+  },
+  {
+    "n": 2,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L6-R5-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L5-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R4-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L4-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 3,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L0-R6-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L6-R5-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L5-R0-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L0-R4-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L4-R5-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L5-R2-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        }
+      ]
+    }
+  },
+  {
+    "n": 4,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 5,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 6,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 7,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 8,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 9,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 10,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 11,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 12,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 13,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 14,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 15,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 16,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 17,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 18,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 19,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 20,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 21,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 22,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 23,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 24,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 25,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 26,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  },
+  {
+    "n": 27,
+    "s": {
+      "snakeRect": {
+        "w": 327,
+        "h": 350
+      },
+      "snakeTransform": "matrix(1, 0, 0, 1, 0, 0)",
+      "tiles": [
+        {
+          "tid": "damma-board-tile-0-L1-R3-rot0-v0",
+          "sL": "58.05px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-1-L3-R0-rot0-v0",
+          "sL": "129.3px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-2-L0-R6-rot0-v0",
+          "sL": "200.55px",
+          "sT": "72.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 200.390625
+        },
+        {
+          "tid": "damma-board-tile-3-L6-R5-rot90-v1",
+          "sL": "271.8px",
+          "sT": "83.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 295.796875,
+          "domY": 211.796875
+        },
+        {
+          "tid": "damma-board-tile-4-L5-R0-rot180-v0",
+          "sL": "200.55px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 224.546875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-5-L0-R4-rot180-v0",
+          "sL": "129.3px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 153.296875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-6-L4-R5-rot180-v0",
+          "sL": "58.05px",
+          "sT": "129.4px",
+          "sW": "68.4px",
+          "sH": "34.2px",
+          "domW": 68.390625,
+          "domH": 34.1875,
+          "domX": 82.046875,
+          "domY": 257.390625
+        },
+        {
+          "tid": "damma-board-tile-7-L5-R2-rot270-v1",
+          "sL": "21px",
+          "sT": "140.8px",
+          "sW": "34.2px",
+          "sH": "68.4px",
+          "domW": 34.1875,
+          "domH": 68.390625,
+          "domX": 45,
+          "domY": 268.796875
+        }
+      ]
+    }
+  }
+]

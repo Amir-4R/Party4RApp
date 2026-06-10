@@ -1738,3 +1738,64 @@ agent_communication:
       6. Adjacency invariant still holds (board[i].right === board[i+1].left).
       
       Backend untouched. Skip backend.
+
+#====================================================================================================
+# 2026-06-10 — DAMMA: STEPPED zoom-out with smooth animated transitions
+#====================================================================================================
+
+frontend:
+  - task: "Damma — Stepped scale tiers with smooth zoom-out transitions"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/components/SnakeLayout.ts, /app/frontend/src/games/damma/components/WoodenTable.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          User requested: "خلي الزوم حق اللعبه لما يبعد يبعد كثير وبحركه
+          تدريجيه مش بلحضات ويبعد بس قليل كل شويه يبعد لا الافضل يبعد مرات
+          قليل بس لمسافه طويله" = the game should zoom out in LARGE STEPS
+          with SMOOTH animations, infrequently, not in tiny continuous
+          shrinks every turn.
+          
+          Implementation:
+          1. SnakeLayout exposes SCALE_TIERS = [0.95, 0.72, 0.55, 0.42, 0.32]
+             — discrete zoom levels with big jumps between them.
+          2. New `pickScaleTier()` helper returns the LARGEST tier where
+             the chain fits. Called by WoodenTable; only steps DOWN, never
+             back up — so once zoomed out, the chain stays zoomed out.
+          3. SnakeLayout computes layout at a CHOSEN scale (caller picks).
+             Within a single tier all positions are stable (the previous
+             stability invariant still holds).
+          4. WoodenTable owns `tierIdx` state. On chain growth, picks the
+             ideal tier; if it's larger than current, sets tier to it.
+          5. Tier change triggers a 700 ms ease-out scale-transform on the
+             chain container. Visual ratio goes from (prevScale/newScale)
+             → 1.0 so the chain VISUALLY shrinks gradually rather than
+             snapping to the new size instantly.
+          6. Bot think time is 1.5 s so successive zoom-out triggers are
+             well-spaced and the user sees the animation clearly.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Damma zoom-tier system applied. Validation needed (FRONTEND ONLY):
+      
+      1. /game/damma. The first tile shows at the LARGEST tier (~95% size).
+         Tiles look big and easy to read.
+      2. Play 8-12 tiles. The chain stays at 95% scale until it would not
+         fit. At that point the entire chain smoothly ZOOMS OUT (700 ms
+         ease) to the next tier (~72%). Existing tiles all shrink TOGETHER
+         in one fluid motion. New tiles continue at this smaller scale.
+      3. Continue playing. Subsequent zoom-outs happen ONLY when the chain
+         no longer fits — at ~16-18 tiles and again at ~22-25 if needed.
+         Tier sizes: 0.95 → 0.72 → 0.55 → 0.42 → 0.32. Each step is large.
+      4. Within a single tier, NO tile changes position. Stability is
+         preserved within tiers.
+      5. The smooth zoom-out animation should be visible — not instant.
+         Use the screenshot tool to capture during the transition.
+      
+      Backend untouched. Skip backend.

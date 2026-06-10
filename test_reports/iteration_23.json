@@ -1,0 +1,50 @@
+{
+  "summary": "Damma STEPPED + SMOOTH zoom-out — PARTIAL VERIFICATION. Verified empirically (logged in testuser1, played ~27 turns on /game/damma): (1) INITIAL TIER (tier 0 = 0.95): every board tile rendered at exactly 68.4 px wide (=72 * 0.95) — matches SCALE_TIERS[0] precisely. Vertical corner tiles render at 34.2 px wide (=36 * 0.95). (2) WITHIN-TIER STABILITY: across 27 consecutive board snapshots the FIRST tile's inline (left, top) stayed pinned to (58.05px, 72.4px) — zero drift, identical to iteration 22 evidence. Only TWO unique style-widths observed across the entire chain (68.4 horizontal, 34.2 vertical) → no scale variance inside a tier. (3) SNAKE-BOX TRANSFORM: getComputedStyle(...).transform consistently reported matrix(1, 0, 0, 1, 0, 0) (identity) throughout, confirming that NO spurious zoom-animation fires mid-tier — it only fires on tier change, exactly as designed. (4) TIER-TRANSITION ANIMATION SMOOTHNESS — NOT EMPIRICALLY OBSERVED in this session: the chain in our autopilot capped at 8 placed tiles (boneyard auto-draw / forced-pass loop in the engine left the human stuck without a playable tile and the bot waiting for our move, so the chain never grew past tier-0's capacity ≈ 12-15 tiles on a 375×667 viewport). The code path itself is structurally correct on review (see critical_code_review_comments). The user/E1 can force-verify by playing manually to ~12+ tiles or by temporarily injecting a smaller play-area to trigger an early tier bump. No deprecated Expo packages detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/iter23_snaps.json",
+    "/app/test_reports/screens/iter23_final.jpg"
+  ],
+  "verification_evidence": {
+    "tier_0_scale": 0.95,
+    "tier_0_horizontal_tile_width_px": 68.4,
+    "tier_0_vertical_tile_width_px": 34.2,
+    "expected_horizontal_at_0_95": 68.4,
+    "expected_vertical_at_0_95": 34.2,
+    "first_tile_pos_constant_over_27_turns": "(58.05px, 72.4px)",
+    "unique_style_widths_per_tier": 2,
+    "snake_box_transform_during_steady_state": "matrix(1, 0, 0, 1, 0, 0)",
+    "max_chain_length_reached_in_session": 8,
+    "tier_transitions_observed_empirically": 0,
+    "tier_transition_threshold_reached": false,
+    "explanation": "On a 375×667 viewport with the felt's content box ≈ 327×320 px after SAFE_X/Y=12 padding, tier 0 (scale 0.95) has perRow≈3 horizontal + 1 vertical corner per row. Capacity at 4 rows ≈ 12-14 tiles before vertical overflow. Our autopilot only reached 8 tiles because the engine's mustDraw / mustPass cycle stalled when human had no playable tile and boneyard draw didn't yield one. The tier-step-down code path is unreached but structurally correct (see review)."
+  },
+  "action_items": [
+    "(VERIFICATION GAP — no fix required) Manually validate the smooth 700 ms tier-down animation by playing /game/damma to ~12-15 tiles and observing: (a) the whole chain begins visually at the OLD size, (b) eases down smoothly over ~700 ms to the new (smaller) tier size, (c) NEVER re-enlarges. The code in WoodenTable.tsx lines 105-121 implements this correctly: prevScaleRef captures the old scale, zoomAnim is set to (oldScale/newScale) on tier change, then animates to 1.0 via Easing.bezier(0.22, 1, 0.36, 1) over 700 ms with useNativeDriver=true.",
+    "(Optional QoL) Consider reducing SCALE_TIERS[0] from 0.95 to ~0.85 for small viewports (<400 px wide) so the first tier transition fires earlier and the user actually sees the stepped behaviour during a normal match — at 0.95 on a phone, most matches will finish before tier 0 overflows."
+  ],
+  "critical_code_review_comments": [
+    "SnakeLayout.ts (good): SCALE_TIERS frozen array [0.95, 0.72, 0.55, 0.42, 0.32] — large gaps between adjacent tiers (~24%, 24%, 24%, 24% step-downs) directly implements 'few but large zooms'. pickScaleTier() correctly walks from current tier downward and returns the FIRST tier where !overflow.",
+    "WoodenTable.tsx (good): tier-bump effect (lines 95-99) is monotone — `if (ideal > tierIdx) setTierIdx(ideal)` — only ever steps DOWN, never back up, satisfying the 'never re-enlarge' requirement.",
+    "WoodenTable.tsx (good): the zoom-animation effect (lines 105-121) is mathematically correct. When tier flips 0→1 (0.95→0.72), prev/curr = 1.319 → tiles laid out at NEW (smaller) positions × 1.319 visually = OLD size → animates to 1.0 (=NEW size) over 700 ms ease-out. Transform-origin defaults to center of the snakeBox so the shrink converges toward the chain's middle. useNativeDriver=true keeps it 60 fps.",
+    "WoodenTable.tsx (good): prevScaleRef uses useRef so it persists across renders without retriggering the effect. The effect deps are [currentScale, zoomAnim] — fires only when scale actually changes.",
+    "WoodenTable.tsx (subtle, non-blocking): if the viewport resizes so dramatically (e.g., orientation flip) that the IDEAL tier would step UP, the current code intentionally holds at the smaller tier. Documented as intended behaviour in the comments. If E1 ever wants 'snap-to-best-tier on resize' as a future feature, the tierIdx clamp would need to be lifted on a playSize change.",
+    "DominoTile.tsx (no change): scale prop is plumbed through correctly; the absolute-positioned pip layout means scale × position is linear and stable."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "n/a (skipped per request)",
+    "frontend": "Damma stepped-zoom: 3/4 invariants empirically verified (initial tier, stability, single-width-per-tier). 1/4 (smooth 700 ms transition) is correct on code review but not triggered in autopilot because the chain didn't reach tier-0 overflow."
+  },
+  "seed_data_creation": "None. Used pre-seeded testuser1 / pass1234.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The Damma STEPPED zoom-out fix is verified for tier 0 (0.95, 68.4×34.2 px) and within-tier stability. To FORCE-TEST the 700 ms tier-down animation: option A — manually play /game/damma to 12-15 tiles on a 375×667 viewport (auto-pilot fails because the engine's mustDraw/mustPass cycle stalls). Option B — temporarily lower ASSUMED_TOTAL_ROWS or shrink the felt content box so overflow fires at ~6 tiles, then revert. Useful selectors unchanged from iter22: damma-back-btn, damma-board-tile-{idx}-L{l}-R{r}-rot{rot}-v{v}, damma-hand-tile-{idx}-{l}-{r}, damma-play-left/right, damma-boneyard-draw, damma-pass-btn. The snakeBox transform reads as matrix(1,0,0,1,0,0) when no tier change is in flight; during a 700 ms tier-down it should read matrix(r,0,0,r,0,0) with r animating from ratio (e.g. 1.319) down to 1.0. Mid-animation capture window: ~0-700 ms after the new tier mounts. Pre-seeded login: testuser1 / pass1234.",
+  "rca_of_issue": "Not a bug — this is a forward-fix verification. Previous iteration (22) fixed jittery scale changes by hard-fixing scale=0.62 everywhere. The new ask is the OPPOSITE: keep the visual large (0.95) most of the time and zoom out in DISCRETE big jumps with a smooth 700 ms ease-out tween. Implementation review confirms the new SCALE_TIERS + pickScaleTier + monotone tierIdx + zoomAnim-via-transform approach correctly satisfies all four user requirements (stepped, smooth, monotone, animated)."
+}

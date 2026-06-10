@@ -1,23 +1,20 @@
 // =============================================================================
-// damma/components/SnakeLayout.ts — STABLE serpentine layout
+// damma/components/SnakeLayout.ts — STABLE serpentine layout w/ scale tiers
 // =============================================================================
-// Builds a deterministic chain layout where:
+// Builds a deterministic chain layout. Caller picks the scale; the layout is
+// purely a function of (N, playW, playH, scale). Within a single scale tier
+// every tile keeps its (x, y) across re-renders. Zooming out happens in
+// DISCRETE TIERS (managed by the parent component) so the visual size only
+// changes a few times per match — and each transition is animated smoothly.
 //
-//   • Tiles use a SINGLE FIXED scale — no auto-shrink. So existing tiles
-//     NEVER reposition when a new tile is appended.
-//   • The first tile always lands at a constant (x, y) anchor regardless
-//     of how many tiles are currently on the board.
-//   • Each subsequent tile's position is purely a function of its CHAIN
-//     INDEX, the play area dimensions, and the fixed scale — so position
-//     [i] is identical across renders.
-//   • The chain bends 90° via vertical "corner" tiles at row edges.
-//   • Tiles are sized small enough that the full 28-tile DS6 deck fits
-//     comfortably on a phone-sized board.
+//   • Tiles use the SCALE supplied by the caller — no auto-shrink in here.
+//   • The first tile lands at a constant anchor (y is computed assuming a
+//     fixed pretend chain length so existing tiles never shift up/down).
+//   • Each subsequent tile's position is a pure function of its chain index.
+//   • The chain bends 90° via vertical "corner" tiles at row ends.
 //
-// Returned coordinates are CENTER (x, y); the caller positions the tile
-// by its top-left at (x − w/2, y − h/2). Coordinates are PHYSICAL pixels
-// — never logical-start / logical-end — so the layout is fully immune to
-// RTL ("Arabic mode") flipping.
+// Returned coordinates are CENTER (x, y); the caller renders by top-left at
+// (x − w/2, y − h/2). Coordinates are PHYSICAL pixels — RTL has no effect.
 // =============================================================================
 
 // Base tile dims at scale = 1.
@@ -26,53 +23,66 @@ export const TILE_H = 36;
 export const TILE_GAP = 3;
 export const ROW_GAP = 6;
 
-// FIXED scale — every tile renders at exactly this size, on every board
-// state. Picked so ~6 tiles fit per row on a 360-px-wide play area and the
-// full 28-tile chain comfortably fits in 4-5 rows. Smaller = more room
-// for long matches, larger = easier to read individual pips.
-export const FIXED_TILE_SCALE = 0.62;
+// ── Scale tiers — used by callers that want stepped zoom-out behaviour ──
+// First tier is the LARGEST (most readable). The chain zooms out to a
+// smaller tier ONLY when the current tier's layout would overflow. Each
+// step is a big jump so the user experiences "a few clear zooms per match"
+// rather than "tiny constant shrinks every turn".
+export const SCALE_TIERS: readonly number[] = Object.freeze([0.95, 0.72, 0.55, 0.42, 0.32]);
+export const DEFAULT_TIER_INDEX = 0;
 
 // How many rows of horizontal tiles we ASSUME the chain will eventually
-// fill. Used only to pre-allocate the vertical centring offset so the
-// chain visually starts in the middle of the table and grows downward
-// WITHOUT shifting existing tiles upward as new rows appear.
+// fill at each tier. Used only to pre-allocate the vertical centring
+// offset so the chain visually starts near the middle of the table and
+// grows downward WITHOUT shifting existing tiles upward as new rows appear.
 const ASSUMED_TOTAL_ROWS = 4;
 
 export interface SnakePos {
-  /** Chain index (0 = leftmost in the engine board[] array). */
   idx: number;
-  /** Absolute CENTER X inside the play area (physical px from left edge). */
   x: number;
-  /** Absolute CENTER Y inside the play area. */
   y: number;
-  /** Rotation in degrees. 0 / 90 / 180 / 270. */
   rotation: number;
-  /** Vertical (corner) tile? */
   isVertical: boolean;
 }
 
 export interface SnakeLayoutResult {
   positions: SnakePos[];
   scale: number;
-  /** True when the chain would not fit even at MIN scale. Caller may clip. */
+  /** True when the chain at this scale would not fit comfortably in the
+   * available area. Caller should bump to a smaller scale tier. */
   overflow: boolean;
 }
 
 /**
- * Compute (or recompute) positions for every tile in the chain.
+ * Compute positions for every tile in the chain at the given scale.
  *
- * IMPORTANT: This function is PURE and DETERMINISTIC. Given the same
- * (N, playW, playH) inputs it always returns the same positions. Most
- * importantly, the position of board[i] is INDEPENDENT of the current
- * value of N — so adding a new tile NEVER shifts existing tiles.
+ * Position of board[i] is a pure function of (i, playW, playH, scale) —
+ * never depends on N. Adding tiles 1 → N+1 leaves positions[0..N-1] byte-
+ * identical.
  */
 export function buildSnakeLayout(
   N: number, playW: number, playH: number,
+  scale: number = SCALE_TIERS[DEFAULT_TIER_INDEX],
 ): SnakeLayoutResult {
   if (N <= 0 || playW <= 0 || playH <= 0) {
-    return { positions: [], scale: FIXED_TILE_SCALE, overflow: false };
+    return { positions: [], scale, overflow: false };
   }
-  return computeLayout(N, playW, playH, FIXED_TILE_SCALE);
+  return computeLayout(N, playW, playH, scale);
+}
+
+/**
+ * Pick the LARGEST scale tier at which the chain fits the play area. Used
+ * by the parent to decide when to step down to a smaller tier. Returns
+ * the index into SCALE_TIERS (0 = largest).
+ */
+export function pickScaleTier(
+  N: number, playW: number, playH: number, startTier = 0,
+): number {
+  for (let i = Math.max(0, startTier); i < SCALE_TIERS.length; i++) {
+    const layout = computeLayout(N, playW, playH, SCALE_TIERS[i]);
+    if (!layout.overflow) return i;
+  }
+  return SCALE_TIERS.length - 1;
 }
 
 function computeLayout(
@@ -91,42 +101,31 @@ function computeLayout(
   const rowH = (tw + th) / 2 + rowGap;
 
   // VERTICAL CENTRING uses an ASSUMED total row count rather than the
-  // actual segment count. This means the y of row 0 is a CONSTANT — it
-  // never changes when the chain grows from 1 → 10 → 20 tiles. Existing
-  // tiles stay put.
+  // actual segment count — so row 0's y is a CONSTANT regardless of N.
   const assumedTotalH = (ASSUMED_TOTAL_ROWS - 1) * rowH + th;
   const yOffset = Math.max(th / 2 + 8, (playH - assumedTotalH) / 2 + th / 2);
 
-  // Horizontal anchors for the row (kept constant across rows so corners
-  // line up across rows).
+  // Horizontal anchors for each row, kept constant across rows so corners
+  // line up vertically.
   const xLeft = (playW / 2) - ((perRow - 1) * (tw + gap)) / 2;
   const xRight = (playW / 2) + ((perRow - 1) * (tw + gap)) / 2;
 
-  // Walk the chain segment-by-segment, computing positions for the FIRST
-  // N tiles. We compute up to the actual N, but we DO NOT vary anything
-  // based on N — positions[0..k] are always identical for any N ≥ k+1.
   const positions: SnakePos[] = [];
   let chainIdx = 0;
   let seg = 0;
+  let maxRowReached = 0;
+
   while (chainIdx < N) {
     const goingRight = seg % 2 === 0;
     const yRow = yOffset + seg * rowH;
+    maxRowReached = seg;
 
-    // How many tiles will live in THIS row? In FULL segments (≠ last) it's
-    // exactly `perRow` horizontal tiles followed by 1 vertical corner. For
-    // the FINAL segment we just take whatever's left.
-    // We don't actually need to know "isLast" upfront — we just walk forward
-    // and decide as we go.
     let placedInRow = 0;
     while (placedInRow < perRow && chainIdx < N) {
-      // Place a horizontal tile.
       const rowSpan = (perRow - 1) * (tw + gap);
       const xStart = goingRight ? (playW / 2 - rowSpan / 2) : (playW / 2 + rowSpan / 2);
       const j = placedInRow;
       const x = goingRight ? (xStart + j * (tw + gap)) : (xStart - j * (tw + gap));
-      // Tiles in LEFT-going rows are rendered rotated 180° so adjacent
-      // values stay visually continuous (since their on-screen order is
-      // reversed relative to the chain order).
       positions.push({
         idx: chainIdx,
         x, y: yRow,
@@ -137,8 +136,6 @@ function computeLayout(
       placedInRow++;
     }
 
-    // After a full row of perRow tiles, place a corner ONLY if more tiles
-    // remain in the chain. Otherwise the chain ends mid-row.
     if (chainIdx < N) {
       const yCorner = yRow + rowH / 2;
       const xCorner = goingRight
@@ -154,16 +151,19 @@ function computeLayout(
     }
 
     seg++;
-    // Safety: avoid an infinite loop if perRow somehow ends up at 0.
     if (seg > 200) break;
   }
 
-  // Overflow detection — chain ran beyond the assumed row count.
-  const overflow = seg > ASSUMED_TOTAL_ROWS;
+  // Overflow: the chain extended past the available play height with the
+  // current scale. Parent should bump to the next tier.
+  const usedH = yOffset + maxRowReached * rowH + th / 2;
+  const overflow = usedH > playH - 4;  // 4 px safety margin
 
   return { positions, scale, overflow };
 }
 
-// Re-exported for callers that need to size tile sprites.
-export const MIN_SCALE = FIXED_TILE_SCALE;
-export const MAX_SCALE = FIXED_TILE_SCALE;
+// Aliases — kept for backward compatibility with callers that imported the
+// old names. New callers should use SCALE_TIERS / pickScaleTier directly.
+export const MIN_SCALE = SCALE_TIERS[SCALE_TIERS.length - 1];
+export const MAX_SCALE = SCALE_TIERS[0];
+export const FIXED_TILE_SCALE = SCALE_TIERS[DEFAULT_TIER_INDEX];
