@@ -273,6 +273,7 @@ export default function WoodenTable({
                   return (
                     <Animated.View
                       key={tile.id}
+                      testID={`damma-board-tile-${pos.idx}-L${tile.left}-R${tile.right}-rot${pos.rotation}-v${pos.isVertical ? 1 : 0}`}
                       style={[
                         styles.tileWrap,
                         { left, top, width: box.w, height: box.h },

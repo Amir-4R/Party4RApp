@@ -6,7 +6,7 @@
 // No engine/AI logic here.
 // =============================================================================
 import React from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, I18nManager } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { dammaPalette } from "@/src/games/shared/gameTheme";
@@ -85,12 +85,29 @@ export default function DominoTile({
           { borderRadius: 6 * scale },
         ]}
       >
-        <PipFace value={domino.left} size={faceSize} color={pal.pip} />
-        <View style={[
-          horizontal ? styles.dividerV : styles.dividerH,
-          { backgroundColor: pal.divider, height: horizontal ? "62%" : Math.max(1, 1.5 * scale), width: horizontal ? Math.max(1, 1.5 * scale) : "62%" },
-        ]} />
-        <PipFace value={domino.right} size={faceSize} color={pal.pip} />
+        {/* RTL FIX — In Arabic mode `flexDirection: "row"` is mirrored by
+            React Native, which would swap `domino.left` to the screen-right.
+            We compensate by manually reversing children when isRTL is true,
+            so domino.left ALWAYS appears at the visual screen-LEFT. */}
+        {horizontal && I18nManager.isRTL ? (
+          <>
+            <PipFace value={domino.right} size={faceSize} color={pal.pip} />
+            <View style={[
+              styles.dividerV,
+              { backgroundColor: pal.divider, height: "62%", width: Math.max(1, 1.5 * scale) },
+            ]} />
+            <PipFace value={domino.left} size={faceSize} color={pal.pip} />
+          </>
+        ) : (
+          <>
+            <PipFace value={domino.left} size={faceSize} color={pal.pip} />
+            <View style={[
+              horizontal ? styles.dividerV : styles.dividerH,
+              { backgroundColor: pal.divider, height: horizontal ? "62%" : Math.max(1, 1.5 * scale), width: horizontal ? Math.max(1, 1.5 * scale) : "62%" },
+            ]} />
+            <PipFace value={domino.right} size={faceSize} color={pal.pip} />
+          </>
+        )}
       </LinearGradient>
     </TouchableOpacity>
   );

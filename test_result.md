@@ -1518,3 +1518,58 @@ agent_communication:
       
       Backend untouched in this iteration (only engine.ts + SnakeLayout.ts +
       room/[id].tsx changed). Skip backend retest.
+
+#====================================================================================================
+# 2026-06-10 — DAMMA: RTL pip rendering fix (root cause of "reversed numbers")
+#====================================================================================================
+
+frontend:
+  - task: "Damma — DominoTile pip faces render LTR even in RTL (Arabic) mode"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/components/DominoTile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          REAL ROOT CAUSE of the "reversed numbers" issue found via the
+          user's screenshots. The previous engine fix was correct, but the
+          DominoTile component used `flexDirection: "row"` which React Native
+          automatically mirrors when `I18nManager.forceRTL(true)` is active
+          (which the app does in Arabic mode). That mirror caused
+          `domino.left` to render on the visual screen-RIGHT instead of
+          screen-LEFT, breaking the engine's invariant (board[i].right ===
+          board[i+1].left) AT THE PIXEL LEVEL.
+          
+          Fix: import `I18nManager` and, when isRTL=true AND horizontal=true,
+          render the two PipFace children in REVERSED order (right first,
+          then divider, then left). The visual screen output now matches the
+          engine's value semantics regardless of language. Vertical tiles
+          (corner) are unaffected since flexDirection:column isn't mirrored
+          by RTL.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      RTL pip rendering fix applied. Validation needed (FRONTEND ONLY):
+      
+      1. Set the app language to ARABIC (force RTL). Visit /game/damma.
+      2. Play 15-20 tiles vs the bot, mixing left and right side plays.
+      3. At EVERY chain length, verify VISUAL adjacency: for adjacent tiles
+         on the same horizontal row, the screen-right value of the left
+         tile MUST equal the screen-left value of the right tile.
+         E.g., if the row reads [3|5][5|4][4|2] on screen left-to-right,
+         the values match (5=5, 4=4). The user's previous screenshot
+         showed [3|5][3|3][1|5] where 5≠3, 3≠1 — that's the bug. After fix,
+         this should never happen.
+      4. Verify the same continuity through the corner tile (vertical) into
+         the next row. After the corner, the next row (going LEFT) tiles
+         have rotation=180° applied externally — their visual screen-LEFT
+         value (which is their original RIGHT) connects to the corner's
+         visual BOTTOM (= corner's right value).
+      5. Switch language back to ENGLISH (LTR) and confirm no regression.
+      
+      Backend untouched. Skip backend retest.
