@@ -384,6 +384,9 @@ export default function DammaScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_damma") || "Damma"}</Text>
         <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity onPress={() => router.push("/game/damma-lobby")} style={styles.iconBtn}>
+            <Ionicons name="people-circle-outline" size={24} color={GOLD} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowModePicker(true)} style={styles.iconBtn}>
             <Ionicons name={playerCount === 4 ? "people" : "person"} size={22} color={GOLD} />
           </TouchableOpacity>
