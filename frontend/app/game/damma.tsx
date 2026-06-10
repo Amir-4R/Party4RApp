@@ -11,7 +11,7 @@
 // All existing flows (engine, sound, stats, result overlay, countdown) intact.
 // =============================================================================
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable, Dimensions, Animated, Image, Easing } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Dimensions, Animated, Easing } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +34,14 @@ import Countdown from "@/src/games/shared/ui/Countdown";
 import { recordResult, RecordResult } from "@/src/games/stats";
 import { playSound } from "@/src/games/sound/SoundManager";
 
+// ── Refactored sub-components (UI only) ─────────────────────────────────────
+import DominoTile from "@/src/games/damma/components/DominoTile";
+import PlayerCard from "@/src/games/damma/components/PlayerCard";
+import BoneyardPanel from "@/src/games/damma/components/BoneyardPanel";
+import WoodenTable from "@/src/games/damma/components/WoodenTable";
+import HandTray from "@/src/games/damma/components/HandTray";
+import { GOLD } from "@/src/games/damma/components/theme";
+
 const { width: SCREEN_W } = Dimensions.get("window");
 const DIFF_KEY = "damma_bot_difficulty";
 const MODE_KEY = "damma_player_count";
@@ -42,101 +50,7 @@ const BOT_THINK_MS = 5000;        // ← Bot thinks for 5 s before playing.
 const PLAY_ANIM_MS = 450;         // ← Tile slide animation duration (300–600 ms).
 const ME: PlayerId = "player1";
 
-// Premium gold accent palette
-const GOLD = "#D4AF37";
-const GOLD_SOFT = "#B8860B";
-
-// ── Premium "luxury table" palette (UI only — no engine changes) ─────────────
-const WOOD_MID    = "#4A2E16";   // rich walnut frame
-const WOOD_LIGHT  = "#6E4520";   // upper highlight on the wood
-const WOOD_DARK   = "#1F0E05";   // shadow side of the wood
-const FELT_CENTER = "#0E5A2D";   // center of the green felt
-const FELT_EDGE   = "#063318";   // outer felt (darker for vignette)
-const FELT_DEEP   = "#02180B";   // deepest shadow under the rim
-
-// ── Pip-dot layouts on a 3×3 grid (true domino faces) ────────────────────────
-const PIP_MAP: Record<number, number[]> = {
-  0: [],
-  1: [4],
-  2: [0, 8],
-  3: [0, 4, 8],
-  4: [0, 2, 6, 8],
-  5: [0, 2, 4, 6, 8],
-  6: [0, 2, 3, 5, 6, 8],
-};
-
-function PipFace({ value, size, color }: { value: number; size: number; color: string }) {
-  const cells = PIP_MAP[value] || [];
-  const dot = Math.max(2.5, size * 0.16);
-  return (
-    <View style={[styles.pipFace, { width: size, height: size }]}>
-      {Array.from({ length: 9 }).map((_, i) => (
-        <View key={i} style={styles.pipCell}>
-          {cells.includes(i) && (
-            <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color }} />
-          )}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// ── Tile renderer — accepts an explicit `scale` so the board can shrink
-// the played chain while the hand keeps its standard size. ───────────────────
-function DominoTile({
-  domino, onPress, selected, horizontal, pal, scale = 1, testID,
-}: {
-  domino: Domino | PlacedDomino;
-  onPress?: () => void;
-  selected?: boolean;
-  horizontal?: boolean;
-  pal: ReturnType<typeof dammaPalette>;
-  scale?: number;
-  testID?: string;
-}) {
-  const W = (horizontal ? 72 : 40) * scale;
-  const H = (horizontal ? 40 : 72) * scale;
-  const faceSize = (horizontal ? 30 : 28) * scale;
-  return (
-    <TouchableOpacity
-      testID={testID}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={0.85}
-      style={[
-        styles.tile,
-        {
-          width: W, height: H,
-          backgroundColor: pal.tileFace, borderColor: pal.tileBorder,
-          borderRadius: 8 * scale, borderWidth: Math.max(1, 1.5 * scale),
-        },
-        selected && {
-          borderColor: FUTURISTIC.brand, borderWidth: 2.5,
-          shadowColor: FUTURISTIC.brand, shadowOpacity: 0.7, shadowRadius: 8,
-          transform: [{ translateY: -10 }],
-        },
-      ]}
-    >
-      <LinearGradient
-        colors={[pal.tileFace, pal.tileFaceEdge]}
-        start={{ x: 0.2, y: 0.1 }}
-        end={{ x: 0.9, y: 1 }}
-        style={[
-          styles.tileInner,
-          horizontal && styles.tileInnerH,
-          { borderRadius: 6 * scale },
-        ]}
-      >
-        <PipFace value={domino.left} size={faceSize} color={pal.pip} />
-        <View style={[
-          horizontal ? styles.dividerV : styles.dividerH,
-          { backgroundColor: pal.divider, height: horizontal ? "62%" : Math.max(1, 1.5 * scale), width: horizontal ? Math.max(1, 1.5 * scale) : "62%" },
-        ]} />
-        <PipFace value={domino.right} size={faceSize} color={pal.pip} />
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
+// (PipFace + DominoTile now live in /app/frontend/src/games/damma/components/)
 
 // ── Difficulty options ───────────────────────────────────────────────────────
 const DIFF_OPTIONS: { id: DammaDifficulty; label: string; emoji: string; hint: string; color: string }[] = [
@@ -425,19 +339,15 @@ export default function DammaScreen() {
 
       {/* Scores + Turn timer  ── with avatars & usernames for BOTH players */}
       <View style={styles.scoreBar}>
-        {/* Player card (you) */}
-        <View testID="damma-player-card-me" style={[styles.playerScoreCard, isMyTurn && styles.scoreActive]}>
-          <Image
-            source={{ uri: getAvatarUrl(user?.avatar || "avatar_ninja") }}
-            style={[styles.avatar, isMyTurn && styles.avatarActive]}
-          />
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.playerName} numberOfLines={1}>
-              {user?.nickname || user?.username || (t("you") || "أنت")}
-            </Text>
-            <Text style={styles.scoreVal}>{state.scores.player1}</Text>
-          </View>
-        </View>
+        {/* Player card (you) — variant=me, large card */}
+        <PlayerCard
+          testID="damma-player-card-me"
+          variant="me"
+          name={user?.nickname || user?.username || (t("you") || "أنت")}
+          score={state.scores.player1}
+          avatarUri={getAvatarUrl(user?.avatar || "avatar_ninja")}
+          active={isMyTurn}
+        />
 
         {/* Turn timer */}
         <View testID="damma-timer" style={[styles.timerBox, isMyTurn && turnTimeLeft <= 10 && styles.timerWarn]}>
@@ -453,36 +363,28 @@ export default function DammaScreen() {
           </Text>
         </View>
 
-        {/* Opponent card (bot) */}
-        <View testID="damma-player-card-bot" style={[styles.playerScoreCard, !isMyTurn && styles.scoreActive]}>
-          <View style={{ flex: 1, marginRight: 8, alignItems: "flex-end" }}>
-            <Text style={styles.playerName} numberOfLines={1}>
-              🤖 {diffMeta.label}
-            </Text>
-            <Text style={styles.scoreVal}>{state.scores.player2}</Text>
-          </View>
-          <View style={[styles.avatar, styles.botAvatarBox, !isMyTurn && styles.avatarActive]}>
-            <Ionicons name="hardware-chip" size={22} color={diffMeta.color} />
-          </View>
-        </View>
+        {/* Opponent card (bot) — variant=bot, large card */}
+        <PlayerCard
+          testID="damma-player-card-bot"
+          variant="bot"
+          name={`🤖 ${diffMeta.label}`}
+          score={state.scores.player2}
+          iconColor={diffMeta.color}
+          active={!isMyTurn}
+        />
       </View>
 
       {/* Opponent hand (face down) — top player (player2 in 2P, player3 in 4P) */}
       <View style={styles.oppHand}>
         {playerCount === 4 && state.hands.player3 && (
-          <View testID="damma-player-card-top" style={styles.topPlayerCard}>
-            <View style={[styles.smallAvatar, state.turn === "player3" && styles.smallAvatarActive]}>
-              <Ionicons name="hardware-chip" size={18} color={GOLD} />
-            </View>
-            <View style={{ alignItems: "center" }}>
-              <Text style={styles.smallPlayerName}>🤖 لاعب 3</Text>
-              <Text style={styles.smallScoreVal}>{state.scores.player3 ?? 0}</Text>
-            </View>
-            <View style={styles.tileCountBadge}>
-              <Ionicons name="apps" size={11} color={GOLD} />
-              <Text style={styles.tileCountText}>{state.hands.player3.length}</Text>
-            </View>
-          </View>
+          <PlayerCard
+            testID="damma-player-card-top"
+            variant="top"
+            name="🤖 لاعب 3"
+            score={state.scores.player3 ?? 0}
+            tileCount={state.hands.player3.length}
+            active={state.turn === "player3"}
+          />
         )}
         {playerCount === 2 && state.hands.player2.map((_, i) => (
           <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
@@ -495,246 +397,80 @@ export default function DammaScreen() {
       {/* Side player cards (for 4-player mode) */}
       {playerCount === 4 && (
         <View style={styles.sidePlayersRow}>
-          <View testID="damma-player-card-left" style={[styles.sidePlayerCard, state.turn === "player2" && styles.scoreActive]}>
-            <View style={[styles.smallAvatar, state.turn === "player2" && styles.smallAvatarActive]}>
-              <Ionicons name="hardware-chip" size={18} color={GOLD} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 6 }}>
-              <Text style={styles.smallPlayerName}>🤖 لاعب 2</Text>
-              <Text style={styles.smallScoreVal}>{state.scores.player2}</Text>
-            </View>
-            <View style={styles.tileCountBadge}>
-              <Ionicons name="apps" size={10} color={GOLD} />
-              <Text style={styles.tileCountText}>{state.hands.player2?.length ?? 0}</Text>
-            </View>
-          </View>
-
-          <View testID="damma-player-card-right" style={[styles.sidePlayerCard, state.turn === "player4" && styles.scoreActive]}>
-            <View style={[styles.smallAvatar, state.turn === "player4" && styles.smallAvatarActive]}>
-              <Ionicons name="hardware-chip" size={18} color={GOLD} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 6 }}>
-              <Text style={styles.smallPlayerName}>🤖 لاعب 4</Text>
-              <Text style={styles.smallScoreVal}>{state.scores.player4 ?? 0}</Text>
-            </View>
-            <View style={styles.tileCountBadge}>
-              <Ionicons name="apps" size={10} color={GOLD} />
-              <Text style={styles.tileCountText}>{state.hands.player4?.length ?? 0}</Text>
-            </View>
-          </View>
+          <PlayerCard
+            testID="damma-player-card-left"
+            variant="side"
+            name="🤖 لاعب 2"
+            score={state.scores.player2}
+            tileCount={state.hands.player2?.length ?? 0}
+            active={state.turn === "player2"}
+          />
+          <PlayerCard
+            testID="damma-player-card-right"
+            variant="side"
+            name="🤖 لاعب 4"
+            score={state.scores.player4 ?? 0}
+            tileCount={state.hands.player4?.length ?? 0}
+            active={state.turn === "player4"}
+          />
         </View>
       )}
 
       {/* Table row */}
       <View style={styles.tableRow}>
-        {/* Wooden frame outer wrap (UI only — wraps the existing felt) */}
-        <LinearGradient
-          colors={[WOOD_LIGHT, WOOD_MID, WOOD_DARK]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.woodFrame}
-        >
-          {/* Thin gold inner trim */}
-          <View pointerEvents="none" style={styles.woodGoldTrim} />
-          <View style={[styles.tableWrap, { shadowColor: pal.glow }]}>
-            <LinearGradient
-              colors={[FELT_CENTER, FELT_EDGE, FELT_DEEP]}
-              start={{ x: 0.3, y: 0.1 }}
-              end={{ x: 0.8, y: 1 }}
-              style={[styles.table, { borderColor: "transparent" }]}
-            >
-              {/* Subtle radial felt highlight (fabric look) */}
-              <View pointerEvents="none" style={styles.feltHighlight} />
-              {/* Inner stitched bevel — keeps the old elegant dashed inlay */}
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tableInlay, { borderColor: withAlpha(pal.railLight, 0.45) }]} />
-              {/* Ambient corner glow (top-left) */}
-              <View pointerEvents="none" style={[styles.tableGlow, { backgroundColor: withAlpha(pal.glow, 0.18) }]} />
-              {/* Ambient corner glow (bottom-right, opposite tint) */}
-              <View pointerEvents="none" style={[styles.tableGlowB, { backgroundColor: withAlpha("#000000", 0.15) }]} />
+        {/* Wooden frame + green felt + chain (extracted) */}
+        <WoodenTable
+          boardRows={boardRows}
+          leftEnd={state.leftEnd}
+          rightEnd={state.rightEnd}
+          chainScale={chainScale}
+          pal={pal}
+          endsLabel={t("ends") || "Ends"}
+          emptyText={t("place_first_tile") || "ضع أول قطعة"}
+        />
 
-            <Text style={[styles.endsLabel, { color: withAlpha("#FFFFFF", 0.75) }]}>
-              {t("ends") || "Ends"}: {state.leftEnd ?? "—"} / {state.rightEnd ?? "—"}
-            </Text>
-
-            {state.board.length === 0 ? (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <Text style={styles.emptyBoard}>{t("place_first_tile") || "ضع أول قطعة"}</Text>
-              </View>
-            ) : (
-              // Snake-wrapped, scaled chain — fully responsive
-              <ScrollView
-                contentContainerStyle={styles.boardWrap}
-                showsVerticalScrollIndicator={false}
-              >
-                {boardRows.map((row, ri) => (
-                  <View
-                    key={`row-${ri}`}
-                    style={[
-                      styles.boardRow,
-                      { gap: Math.max(2, 3 * chainScale) },
-                    ]}
-                  >
-                    {row.map((d, i) => (
-                      <DominoTile
-                        key={`${d.id}-${ri}-${i}`}
-                        domino={d}
-                        horizontal
-                        pal={pal}
-                        scale={chainScale}
-                      />
-                    ))}
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-          </LinearGradient>
-        </View>
-        </LinearGradient>
-        {/* end wooden frame wrap */}
-
-        {/* Dedicated Boneyard pile (always visible count + tap to draw) — now wrapped in a premium wooden panel */}
-        <LinearGradient
-          colors={[WOOD_LIGHT, WOOD_MID, WOOD_DARK]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.boneyardWoodFrame}
-        >
-          <View pointerEvents="none" style={styles.boneyardGoldTrim} />
-          <View style={styles.boneyard}>
-            <Text style={styles.boneyardLabel}>{t("boneyard") || "السحب"}</Text>
-          <TouchableOpacity
-            testID="damma-boneyard"
-            disabled={!isMyTurn || !options.mustDraw}
-            onPress={handleDraw}
-            activeOpacity={0.85}
-            style={[
-              styles.boneyardPile,
-              {
-                borderColor: isMyTurn && options.mustDraw ? FUTURISTIC.brand : withAlpha(pal.railLight, 0.35),
-                shadowColor: isMyTurn && options.mustDraw ? FUTURISTIC.brand : "transparent",
-              },
-            ]}
-          >
-            {/* Stacked card visual — three offset rectangles */}
-            {state.boneyard.length > 0 ? (
-              <>
-                {state.boneyard.length > 2 && (
-                  <LinearGradient
-                    colors={[pal.railLight, pal.rail]}
-                    style={[styles.boneyardCard, { transform: [{ translateX: -4 }, { translateY: -4 }] }]}
-                  />
-                )}
-                {state.boneyard.length > 1 && (
-                  <LinearGradient
-                    colors={[pal.railLight, pal.rail]}
-                    style={[styles.boneyardCard, { transform: [{ translateX: -2 }, { translateY: -2 }] }]}
-                  />
-                )}
-                <LinearGradient
-                  colors={[pal.railLight, pal.rail]}
-                  style={styles.boneyardCard}
-                >
-                  <Ionicons name="apps" size={20} color={withAlpha("#FFFFFF", 0.6)} />
-                </LinearGradient>
-              </>
-            ) : (
-              <View style={[styles.boneyardCard, { backgroundColor: "transparent", borderColor: withAlpha(pal.railLight, 0.25), borderWidth: 1, borderStyle: "dashed" }]}>
-                <Text style={{ color: withAlpha("#FFFFFF", 0.4), fontSize: 10 }}>فارغ</Text>
-              </View>
-            )}
-            <View style={styles.boneyardBadge}>
-              <Text style={styles.boneyardCount}>{state.boneyard.length}</Text>
-            </View>
-          </TouchableOpacity>
-          {isMyTurn && options.mustDraw && (
-            <Text style={styles.boneyardHint}>{t("tap_to_draw") || "اضغط للسحب"}</Text>
-          )}
-        </View>
-        </LinearGradient>
-        {/* end boneyard wooden frame */}
+        {/* Boneyard pile (extracted) */}
+        <BoneyardPanel
+          count={state.boneyard.length}
+          canDraw={isMyTurn && options.mustDraw}
+          onDraw={handleDraw}
+          pal={pal}
+          label={t("boneyard") || "السحب"}
+          hint={t("tap_to_draw") || "اضغط للسحب"}
+          emptyLabel="فارغ"
+        />
       </View>
 
-      {/* My hand — premium wooden tray look */}
-      <LinearGradient
-        colors={[WOOD_LIGHT, WOOD_MID, WOOD_DARK]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.handTrayFrame, { paddingBottom: Math.max(8, insets.bottom + 4) }]}
-      >
-        <View pointerEvents="none" style={styles.handTrayGoldTrim} />
-        <View style={styles.myHandArea}>
-        {/* Bot "Thinking..." indicator (5-second delay before AI plays) */}
-        {botThinking && (
-          <View testID="damma-thinking" style={styles.thinkingBox}>
-            <View style={styles.thinkingDot} />
-            <Text style={styles.thinkingText}>🤖 {t("thinking") || "البوت يفكر..."}</Text>
-          </View>
-        )}
-
-        {/* Play side buttons — kept BELOW the board, well above the hand,
-            with generous horizontal gap so they never overlap the chain. */}
-        {selectedTile && isMyTurn && state.board.length > 0 && (
-          <View style={styles.sideButtons}>
-            {playableSides.includes("left") && (
-              <TouchableOpacity testID="damma-play-left" style={styles.sideBtn} onPress={() => handlePlay("left")} activeOpacity={0.9}>
-                <Ionicons name="arrow-back" size={18} color={FUTURISTIC.bg} />
-                <Text style={styles.sideBtnText}>{t("left") || "يسار"}</Text>
-              </TouchableOpacity>
-            )}
-            {/* spacer ensures Left & Right never touch each other */}
-            <View style={{ width: 24 }} />
-            {playableSides.includes("right") && (
-              <TouchableOpacity testID="damma-play-right" style={styles.sideBtn} onPress={() => handlePlay("right")} activeOpacity={0.9}>
-                <Text style={styles.sideBtnText}>{t("right") || "يمين"}</Text>
-                <Ionicons name="arrow-forward" size={18} color={FUTURISTIC.bg} />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        <Text style={styles.turnText}>
-          {isMyTurn ? (t("your_turn") || "دورك") : (t("opponent_turn") || "دور الخصم")}
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.handScroll}>
-          {state.hands[ME].map((d) => {
-            const playable = isMyTurn && options.playableTiles.some((p) => p.id === d.id);
-            const dimmed = isMyTurn && !playable && state.board.length > 0;
-            const isFlying = flying?.domino.id === d.id;
-            return (
-              <View
-                key={d.id}
-                style={[
-                  dimmed ? { opacity: 0.45 } : undefined,
-                  // While this tile is animating to the board hide it from
-                  // the hand so the player sees a single flying piece.
-                  isFlying ? { opacity: 0 } : undefined,
-                ]}
-              >
-                <DominoTile
-                  domino={d}
-                  pal={pal}
-                  testID={`damma-hand-tile-${d.left}-${d.right}`}
-                  selected={selectedTile === d.id}
-                  onPress={() => {
-                    if (!isMyTurn || counting || flying) return;
-                    if (state.board.length === 0) {
-                      // First tile: animate it onto the empty board too.
-                      animateAndPlay(d.id, "left");
-                    } else if (playable) {
-                      setSelectedTile(selectedTile === d.id ? null : d.id);
-                    }
-                  }}
-                />
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        {isMyTurn && options.mustPass && (
-          <TouchableOpacity testID="damma-pass-btn" style={[styles.actionBtn, { backgroundColor: FUTURISTIC.textMuted }]} onPress={handlePass} activeOpacity={0.9}>
-            <Text style={styles.actionText}>{t("pass") || "تخطي"}</Text>
-          </TouchableOpacity>
-        )}
-        </View>
-      </LinearGradient>
-      {/* end wooden hand tray */}
+      {/* My hand — premium wooden tray (extracted) */}
+      <HandTray
+        hand={state.hands[ME]}
+        playableTiles={options.playableTiles}
+        isMyTurn={isMyTurn}
+        boardEmpty={state.board.length === 0}
+        selectedTileId={selectedTile}
+        flyingTileId={flying?.domino.id ?? null}
+        botThinking={botThinking}
+        mustPass={options.mustPass}
+        playableSides={playableSides}
+        bottomInset={insets.bottom}
+        pal={pal}
+        turnText={isMyTurn ? (t("your_turn") || "دورك") : (t("opponent_turn") || "دور الخصم")}
+        thinkingText={t("thinking") || "البوت يفكر..."}
+        leftText={t("left") || "يسار"}
+        rightText={t("right") || "يمين"}
+        passText={t("pass") || "تخطي"}
+        onTilePress={(d, playable) => {
+          if (!isMyTurn || counting || flying) return;
+          if (state.board.length === 0) {
+            // First tile: animate it onto the empty board too.
+            animateAndPlay(d.id, "left");
+          } else if (playable) {
+            setSelectedTile(selectedTile === d.id ? null : d.id);
+          }
+        }}
+        onPlay={handlePlay}
+        onPass={handlePass}
+      />
 
       {/* ── Flying tile (slides from hand → board) ─────────────────────────── */}
       {flying && (
@@ -862,8 +598,6 @@ const styles = StyleSheet.create({
   bgVignetteTop: {
     position: "absolute", top: 0, left: 0, right: 0, height: 130,
     backgroundColor: "transparent",
-    borderBottomWidth: 0,
-    // soft top vignette via shadow
     shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 30, shadowOffset: { width: 0, height: -10 },
   },
   bgVignetteBottom: {
@@ -871,11 +605,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
 
+  // ── Header & title ──────────────────────────────────────────────────────
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  title: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "800" },
-
-  // ── Premium centered title with gold filigree ────────────────────────────
   titleWrap: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     paddingHorizontal: 10,
@@ -897,34 +629,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1, marginTop: 3,
   },
 
-  // ── Score / player cards ─────────────────────────────────────────────────
+  // ── Score-bar row (parent layout only — PlayerCard owns its visuals) ────
   scoreBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  playerScoreCard: {
-    flex: 1, flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 10, paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: "rgba(20,22,28,0.92)",
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.18),
-    minHeight: 56,
-    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
-  },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: FUTURISTIC.surface2 },
-  avatarActive: { borderWidth: 2, borderColor: "#4ADE80" },
-  botAvatarBox: {
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
-  },
-  playerName: { color: FUTURISTIC.textPrimary, fontSize: 12, fontWeight: "800", maxWidth: 110 },
-  scoreBox: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 12, backgroundColor: FUTURISTIC.surface1, borderWidth: 1, borderColor: FUTURISTIC.borderSoft, alignItems: "center", minWidth: 100 },
-  // ✅ Active player: rich green glow (you / human turn). Opponent uses a softer gold tint.
-  scoreActive: {
-    borderColor: "#4ADE80",
-    backgroundColor: "rgba(74,222,128,0.08)",
-    shadowColor: "#4ADE80", shadowOpacity: 0.55, shadowRadius: 10, shadowOffset: { width: 0, height: 0 },
-  },
-  scoreLabel: { color: FUTURISTIC.textMuted, fontSize: 11, fontWeight: "700" },
-  scoreVal: { color: GOLD, fontSize: 22, fontWeight: "900", marginTop: 1 },
-
   timerBox: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12,
@@ -934,148 +640,18 @@ const styles = StyleSheet.create({
   timerWarn: { borderColor: "#FF5C5C", backgroundColor: "#FF5C5C15" },
   timerText: { color: GOLD, fontWeight: "900", fontSize: 14 },
 
+  // ── Opponent face-down hand row + 4-Player side cards row ───────────────
   oppHand: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 10, flexWrap: "wrap" },
   tileBack: { width: 22, height: 40, borderRadius: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  sidePlayersRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    paddingHorizontal: 10, paddingVertical: 4, gap: 8,
+  },
 
-  // ── Table row (felt + boneyard) ──────────────────────────────────────────
+  // Table row container — WoodenTable + BoneyardPanel are siblings here.
   tableRow: { flex: 1, flexDirection: "row", marginHorizontal: 8, marginVertical: 4, gap: 6 },
 
-  // Wooden frame around the felt table — gives the premium "real domino table" feel.
-  woodFrame: {
-    flex: 1,
-    borderRadius: 22,
-    padding: 10,
-    shadowColor: "#000", shadowOpacity: 0.8, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
-    position: "relative",
-    overflow: "hidden",
-  },
-  // Thin gold trim line just inside the wood
-  woodGoldTrim: {
-    ...StyleSheet.absoluteFillObject,
-    margin: 6,
-    borderRadius: 16,
-    borderWidth: 1.2,
-    borderColor: withAlpha(GOLD, 0.55),
-  },
-
-  tableWrap: { flex: 1, shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, borderRadius: 14, overflow: "hidden" },
-  table: {
-    flex: 1, borderRadius: 14,
-    borderWidth: 0,
-    paddingVertical: 14, paddingHorizontal: 12,
-    overflow: "hidden",
-  },
-  // Soft radial-style highlight overlay on the felt (gives a fabric/light glow)
-  feltHighlight: {
-    position: "absolute",
-    top: -40, left: "10%", right: "10%", height: 240,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 9999,
-  },
-  tableInlay: { margin: 4, borderRadius: 10, borderWidth: 1, borderStyle: "dashed" },
-  tableGlow: { position: "absolute", top: -40, left: -40, width: 180, height: 180, borderRadius: 999, opacity: 0.8 },
-  tableGlowB: { position: "absolute", bottom: -50, right: -50, width: 200, height: 200, borderRadius: 999 },
-  endsLabel: { fontSize: 12, fontWeight: "700", textAlign: "center", marginBottom: 6 },
-
-  // Board chain layout (snake-wrap)
-  boardWrap: { paddingVertical: 8, alignItems: "center", justifyContent: "center", flexGrow: 1 },
-  boardRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginVertical: 2 },
-  emptyBoard: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontStyle: "italic" },
-
-  // ── Boneyard pile (now wrapped in its own wooden panel) ─────────────────
-  boneyardWoodFrame: {
-    width: 84,
-    borderRadius: 18,
-    padding: 6,
-    shadowColor: "#000", shadowOpacity: 0.7, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-    position: "relative",
-    overflow: "hidden",
-  },
-  boneyardGoldTrim: {
-    ...StyleSheet.absoluteFillObject,
-    margin: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: withAlpha(GOLD, 0.5),
-  },
-  boneyard: {
-    flex: 1, alignItems: "center", justifyContent: "flex-start",
-    paddingTop: 12, gap: 4,
-  },
-  boneyardLabel: {
-    color: GOLD, fontSize: 10, fontWeight: "800",
-    textTransform: "uppercase", letterSpacing: 1,
-  },
-  boneyardPile: {
-    width: 56, height: 78,
-    borderRadius: 8, borderWidth: 2, padding: 0,
-    alignItems: "center", justifyContent: "center",
-    shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-    position: "relative",
-    marginTop: 10,
-  },
-  boneyardCard: {
-    position: "absolute",
-    width: 48, height: 70,
-    borderRadius: 6, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
-    alignItems: "center", justifyContent: "center",
-  },
-  boneyardBadge: {
-    position: "absolute", top: -8, right: -8,
-    minWidth: 24, height: 24, borderRadius: 12,
-    backgroundColor: GOLD,
-    alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 6,
-    borderWidth: 2, borderColor: WOOD_DARK,
-  },
-  boneyardCount: { color: "#1A0E06", fontSize: 11, fontWeight: "900" },
-  boneyardHint: { color: GOLD, fontSize: 9, fontWeight: "700", textAlign: "center", marginTop: 4 },
-
-  // Tiles
-  tile: {
-    padding: 2, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4, shadowOffset: { width: 1, height: 2 },
-  },
-  tileInner: { flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "space-around", paddingVertical: 3 },
-  tileInnerH: { flexDirection: "row", paddingVertical: 0, paddingHorizontal: 3 },
-  dividerH: { width: "62%", height: 1.5, borderRadius: 1 },
-  dividerV: { height: "62%", width: 1.5, borderRadius: 1 },
-  pipFace: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center" },
-  pipCell: { width: "33.33%", height: "33.33%", alignItems: "center", justifyContent: "center" },
-
-  // ── Side buttons (Left / Right) — now premium gold pill style ─────────────
-  sideButtons: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingTop: 4, paddingBottom: 12,
-    marginBottom: 6,
-  },
-  sideBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: GOLD,
-    paddingHorizontal: 26, paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1.5, borderColor: GOLD_SOFT,
-    shadowColor: GOLD, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
-  },
-  sideBtnText: { color: "#1A0E06", fontWeight: "900", fontSize: 14 },
-
-  // Bot "Thinking…" indicator
-  thinkingBox: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    paddingVertical: 8, paddingHorizontal: 14, marginHorizontal: 60,
-    backgroundColor: withAlpha(GOLD, 0.12),
-    borderRadius: 999,
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.4),
-    marginBottom: 6,
-  },
-  thinkingDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: GOLD,
-  },
-  thinkingText: { color: GOLD, fontSize: 12, fontWeight: "800" },
-
-  // Animated flying tile (slides from hand row up to the board area)
+  // Flying tile (slides from hand → board)
   flyingTile: {
     position: "absolute",
     bottom: 120,
@@ -1086,32 +662,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
 
-  // ── Wooden hand tray (bottom) ────────────────────────────────────────────
-  handTrayFrame: {
-    paddingHorizontal: 6, paddingTop: 6,
-    borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    shadowColor: "#000", shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: -4 },
-    elevation: 10,
-    overflow: "hidden",
-    position: "relative",
-  },
-  handTrayGoldTrim: {
-    position: "absolute", top: 4, left: 4, right: 4, bottom: 4,
-    borderTopLeftRadius: 18, borderTopRightRadius: 18,
-    borderWidth: 1.2,
-    borderColor: withAlpha(GOLD, 0.55),
-  },
-  myHandArea: {
-    paddingVertical: 12, paddingHorizontal: 8,
-    backgroundColor: "rgba(8,4,2,0.55)",
-    borderRadius: 16,
-  },
-  turnText: { color: GOLD, fontSize: 14, fontWeight: "800", textAlign: "center", marginBottom: 8, letterSpacing: 0.5 },
-  handScroll: { gap: 6, paddingHorizontal: 8, paddingTop: 12, alignItems: "flex-end", minHeight: 90 },
-  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: GOLD, marginTop: 12, marginHorizontal: 40, paddingVertical: 12, borderRadius: 12 },
-  actionText: { color: "#1A0E06", fontWeight: "900", fontSize: 14 },
-
-  // Difficulty picker modal
+  // ── Modals (Difficulty & Mode pickers) ──────────────────────────────────
   modalBackdrop: {
     flex: 1, backgroundColor: "rgba(0,0,0,0.65)",
     alignItems: "center", justifyContent: "center", padding: 20,
@@ -1138,46 +689,4 @@ const styles = StyleSheet.create({
   diffEmoji: { fontSize: 30, marginRight: 12 },
   diffLabel: { color: "#FFF", fontSize: 16, fontWeight: "700" },
   diffHint: { fontSize: 12, marginTop: 2 },
-
-  // ── 4-player layout: side player cards + top player card ───────────────────
-  sidePlayersRow: {
-    flexDirection: "row", justifyContent: "space-between",
-    paddingHorizontal: 10, paddingVertical: 4, gap: 8,
-  },
-  sidePlayerCard: {
-    flex: 1, flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12,
-    backgroundColor: "rgba(20,22,28,0.92)",
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.30),
-    minHeight: 44,
-    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4,
-  },
-  topPlayerCard: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
-    backgroundColor: "rgba(20,22,28,0.92)",
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.30),
-    marginBottom: 6,
-    shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 4,
-  },
-  smallAvatar: {
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: FUTURISTIC.surface2,
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
-  },
-  smallAvatarActive: {
-    borderColor: GOLD,
-    shadowColor: GOLD, shadowOpacity: 0.6, shadowRadius: 4,
-  },
-  smallPlayerName: { color: FUTURISTIC.textPrimary, fontSize: 11, fontWeight: "700" },
-  smallScoreVal: { color: GOLD, fontSize: 14, fontWeight: "900" },
-  tileCountBadge: {
-    flexDirection: "row", alignItems: "center", gap: 3,
-    backgroundColor: withAlpha(GOLD, 0.12),
-    borderRadius: 8,
-    paddingHorizontal: 5, paddingVertical: 2,
-    borderWidth: 1, borderColor: withAlpha(GOLD, 0.4),
-  },
-  tileCountText: { color: GOLD, fontSize: 10, fontWeight: "800" },
 });

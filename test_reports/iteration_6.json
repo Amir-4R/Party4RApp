@@ -1,0 +1,29 @@
+{
+  "summary": "FRONTEND-ONLY regression test of the structural refactor of /game/damma — END-TO-END PASS. The parent screen damma.tsx (now 692 lines, down from 1180) bundles cleanly and renders identically to the iteration_5 baseline. The 5 extracted components (WoodenTable, BoneyardPanel, HandTray, PlayerCard, DominoTile + shared theme.ts) all mount correctly. Verified: (1) BUNDLER — no compile/Metro errors, no red screen, page loads. (2) VISUAL — wooden walnut frame, green felt, gold 'ضمنة • Classic Game' title pill, green-glow active player card on Tester (testID damma-player-card-me, score 0), gold-tinted bot card '🤖 متوسط' (testID damma-player-card-bot), vertical wooden BONEYARD panel with gold label and badge showing 14, wooden hand tray with 7 cream domino tiles. (3) GAMEPLAY — tapping the first hand tile auto-plays it (hand: 7→6), 🤖 Thinking… indicator (testID damma-thinking) appears on bot's turn for ~5 s, then bot plays. (4) TIMER — testID damma-timer ticks 59s → 56s over 2.2 s as expected. (5) 4-PLAYER MODE — opening damma-mode-picker → damma-mode-4 correctly spawns damma-player-card-left, damma-player-card-top and damma-player-card-right around the felt. (6) DIFFICULTY — damma-difficulty-picker opens, damma-diff-easy selection updates the bot label to '🤖 سهل'. (7) RESET — damma-reset-btn clears the board, hand returns to 7 tiles, timer resets to ~60s. (8) LOBBY — damma-lobby-link navigates to /game/damma-lobby successfully. (9) TESTIDs — all 9 required testIDs are present exactly once each: damma-back-btn (1), damma-lobby-link (1), damma-mode-picker (1), damma-difficulty-picker (1), damma-reset-btn (1), damma-player-card-me (1), damma-player-card-bot (1), damma-timer (1), damma-boneyard (1). Hand tile testIDs follow the damma-hand-tile-{L}-{R} convention with 7 tiles initially. No regressions vs iteration_5 baseline.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "damma.tsx parent screen is now 692 lines (down from 1180) — under the 700-line guideline. Refactor is clean: components/theme.ts centralises palette constants, each sub-component is pure presentation with prop-based variants (PlayerCard variant='me'|'bot'|'top'|'side'). Engine code untouched.",
+    "Pre-existing console warnings observed (NOT a regression — also present in iteration_5): 'shadow*' style props deprecated (use boxShadow), 'textShadow*' deprecated, 'props.pointerEvents is deprecated', and 'Unexpected text node:  . A text node cannot be a child of a <View>' fires from inside the Pressable modal cards in damma.tsx lines 515/542 (whitespace between '<Pressable ...>' and '<Text>' children). These do not affect rendering but should be cleaned up in a future iteration."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only request)",
+    "frontend": "100% — all 9 required testIDs present (1 each), 7 hand-tile testIDs correctly formatted, bundler clean, no red screen, gameplay (first-tile play, bot thinking, timer tick), 4-player layout, difficulty picker + bot label update, mode picker, reset, lobby navigation — all working."
+  },
+  "seed_data_creation": "Logged in as testuser1/pass1234. No persistent state mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The refactor introduced 6 new files in /app/frontend/src/games/damma/components/: DominoTile.tsx, PlayerCard.tsx, BoneyardPanel.tsx, WoodenTable.tsx, HandTray.tsx and theme.ts. Parent damma.tsx wires them via props. For E2E testing of /game/damma, use testIDs: damma-back-btn, damma-lobby-link, damma-mode-picker (opens modal → damma-mode-2 / damma-mode-4), damma-difficulty-picker (opens modal → damma-diff-easy/medium/hard), damma-reset-btn, damma-player-card-me, damma-player-card-bot, damma-player-card-top/left/right (4P only), damma-timer, damma-boneyard, damma-thinking, damma-pass-btn, damma-play-left, damma-play-right, and damma-hand-tile-{L}-{R} (7 tiles). Login first at /login (testuser1/pass1234) then router.push('/game/damma'); wait ~4-5 s for the 3-2-1 countdown to clear before interactions. On an empty board, any tile tap auto-plays to 'left'. On a non-empty board, tile tap selects → side buttons appear. Bot delays ~5 s before playing.",
+  "rca_of_issue": "N/A — pure refactor, no regressions detected."
+}
