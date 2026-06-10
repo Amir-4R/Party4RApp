@@ -121,6 +121,44 @@ export default function DammaScreen() {
     setResult(null);
   }, []);
 
+  // ── Resume-after-exit persistence (auto-save the engine state) ──────────
+  // We snapshot the FULL engine state + mode + difficulty so the match can
+  // pick up where the user left it. Transient flags (counting, botThinking,
+  // flying, turnTimeLeft) are NOT persisted — they reset cleanly on restore.
+  type DammaSnapshot = {
+    state: DammaState;
+    playerCount: 2 | 4;
+    difficulty: DammaDifficulty;
+  };
+  const persist = useGamePersistence<DammaSnapshot>({
+    key: "damma",
+    userId: user?.id,
+    getState: () => ({ state, playerCount, difficulty }),
+    restore: (s) => {
+      setState(s.state);
+      setPlayerCount(s.playerCount);
+      setDifficulty(s.difficulty);
+      // Reset transient runtime flags so the game resumes in a clean state.
+      setSelectedTile(null);
+      setCounting(false);
+      setBotThinking(false);
+      setFlying(null);
+      setTurnTimeLeft(TURN_SECONDS);
+      setResult(null);
+      recordedRef.current = s.state.phase === "game_over";
+      lastTurnRef.current = s.state.turn;
+    },
+    paused: state.phase === "game_over",
+  });
+  const exitGame = useCallback(() => { persist.clear(); router.back(); }, [persist, router]);
+
+  // Drop the resume snapshot when the match concludes so we don't restore a
+  // finished game later.
+  useEffect(() => {
+    if (state.phase === "game_over") persist.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase]);
+
   // ── Animated tile-play helper ──────────────────────────────────────────────
   // Starts the slide animation, then commits the move once the animation
   // finishes. This is shared by manual taps, side buttons, and the timeout
@@ -289,7 +327,7 @@ export default function DammaScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity testID="damma-back-btn" onPress={() => router.back()} style={styles.iconBtn}>
+        <TouchableOpacity testID="damma-back-btn" onPress={exitGame} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         {/* Premium centered title pill with gold filigree (real generated ornament asset) */}
@@ -563,7 +601,7 @@ export default function DammaScreen() {
             oppLabel: `🤖 ${diffMeta.label}`,
           }}
           onPlayAgain={reset}
-          onExit={() => router.back()}
+          onExit={exitGame}
         />
       )}
 

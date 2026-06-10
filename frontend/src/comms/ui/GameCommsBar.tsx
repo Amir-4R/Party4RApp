@@ -62,7 +62,7 @@ export default function GameCommsBar({
 
   return (
     <>
-      <View style={[styles.bar, { top: insets.top + 70 }, style]} pointerEvents="box-none">
+      <View style={[styles.bar, { top: insets.top + 120 }, style]} pointerEvents="box-none">
         <TouchableOpacity style={styles.btn} onPress={openChat} activeOpacity={0.85}>
           <Ionicons name="chatbubbles" size={20} color={FUTURISTIC.brand} />
           {unread > 0 && (
