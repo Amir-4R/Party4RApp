@@ -1116,9 +1116,19 @@ async def download_export_file_direct(filename: str):
     path = os.path.join(_EXPORTS_DIR, filename)
     if not os.path.exists(path) or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="file not found")
+    # Pick a sensible media type from the extension
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    media = {
+        "zip":  "application/zip",
+        "txt":  "text/plain; charset=utf-8",
+        "ts":   "text/plain; charset=utf-8",
+        "tsx":  "text/plain; charset=utf-8",
+        "json": "application/json",
+        "md":   "text/markdown; charset=utf-8",
+    }.get(ext, "application/octet-stream")
     return FileResponse(
         path,
-        media_type="text/plain; charset=utf-8",
+        media_type=media,
         filename=filename,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
