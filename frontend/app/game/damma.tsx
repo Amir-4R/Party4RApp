@@ -11,7 +11,7 @@
 // All existing flows (engine, sound, stats, result overlay, countdown) intact.
 // =============================================================================
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable, Dimensions } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Pressable, Dimensions, Animated, Image, Easing } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,6 +28,7 @@ import { useTheme } from "@/src/context/ThemeContext";
 import { dammaPalette, gameBackground, withAlpha } from "@/src/games/shared/gameTheme";
 import { useT } from "@/src/context/LanguageContext";
 import { useAuth } from "@/src/context/AuthContext";
+import { getAvatarUrl } from "@/src/constants/avatars";
 import GameResultOverlay from "@/src/games/shared/ui/GameResultOverlay";
 import Countdown from "@/src/games/shared/ui/Countdown";
 import { recordResult, RecordResult } from "@/src/games/stats";
@@ -36,6 +37,8 @@ import { playSound } from "@/src/games/sound/SoundManager";
 const { width: SCREEN_W } = Dimensions.get("window");
 const DIFF_KEY = "damma_bot_difficulty";
 const TURN_SECONDS = 60;
+const BOT_THINK_MS = 5000;        // ← Bot now thinks for 5 s before playing.
+const PLAY_ANIM_MS = 450;         // ← Tile slide animation duration (300–600 ms).
 const ME: PlayerId = "player1";
 
 // ── Pip-dot layouts on a 3×3 grid (true domino faces) ────────────────────────
@@ -143,8 +146,14 @@ export default function DammaScreen() {
   const [difficulty, setDifficulty] = useState<DammaDifficulty>("medium");
   const [showDiffPicker, setShowDiffPicker] = useState(false);
   const [turnTimeLeft, setTurnTimeLeft] = useState(TURN_SECONDS);
+  // ── Animation: a tile currently sliding from origin → target.
+  // While `flying` is set, the move is NOT yet committed to engine state.
+  const [flying, setFlying] = useState<{ domino: Domino; side: "left" | "right" } | null>(null);
+  // ── Bot thinking indicator (shows for BOT_THINK_MS before the bot plays).
+  const [botThinking, setBotThinking] = useState(false);
   const recordedRef = useRef(false);
   const lastTurnRef = useRef<PlayerId>(state.turn);
+  const flyAnim = useRef(new Animated.Value(0)).current;
 
   const isMyTurn = state.turn === ME;
   const options = useMemo(() => getPlayerOptions(state, ME), [state]);
@@ -161,6 +170,31 @@ export default function DammaScreen() {
     setShowDiffPicker(false);
   }, []);
 
+  // ── Animated tile-play helper ──────────────────────────────────────────────
+  // Starts the slide animation, then commits the move once the animation
+  // finishes. This is shared by manual taps, side buttons, and the timeout
+  // auto-action.
+  const animateAndPlay = useCallback((dominoId: string, side: "left" | "right") => {
+    const tile = state.hands[ME].find((d) => d.id === dominoId);
+    if (!tile) return;
+    setFlying({ domino: tile, side });
+    flyAnim.setValue(0);
+    Animated.timing(flyAnim, {
+      toValue: 1,
+      duration: PLAY_ANIM_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      const next = playDomino(state, ME, dominoId, side);
+      setFlying(null);
+      if (next) {
+        playSound("domino_move");
+        setSelectedTile(null);
+        setState(next); // ← bot scheduling is handled by useEffect below
+      }
+    });
+  }, [state, flyAnim]);
+
   // ── AI move (uses the difficulty-aware planner) ────────────────────────────
   const playAITurn = useCallback((s: DammaState): DammaState => {
     if (s.turn === ME || s.phase !== "playing") return s;
@@ -171,7 +205,6 @@ export default function DammaScreen() {
     if (plan.kind === "draw") {
       const after = drawFromBoneyard(s, s.turn);
       if (!after) return passTurn(s, s.turn);
-      // try again with the drawn tile
       return playAITurn(after);
     }
     return passTurn(s, s.turn);
@@ -190,14 +223,9 @@ export default function DammaScreen() {
 
   // ── Player actions ─────────────────────────────────────────────────────────
   const handlePlay = useCallback((side: "left" | "right") => {
-    if (!selectedTile || !isMyTurn) return;
-    const next = playDomino(state, ME, selectedTile, side);
-    if (next) {
-      playSound("domino_move");
-      setSelectedTile(null);
-      setState(advanceAI(next));
-    }
-  }, [selectedTile, isMyTurn, state, advanceAI]);
+    if (!selectedTile || !isMyTurn || flying) return;
+    animateAndPlay(selectedTile, side);
+  }, [selectedTile, isMyTurn, flying, animateAndPlay]);
 
   const handleDraw = () => {
     if (!isMyTurn || !options.mustDraw) return;
@@ -207,7 +235,7 @@ export default function DammaScreen() {
 
   const handlePass = () => {
     if (!isMyTurn || !options.mustPass) return;
-    setState(advanceAI(passTurn(state, ME)));
+    setState(passTurn(state, ME));
   };
 
   const reset = () => {
@@ -219,10 +247,18 @@ export default function DammaScreen() {
     setTurnTimeLeft(TURN_SECONDS);
   };
 
-  // Auto-run bot if it's the bot's turn after countdown / a player move.
+  // Auto-run bot if it's the bot's turn. We now wait 5 seconds and show a
+  // visible "Thinking..." indicator before the bot actually plays.
   useEffect(() => {
-    if (counting || state.phase !== "playing" || state.turn === ME) return;
-    const id = setTimeout(() => setState((s) => advanceAI(s)), 600);
+    if (counting || state.phase !== "playing" || state.turn === ME) {
+      setBotThinking(false);
+      return;
+    }
+    setBotThinking(true);
+    const id = setTimeout(() => {
+      setBotThinking(false);
+      setState((s) => advanceAI(s));
+    }, BOT_THINK_MS);
     return () => clearTimeout(id);
   }, [counting, state.phase, state.turn, advanceAI]);
 
@@ -257,19 +293,14 @@ export default function DammaScreen() {
           if (opts.playableTiles.length > 0) {
             const tile = opts.playableTiles[0];
             const side = getPlayableSides(state, tile)[0];
-            const next = playDomino(state, ME, tile.id, side);
-            if (next) {
-              playSound("domino_move");
-              setSelectedTile(null);
-              setState(advanceAI(next));
-              return TURN_SECONDS;
-            }
+            animateAndPlay(tile.id, side);
+            return TURN_SECONDS;
           } else if (opts.mustDraw) {
             const next = drawFromBoneyard(state, ME);
             if (next) setState(next);
             return TURN_SECONDS;
           } else {
-            setState(advanceAI(passTurn(state, ME)));
+            setState(passTurn(state, ME));
             return TURN_SECONDS;
           }
         }
@@ -337,15 +368,23 @@ export default function DammaScreen() {
         </View>
       </View>
 
-      {/* Scores + Turn timer */}
+      {/* Scores + Turn timer  ── with avatars & usernames for BOTH players */}
       <View style={styles.scoreBar}>
-        <View style={[styles.scoreBox, isMyTurn && styles.scoreActive]}>
-          <Text style={styles.scoreLabel}>{t("you") || "You"}</Text>
-          <Text style={styles.scoreVal}>{state.scores.player1}</Text>
+        {/* Player card (you) */}
+        <View style={[styles.playerScoreCard, isMyTurn && styles.scoreActive]}>
+          <Image
+            source={{ uri: getAvatarUrl(user?.avatar || "avatar_ninja") }}
+            style={[styles.avatar, isMyTurn && styles.avatarActive]}
+          />
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={styles.playerName} numberOfLines={1}>
+              {user?.nickname || user?.username || (t("you") || "أنت")}
+            </Text>
+            <Text style={styles.scoreVal}>{state.scores.player1}</Text>
+          </View>
         </View>
 
-        {/* Turn timer — visible during the human's turn so the player sees the
-            countdown. We show a static "—" during the bot's turn. */}
+        {/* Turn timer */}
         <View style={[styles.timerBox, isMyTurn && turnTimeLeft <= 10 && styles.timerWarn]}>
           <Ionicons
             name="time-outline" size={16}
@@ -359,9 +398,17 @@ export default function DammaScreen() {
           </Text>
         </View>
 
-        <View style={[styles.scoreBox, !isMyTurn && styles.scoreActive]}>
-          <Text style={styles.scoreLabel}>🤖 {diffMeta.label}</Text>
-          <Text style={styles.scoreVal}>{state.scores.player2}</Text>
+        {/* Opponent card (bot) */}
+        <View style={[styles.playerScoreCard, !isMyTurn && styles.scoreActive]}>
+          <View style={{ flex: 1, marginRight: 8, alignItems: "flex-end" }}>
+            <Text style={styles.playerName} numberOfLines={1}>
+              🤖 {diffMeta.label}
+            </Text>
+            <Text style={styles.scoreVal}>{state.scores.player2}</Text>
+          </View>
+          <View style={[styles.avatar, styles.botAvatarBox, !isMyTurn && styles.avatarActive]}>
+            <Ionicons name="hardware-chip" size={22} color={diffMeta.color} />
+          </View>
         </View>
       </View>
 
@@ -482,26 +529,37 @@ export default function DammaScreen() {
         </View>
       </View>
 
-      {/* Play side buttons (when a tile is selected) */}
-      {selectedTile && isMyTurn && state.board.length > 0 && (
-        <View style={styles.sideButtons}>
-          {playableSides.includes("left") && (
-            <TouchableOpacity style={styles.sideBtn} onPress={() => handlePlay("left")} activeOpacity={0.9}>
-              <Ionicons name="arrow-back" size={18} color={FUTURISTIC.bg} />
-              <Text style={styles.sideBtnText}>{t("left") || "يسار"}</Text>
-            </TouchableOpacity>
-          )}
-          {playableSides.includes("right") && (
-            <TouchableOpacity style={styles.sideBtn} onPress={() => handlePlay("right")} activeOpacity={0.9}>
-              <Text style={styles.sideBtnText}>{t("right") || "يمين"}</Text>
-              <Ionicons name="arrow-forward" size={18} color={FUTURISTIC.bg} />
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
       {/* My hand */}
       <View style={[styles.myHandArea, { backgroundColor: FUTURISTIC.surface1, borderTopColor: FUTURISTIC.borderSoft }]}>
+        {/* Bot "Thinking..." indicator (5-second delay before AI plays) */}
+        {botThinking && (
+          <View style={styles.thinkingBox}>
+            <View style={styles.thinkingDot} />
+            <Text style={styles.thinkingText}>🤖 {t("thinking") || "البوت يفكر..."}</Text>
+          </View>
+        )}
+
+        {/* Play side buttons — kept BELOW the board, well above the hand,
+            with generous horizontal gap so they never overlap the chain. */}
+        {selectedTile && isMyTurn && state.board.length > 0 && (
+          <View style={styles.sideButtons}>
+            {playableSides.includes("left") && (
+              <TouchableOpacity style={styles.sideBtn} onPress={() => handlePlay("left")} activeOpacity={0.9}>
+                <Ionicons name="arrow-back" size={18} color={FUTURISTIC.bg} />
+                <Text style={styles.sideBtnText}>{t("left") || "يسار"}</Text>
+              </TouchableOpacity>
+            )}
+            {/* spacer ensures Left & Right never touch each other */}
+            <View style={{ width: 24 }} />
+            {playableSides.includes("right") && (
+              <TouchableOpacity style={styles.sideBtn} onPress={() => handlePlay("right")} activeOpacity={0.9}>
+                <Text style={styles.sideBtnText}>{t("right") || "يمين"}</Text>
+                <Ionicons name="arrow-forward" size={18} color={FUTURISTIC.bg} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         <Text style={styles.turnText}>
           {isMyTurn ? (t("your_turn") || "دورك") : (t("opponent_turn") || "دور الخصم")}
         </Text>
@@ -509,17 +567,26 @@ export default function DammaScreen() {
           {state.hands[ME].map((d) => {
             const playable = isMyTurn && options.playableTiles.some((p) => p.id === d.id);
             const dimmed = isMyTurn && !playable && state.board.length > 0;
+            const isFlying = flying?.domino.id === d.id;
             return (
-              <View key={d.id} style={dimmed ? { opacity: 0.45 } : undefined}>
+              <View
+                key={d.id}
+                style={[
+                  dimmed ? { opacity: 0.45 } : undefined,
+                  // While this tile is animating to the board hide it from
+                  // the hand so the player sees a single flying piece.
+                  isFlying ? { opacity: 0 } : undefined,
+                ]}
+              >
                 <DominoTile
                   domino={d}
                   pal={pal}
                   selected={selectedTile === d.id}
                   onPress={() => {
-                    if (!isMyTurn || counting) return;
+                    if (!isMyTurn || counting || flying) return;
                     if (state.board.length === 0) {
-                      const next = playDomino(state, ME, d.id, "left");
-                      if (next) { playSound("domino_move"); setState(advanceAI(next)); }
+                      // First tile: animate it onto the empty board too.
+                      animateAndPlay(d.id, "left");
                     } else if (playable) {
                       setSelectedTile(selectedTile === d.id ? null : d.id);
                     }
@@ -536,6 +603,43 @@ export default function DammaScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* ── Flying tile (slides from hand → board) ─────────────────────────── */}
+      {flying && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.flyingTile,
+            {
+              opacity: flyAnim.interpolate({ inputRange: [0, 0.1, 1], outputRange: [0.95, 1, 1] }),
+              transform: [
+                // From the hand row (near bottom of screen, x= ~50% screen) →
+                // up into the board (y= screen height * 0.3).
+                {
+                  translateY: flyAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -260],
+                  }),
+                },
+                {
+                  scale: flyAnim.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [1, 1.12, 0.95],
+                  }),
+                },
+                {
+                  rotate: flyAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0deg", flying.side === "left" ? "-6deg" : "6deg"],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <DominoTile domino={flying.domino} horizontal pal={pal} />
+        </Animated.View>
+      )}
 
       {/* Difficulty picker modal */}
       <Modal visible={showDiffPicker} transparent animationType="fade" onRequestClose={() => setShowDiffPicker(false)}>
@@ -590,11 +694,26 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   title: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "800" },
 
-  scoreBar: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 12, paddingVertical: 8 },
+  scoreBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  playerScoreCard: {
+    flex: 1, flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+    minHeight: 56,
+  },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: FUTURISTIC.surface2 },
+  avatarActive: { borderWidth: 2, borderColor: FUTURISTIC.brand },
+  botAvatarBox: {
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+  },
+  playerName: { color: FUTURISTIC.textPrimary, fontSize: 12, fontWeight: "800", maxWidth: 110 },
   scoreBox: { paddingHorizontal: 18, paddingVertical: 6, borderRadius: 12, backgroundColor: FUTURISTIC.surface1, borderWidth: 1, borderColor: FUTURISTIC.borderSoft, alignItems: "center", minWidth: 100 },
   scoreActive: { borderColor: FUTURISTIC.brand, backgroundColor: withAlpha(FUTURISTIC.brand, 0.08) },
   scoreLabel: { color: FUTURISTIC.textMuted, fontSize: 11, fontWeight: "700" },
-  scoreVal: { color: FUTURISTIC.textPrimary, fontSize: 18, fontWeight: "900" },
+  scoreVal: { color: FUTURISTIC.brand, fontSize: 22, fontWeight: "900", marginTop: 1 },
 
   timerBox: {
     flexDirection: "row", alignItems: "center", gap: 4,
@@ -666,9 +785,48 @@ const styles = StyleSheet.create({
   pipFace: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center" },
   pipCell: { width: "33.33%", height: "33.33%", alignItems: "center", justifyContent: "center" },
 
-  sideButtons: { flexDirection: "row", justifyContent: "center", gap: 12, paddingVertical: 8 },
-  sideBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: FUTURISTIC.brand, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 },
+  // Side buttons — sit INSIDE myHandArea ABOVE the hand row, with strong
+  // vertical spacing so they never overlap the felt board (which is in a
+  // sibling above) and an explicit middle spacer separates them.
+  sideButtons: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    paddingTop: 4, paddingBottom: 12,
+    marginBottom: 6,
+  },
+  sideBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: FUTURISTIC.brand,
+    paddingHorizontal: 26, paddingVertical: 12,
+    borderRadius: 14,
+    shadowColor: FUTURISTIC.brand, shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+  },
   sideBtnText: { color: FUTURISTIC.bg, fontWeight: "800", fontSize: 14 },
+
+  // Bot "Thinking…" indicator
+  thinkingBox: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingVertical: 8, paddingHorizontal: 14, marginHorizontal: 60,
+    backgroundColor: withAlpha(FUTURISTIC.brand, 0.12),
+    borderRadius: 999,
+    borderWidth: 1, borderColor: withAlpha(FUTURISTIC.brand, 0.4),
+    marginBottom: 6,
+  },
+  thinkingDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: FUTURISTIC.brand,
+  },
+  thinkingText: { color: FUTURISTIC.brand, fontSize: 12, fontWeight: "800" },
+
+  // Animated flying tile (slides from hand row up to the board area)
+  flyingTile: {
+    position: "absolute",
+    bottom: 120,
+    alignSelf: "center",
+    left: "50%",
+    marginLeft: -36, // center a 72-wide horizontal tile
+    zIndex: 100,
+    elevation: 12,
+  },
 
   myHandArea: { paddingVertical: 12, paddingHorizontal: 8, borderTopWidth: 1 },
   turnText: { color: FUTURISTIC.textPrimary, fontSize: 14, fontWeight: "700", textAlign: "center", marginBottom: 8 },
