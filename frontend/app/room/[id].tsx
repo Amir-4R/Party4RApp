@@ -191,18 +191,24 @@ export default function RoomScreen() {
           }
           break;
         case "chat":
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `${data.user_id}-${data.timestamp}-${Math.random()}`,
-              user_id: data.user_id,
-              nickname: data.nickname,
-              avatar: data.avatar,
-              text: data.text || "",
-              image: data.image,
-              timestamp: data.timestamp,
-            },
-          ]);
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              {
+                id: `${data.user_id}-${data.timestamp}-${Math.random()}`,
+                user_id: data.user_id,
+                nickname: data.nickname,
+                avatar: data.avatar,
+                text: data.text || "",
+                image: data.image,
+                timestamp: data.timestamp,
+              },
+            ];
+            // Rolling window of 200 — drops the oldest messages so long
+            // chat sessions don't accumulate unbounded memory / re-render
+            // cost. Newer messages always remain at the bottom.
+            return next.length > 200 ? next.slice(next.length - 200) : next;
+          });
           break;
         case "playback":
           if (data.event === "change_video" && data.video_url) {
@@ -516,6 +522,37 @@ export default function RoomScreen() {
     ws.send(JSON.stringify({ type: "vote_cancel" }));
   }, []);
 
+  // Phase B — Host instant skip (no vote required).
+  // The host is the room owner / crown holder and shouldn't need to vote
+  // to skip the current video. We clear the video locally for snappy UX
+  // and broadcast a `playback / change_video` with video_url=null so all
+  // peers drop to the "no video" state immediately. Any in-flight vote is
+  // also cancelled defensively so no stale overlay lingers.
+  const hostSkip = useCallback(() => {
+    const ws = wsRef.current;
+    if (!isHost || !ws || ws.readyState !== WebSocket.OPEN) return;
+    // If a vote is somehow still active, cancel it first.
+    if (activeVote) {
+      try { ws.send(JSON.stringify({ type: "vote_cancel" })); } catch {}
+    }
+    // Clear the video for ourselves immediately.
+    setVideoUrl(null);
+    setSessionId(null);
+    setPlayerReady(false);
+    setPlaying(false);
+    // Broadcast to peers via the existing playback channel.
+    try {
+      ws.send(JSON.stringify({
+        type: "playback",
+        event: "change_video",
+        video_url: null,
+      }));
+    } catch {}
+    // Light confirmation toast so the host knows it worked.
+    setVoteToast(t("vote_skipped") || "Skipped!");
+    setTimeout(() => setVoteToast((v) => (v === (t("vote_skipped") || "Skipped!") ? null : v)), 2200);
+  }, [isHost, activeVote, t]);
+
   // -------------------------------------------------------------------------
   // Phase 4 — Consume `addedVideo` returned from /youtube-browser
   // Host => apply immediately. Non-host => start a "vote-next" vote.
@@ -826,7 +863,8 @@ export default function RoomScreen() {
         {/* Chat panel + composer */}
         {!fullscreen && (
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
             style={styles.chatPanel}
           >
             {/* Action bar: visible to everyone (host vs guest buttons differ) */}
@@ -856,16 +894,16 @@ export default function RoomScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
-              {/* Vote-skip — anyone when video is playing, no active vote */}
+              {/* Skip — host gets instant skip (no vote). Guests start a vote. */}
               {!!videoId && !activeVote && (isHost || votingMode === "allowed") && (
                 <TouchableOpacity
-                  testID="vote-skip"
-                  onPress={() => startVote("skip")}
+                  testID={isHost ? "host-skip" : "vote-skip"}
+                  onPress={isHost ? hostSkip : () => startVote("skip")}
                   style={styles.skipBtn}
                 >
                   <Ionicons name="play-skip-forward" size={18} color={COLORS.warning} />
                   <Text style={styles.skipBtnText} numberOfLines={1}>
-                    {t("vote_skip") || "Vote Skip"}
+                    {isHost ? (t("skip") || "Skip") : (t("vote_skip") || "Vote Skip")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -889,6 +927,8 @@ export default function RoomScreen() {
             <FlatList
               data={messages.filter((m) => !shouldMute(m.text))}
               keyExtractor={(m) => m.id}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
               renderItem={({ item }) => {
                 const mine = item.user_id === user?.id;
                 return (
@@ -958,6 +998,10 @@ export default function RoomScreen() {
                 style={styles.composerInput}
                 onSubmitEditing={sendChat}
                 returnKeyType="send"
+                blurOnSubmit={false}
+                multiline={false}
+                autoCorrect={false}
+                autoCapitalize="none"
               />
               <TouchableOpacity
                 testID="chat-send"

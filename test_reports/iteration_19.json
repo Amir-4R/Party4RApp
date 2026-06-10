@@ -1,0 +1,80 @@
+{
+  "summary": "Frontend-only retest after engine-level Damma chain-continuity fix and Room host-skip / chat keyboard-stability changes. Logged in as testuser1/pass1234. DAMMA (offline /game/damma) PASSES: played 7 moves to a win (game ended via 'You win!' overlay). Chain continuity was verified by reading pip counts of every absolutely-positioned tile inside the snakeBox; at M3 board values were [(2,3),(0,3),(0,4),(1,4),(1,6),(6,6)] and every adjacent pair shared a value (board[i].right === board[i+1].left). Visually the snake layout bends 90° at row ends and LEFT-going rows are rotated 180° so the pip values stay continuous across the bend — see iter19_DAMMA_M3 and iter19_DAMMA_M6 screenshots. 28-tile invariant: no duplicate ids observed and all face values 0-6. Entrance halo glow visible on the newest tile in @M3 screenshot. ROOM has TWO CRITICAL BUGS: (1) HOST sees 'Vote Skip' button — the rendered testID is 'vote-skip' and label is 'Vote Skip' even though the header reads 'HOSTING' (isHost is true for the title but the skip button is rendered as the non-host variant). The new host-skip flow is therefore unreachable from the UI. (2) Chat input loses focus immediately after pressing Enter on web (`blurOnSubmit={false}` is not honoured by RN-Web TextInput); typing 'world' without re-tapping produced an empty value. As a consequence the 220-message stress test could only send the first ~81 messages (m0..m80), so the 200-message rolling-window cap could not be empirically confirmed (the cap code in /app/frontend/app/room/[id].tsx:210 still slices to last 200 and looks correct). Pre-existing deprecation warnings (shadow*/textShadow*/pointerEvents) and useNativeDriver warning still present (informational). Backend skipped per request.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Room — Skip button for host",
+        "issue": "Room creator/host sees the 'Vote Skip' button (testID=`vote-skip`, label='Vote Skip') instead of the new instant 'Skip' (testID=`host-skip`). The header still reads 'HOSTING' so the local `isHost` state is at least transiently true elsewhere, but the skip button render-cycle uses `isHost=false`. Result: the entire instant-host-skip code path (hostSkip callback, transient 'Skipped!' toast, no vote overlay) is unreachable from the UI. Reference: /app/frontend/app/room/[id].tsx:898-908 (button gated by `(isHost || votingMode === 'allowed')` so it renders for both, but `testID` + label + onPress branch all on `isHost`).",
+        "testID": "host-skip (expected) vs vote-skip (observed)",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "Room — chat keyboard persistence on Web",
+        "issue": "After pressing Enter on the chat input, the input loses focus and its value clears. Typing additional characters without re-tapping the input is dropped (document.activeElement is no longer the chat-input). The `blurOnSubmit={false}` prop set in /app/frontend/app/room/[id].tsx:1001 is not honoured by react-native-web TextInput on web. User must re-tap the input between every two messages.",
+        "testID": "chat-input",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Room — 200-msg rolling window stress test",
+        "issue": "Could not empirically verify the 200-message cap because the chat focus-loss bug (above) limited automated message sending to ~81 messages (m0..m80) before the loop went out of sync. Code at /app/frontend/app/room/[id].tsx:207-211 looks correct (`next.length > 200 ? next.slice(next.length - 200) : next`) and should work once the focus bug is fixed.",
+        "testID": "chat-input",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Host video-skip",
+        "issue": "Host's skip click ends up triggering startVote('skip') (vote-skip path) instead of hostSkip() because the testID/label/onPress branch on `isHost` resolves to the guest variant when the button is rendered. Either `isHost` is false at button-render time for the room creator, or the condition `(isHost || votingMode === 'allowed')` defaults to allowed-mode and the branch picks the wrong arm.",
+        "affected_testIDs": ["host-skip", "vote-skip"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "TextInput blurOnSubmit on RN-Web",
+        "issue": "react-native-web's TextInput does not respect `blurOnSubmit={false}` — focus is dropped immediately on Enter. Consider also calling `inputRef.current?.focus()` synchronously inside the `onSubmitEditing` handler, or using `onKeyPress`/`onKeyDown` with `e.preventDefault()` to retain focus on web. Reference: /app/frontend/app/room/[id].tsx:992-1005."
+      },
+      {
+        "component": "shadow* / textShadow* / pointerEvents (RN-Web deprecations)",
+        "issue": "Pre-existing console warnings still emitted on /game/damma and /room/[id]. Reference: WoodenTable.tsx, app/game/damma.tsx, app/room/[id].tsx."
+      },
+      {
+        "component": "Animated.useNativeDriver",
+        "issue": "Pre-existing 'useNativeDriver is not supported' warning on RN-Web (informational, native unaffected)."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/iter19_DAMMA_M3.jpg",
+    "/app/test_reports/screens/iter19_DAMMA_M6.jpg",
+    "/app/test_reports/screens/iter19_DAMMA_FINAL.jpg",
+    "/app/test_reports/screens/iter19b_chain_3.jpg",
+    "/app/test_reports/screens/iter19b_damma.json",
+    "/app/test_reports/screens/iter19_room_with_video.jpg",
+    "/app/test_reports/screens/iter19_after_skip.jpg",
+    "/app/test_reports/screens/iter19_chat_after.jpg",
+    "/app/test_reports/screens/iter19_chat_stress.jpg"
+  ],
+  "action_items": [
+    "CRITICAL: Fix host-skip rendering so the room owner actually sees testID=`host-skip` + label='Skip'. Investigate why `isHost` resolves to false at the button render-cycle while the header (same `isHost`) still reads 'HOSTING'. Likely candidates: (a) `data.is_host` from the WS `init` arrives correctly but a later event (state_request, members update, host_changed) overwrites it to false; (b) the condition on line 898 should also use `isHost` for the testID logic but the state is stale due to a missed re-render. Add a console log around the WS event flow + memoise `isHost` reading via a ref to verify.",
+    "HIGH: On RN-Web TextInput, `blurOnSubmit={false}` is not honoured. Either (a) refocus the input manually inside `onSubmitEditing` via `inputRef.current?.focus()`, or (b) on web only, intercept the Enter key via `onKeyPress` and call `e.preventDefault()` before invoking sendChat to prevent the default blur. File: /app/frontend/app/room/[id].tsx:992-1005.",
+    "Once the chat focus is fixed, re-run the 220-message stress test to confirm the 200-message rolling window from /app/frontend/app/room/[id].tsx:207-211.",
+    "Consider adding testIDs `damma-board-tile-{idx}` and `damma-board-tile-last` to the Animated.View wrappers in WoodenTable.tsx to enable more deterministic geometry checks in future iterations.",
+    "Migrate deprecated shadow*/textShadow*/pointerEvents style props to their RN 0.74+ equivalents (still pending from previous iterations)."
+  ],
+  "critical_code_review_comments": [
+    "Engine refactor in /app/frontend/src/games/damma/engine.ts:141-201 looks correct: tiles are always stored in visual order (`board[i].left` is screen-left, `board[i].right` is screen-right), and the natural-fit vs swap branch correctly swaps the values when prepending/appending. The renderer just draws `left | right` of every tile and the layout adds a 180° rotation on left-going rows so visual continuity is preserved across snake bends. Verified empirically (M3 chain values all share a value with their neighbour).",
+    "Room host-skip render gate on line 898 evaluates `(isHost || votingMode === 'allowed')` which means the button is shown for guests too when votingMode==='allowed'. The testID/onPress/label branch all use `isHost` solely. If `isHost` is ever desynced from header/render-cycle, the host can be silently demoted to vote-skip — exactly the observed bug. Consider deriving from a single `effectiveIsHost = useMemo(() => isHost, [isHost])` and unifying the two render conditions to eliminate the desync window."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "n/a (skipped per request)",
+    "frontend": "Damma: 100% (chain continuity + snake layout + win flow verified). Room: 33% (room creation OK, video pick OK, but host-skip BROKEN, chat keyboard focus BROKEN, 200-cap unverifiable)."
+  },
+  "seed_data_creation": "None. Used pre-seeded testuser1.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Damma /game/damma is verified — chain values are continuous and snake layout renders correctly with 180° rotation on left-going rows; do not waste cycles re-verifying unless engine.ts or SnakeLayout.ts changes. Re-focus on the Room screen after main agent fixes (1) host-skip testID/label appearing for the room owner and (2) chat input keeping focus after Enter on web. Reuse the playwright flow from this iteration: login → create-room-fab → fill room-name-input → create-room-submit → open-yt-search → fill yt-search-input → yt-search-go → click first yt-result-* → verify testID `host-skip` is present (NOT `vote-skip`) and click it → expect transient 'Skipped!' toast, no vote overlay, video iframe disappears. For chat: tap chat-input, fill 'hello', press Enter, expect activeElement to still be chat-input.",
+  "rca_of_issue": "(1) HOST sees Vote Skip: The render condition on /app/frontend/app/room/[id].tsx:898 is `(isHost || votingMode === 'allowed')` which renders the button for everyone in 'allowed' mode. The testID/label/onPress all branch on `isHost`. At the moment the screenshot was captured the header read 'HOSTING' (so `isHost` was true for line 737) but the button right below showed 'Vote Skip' / testID `vote-skip` (so `isHost` was effectively false for line 900). This is either a stale-render / batched-state issue (the button branch was re-evaluated AFTER an event that toggled isHost back to false — most likely a `user_joined` event whose payload lacks `new_host_id`, or a state_request response that does not echo is_host) OR a strict-mode double-render. Either way the empirical observation is reproducible. Fix: a single source of truth (`const showHostSkip = !!videoId && !activeVote && isHost; const showVoteSkip = !!videoId && !activeVote && !isHost && votingMode === 'allowed';`) and render two distinct elements. (2) Chat focus loss: `blurOnSubmit={false}` is documented to work only on native; react-native-web ignores it for hardware-Enter on web. The web TextInput's default `onKeyDown` for Enter triggers a blur. Manual refocus in `onSubmitEditing` is the standard workaround. (3) Stress test only sent 81 messages because the loop relied on `page.fill` after an Enter — once the input lost focus subsequent fills targeted a now-disabled element and Enter presses never fired."
+}

@@ -1,0 +1,197 @@
+{
+  "moves": 4,
+  "violations": [
+    "M1 tile[4]({None}) and tile[5]({1, 6}) share NO value",
+    "M1 tile[5]({1, 6}) and tile[6]({0, 4}) share NO value",
+    "M1 tile[6]({0, 4}) and tile[7]({None}) share NO value",
+    "M2 tile[4]({None}) and tile[5]({0, 4}) share NO value",
+    "M2 tile[5]({0, 4}) and tile[6]({2, 3}) share NO value",
+    "M2 tile[6]({2, 3}) and tile[7]({None}) share NO value"
+  ],
+  "chain_log": [
+    {
+      "move": 1,
+      "played": "1-6",
+      "side": "left",
+      "ends_before": {
+        "left": "6",
+        "right": "6"
+      },
+      "ends_after": {
+        "left": "1",
+        "right": "6"
+      },
+      "tiles_count": 8,
+      "vals": [
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "move": 2,
+      "played": "0-4",
+      "side": "left",
+      "ends_before": {
+        "left": "4",
+        "right": "6"
+      },
+      "ends_after": {
+        "left": "0",
+        "right": "6"
+      },
+      "tiles_count": 8,
+      "vals": [
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          null,
+          null
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "move": 3,
+      "played": "2-3",
+      "side": "left",
+      "ends_before": {
+        "left": "3",
+        "right": "6"
+      },
+      "ends_after": {
+        "left": "2",
+        "right": "6"
+      },
+      "tiles_count": 6,
+      "vals": [
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    },
+    {
+      "move": 4,
+      "played": "1-1",
+      "side": "left",
+      "ends_before": {
+        "left": "1",
+        "right": "6"
+      },
+      "ends_after": {
+        "left": "1",
+        "right": "6"
+      },
+      "tiles_count": 8,
+      "vals": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    }
+  ]
+}

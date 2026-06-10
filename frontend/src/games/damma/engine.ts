@@ -124,6 +124,19 @@ export function getPlayableSides(state: DammaState, domino: Domino): ("left" | "
 }
 
 // ── Play a domino ────────────────────────────────────────────────────────────
+//
+// When a tile is placed on the board we ALWAYS store it in VISUAL ORDER,
+// i.e. board[i].left is the value visible on the LEFT of that tile, and
+// board[i].right is the value visible on the RIGHT. This guarantees:
+//
+//     board[0].left           === leftEnd          (the chain's far-left value)
+//     board[i].right          === board[i+1].left  (adjacent values match)
+//     board[N-1].right        === rightEnd         (the chain's far-right value)
+//
+// The renderer just draws every tile as `left | right` — no need to read
+// a separate flipped flag — so visuals always match the chain. `flipped`
+// is preserved as metadata indicating whether the tile was rotated from
+// its original hand orientation (handy for animations / debugging).
 
 export function playDomino(
   state: DammaState,
@@ -145,24 +158,31 @@ export function playDomino(
     scores: { ...state.scores },
   };
 
-  // First move
+  // First move — placed as-is. The original tile's left becomes the leftEnd
+  // and its right becomes the rightEnd.
   if (state.board.length === 0) {
     newState.board = [{ ...domino, flipped: false }];
     newState.leftEnd = domino.left;
     newState.rightEnd = domino.right;
   } else if (side === "left") {
+    // Prepending to the chain. The new tile's visual RIGHT must equal the
+    // current leftEnd so the chain stays continuous.
     const end = state.leftEnd!;
-    // Orient so the matching value connects
-    const flipped = domino.right === end;
-    const newEnd = flipped ? domino.left : domino.right;
-    newState.board = [{ ...domino, flipped }, ...state.board];
-    newState.leftEnd = newEnd;
+    const naturalFit = domino.right === end;          // no swap needed
+    const placed: PlacedDomino = naturalFit
+      ? { id: domino.id, left: domino.left, right: domino.right, flipped: false }
+      : { id: domino.id, left: domino.right, right: domino.left, flipped: true };
+    newState.board = [placed, ...state.board];
+    newState.leftEnd = placed.left;                   // new outer LEFT value
   } else {
+    // Appending. The new tile's visual LEFT must equal the current rightEnd.
     const end = state.rightEnd!;
-    const flipped = domino.left === end;
-    const newEnd = flipped ? domino.right : domino.left;
-    newState.board = [...state.board, { ...domino, flipped }];
-    newState.rightEnd = newEnd;
+    const naturalFit = domino.left === end;
+    const placed: PlacedDomino = naturalFit
+      ? { id: domino.id, left: domino.left, right: domino.right, flipped: false }
+      : { id: domino.id, left: domino.right, right: domino.left, flipped: true };
+    newState.board = [...state.board, placed];
+    newState.rightEnd = placed.right;                 // new outer RIGHT value
   }
 
   newState.passCount = 0;

@@ -134,28 +134,38 @@ function tryFit(
       : (goingRight ? xLeft : xRight);
 
     // Place horizontal tiles
+    // For LEFT-going rows we render the tile rotated 180° so that the
+    // visual chain stays continuous — i.e. the tile's *screen-right* edge
+    // shows what was originally its `left` value (and matches the previous
+    // tile's screen-left edge in the same row).
+    const horizRotation = goingRight ? 0 : 180;
     for (let j = 0; j < horizInRow; j++) {
       const x = goingRight ? (xStart + j * (tw + gap)) : (xStart - j * (tw + gap));
       positions.push({
         idx: chainIdx,
         x, y: yRow,
-        rotation: 0,
+        rotation: horizRotation,
         isVertical: false,
       });
       chainIdx++;
     }
 
     // Add corner (vertical) tile at the END of the row, unless this is
-    // the final segment.
+    // the final segment. After a RIGHT-going row the corner sits on the
+    // right and is rotated 90° (CW), so its visual top = chain-left value
+    // and visual bottom = chain-right value. After a LEFT-going row the
+    // corner sits on the left and rotates -90° (CCW = 270°) so its visual
+    // bottom carries the next row's chain-left value.
     if (!isLast && chainIdx < N) {
       const yCorner = yRow + rowH / 2;
       const xCorner = goingRight
         ? xRight + (tw + th) / 2 + gap        // right side of row going RIGHT
         : xLeft - (tw + th) / 2 - gap;        // left side of row going LEFT
+      const cornerRotation = goingRight ? 90 : 270;
       positions.push({
         idx: chainIdx,
         x: xCorner, y: yCorner,
-        rotation: 90,
+        rotation: cornerRotation,
         isVertical: true,
       });
       chainIdx++;

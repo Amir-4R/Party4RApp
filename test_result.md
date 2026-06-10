@@ -1385,3 +1385,136 @@ agent_communication:
          turn so the player can see where the bot just played.
       
       Backend untouched; skip backend retest.
+
+#====================================================================================================
+# 2026-06-10 — Damma engine + Room comprehensive fixes (Part B)
+#====================================================================================================
+
+frontend:
+  - task: "Damma engine — store tiles in VISUAL order so numbers never appear reversed"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/engine.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          ROOT CAUSE FIX. The frontend engine previously stored placed tiles
+          with their ORIGINAL (hand) left/right values + a `flipped` flag
+          that the renderer ignored. When a tile's left side matched the
+          chain end (instead of the right), the on-screen visual showed the
+          values in the wrong order, giving the appearance of "reversed
+          numbers". The backend already stored tiles in visual order (line
+          136-141 of damma_online.py), so online games were correct but
+          offline/bot games were not.
+          
+          Fix: refactored playDomino() to ALWAYS swap left/right when needed
+          so that board[i].left === visual-left and board[i].right ===
+          visual-right. Invariants now hold: board[0].left === leftEnd;
+          board[i].right === board[i+1].left; board[N-1].right === rightEnd.
+          DominoTile renders left|right directly — guaranteed correct.
+
+  - task: "Damma SnakeLayout — rotate tiles in LEFT-going rows 180° for visual continuity"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/components/SnakeLayout.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          When the snake turns and the next row goes LEFT, the chain's
+          visual orientation needs to be flipped so adjacent tiles' shared
+          values line up on screen. Added horizRotation=180° for left-going
+          rows and -90° (270°) for corner tiles after them. The chain now
+          stays visually continuous through every turn.
+
+  - task: "Room — Crown holder / host can SKIP instantly without a vote"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/room/[id].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Added a `hostSkip()` helper. The Skip button now branches:
+          - isHost → calls hostSkip(): cancels any active vote, clears the
+            local video state, broadcasts `playback / change_video` with
+            video_url=null so all peers drop instantly. No vote overlay.
+          - Guest → original `startVote("skip")` flow.
+          The button label switches between "Skip" and "Vote Skip" too.
+          TestID `host-skip` for the host variant.
+
+  - task: "Room — Chat 200-message rolling window"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/room/[id].tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          The chat handler now keeps only the last 200 messages. Older ones
+          are dropped from the TOP, newer ones continue at the BOTTOM. Long
+          sessions never accumulate unbounded memory or re-render cost.
+
+  - task: "Room — Keyboard stability (input keeps focus, FlatList persists taps)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/room/[id].tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          - KeyboardAvoidingView now uses behavior="height" on Android (was
+            undefined which caused the keyboard to cover the composer).
+          - TextInput got `blurOnSubmit={false}` so Enter no longer dismisses
+            the keyboard (user can keep typing across multiple sends).
+          - FlatList got `keyboardShouldPersistTaps="handled"` +
+            `keyboardDismissMode="interactive"` so tapping a message no
+            longer pulls the keyboard down mid-typing.
+          - Added `autoCorrect={false}` + `autoCapitalize="none"` to prevent
+            re-render churn from spellcheck suggestions.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Comprehensive Damma + Room fixes applied. Validation needed:
+      
+      DAMMA (offline /game/damma):
+      1. Tile numbers display correctly across LONG chains — play 15+ tiles
+         each turn picking different sides (left vs right). Every tile on
+         the chain should be visually CONTINUOUS — board[i].right value
+         visually meets board[i+1].left value. No "reversed" tiles.
+      2. The snake bends correctly: at the right edge → vertical corner
+         (90°) → next row LEFT with all tiles 180° rotated → vertical corner
+         (270°) → next row RIGHT etc.
+      3. All 28 tiles are used exactly once (no duplicates, no missing).
+      4. The entrance animation still plays each turn with the golden halo.
+      
+      ROOM (/room/{id}):
+      5. As HOST: tap the "Skip" button → video clears instantly, no vote
+         overlay appears, peers' videos also clear via WS.
+      6. As GUEST: tap the "Vote Skip" button → vote overlay appears as
+         before.
+      7. Chat: send 250+ messages back-and-forth → the FlatList only shows
+         the most recent 200, oldest ones drop off the top, no slowdown.
+      8. Keyboard: open chat input, type a message, press Enter → message
+         sends, input STAYS focused, keyboard STAYS open, can immediately
+         type a second message.
+      
+      Backend untouched in this iteration (only engine.ts + SnakeLayout.ts +
+      room/[id].tsx changed). Skip backend retest.
