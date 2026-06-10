@@ -36,10 +36,16 @@ import { playSound } from "@/src/games/sound/SoundManager";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const DIFF_KEY = "damma_bot_difficulty";
+const MODE_KEY = "damma_player_count";
 const TURN_SECONDS = 60;
-const BOT_THINK_MS = 5000;        // ← Bot now thinks for 5 s before playing.
+const BOT_THINK_MS = 5000;        // ← Bot thinks for 5 s before playing.
 const PLAY_ANIM_MS = 450;         // ← Tile slide animation duration (300–600 ms).
 const ME: PlayerId = "player1";
+
+// Premium gold accent palette
+const GOLD = "#D4AF37";
+const GOLD_SOFT = "#B8860B";
+const GOLD_GLOW = "rgba(212,175,55,0.35)";
 
 // ── Pip-dot layouts on a 3×3 grid (true domino faces) ────────────────────────
 const PIP_MAP: Record<number, number[]> = {
@@ -140,6 +146,8 @@ export default function DammaScreen() {
   const bg = gameBackground(themeId);
 
   const [state, setState] = useState<DammaState>(() => createInitialState(2));
+  const [playerCount, setPlayerCount] = useState<2 | 4>(2);
+  const [showModePicker, setShowModePicker] = useState(false);
   const [selectedTile, setSelectedTile] = useState<string | null>(null);
   const [counting, setCounting] = useState(true);
   const [result, setResult] = useState<RecordResult | null>(null);
@@ -158,16 +166,33 @@ export default function DammaScreen() {
   const isMyTurn = state.turn === ME;
   const options = useMemo(() => getPlayerOptions(state, ME), [state]);
 
-  // ── Persisted difficulty ───────────────────────────────────────────────────
+  // ── Persisted difficulty + player count ────────────────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(DIFF_KEY).then((v) => {
       if (v === "easy" || v === "medium" || v === "hard") setDifficulty(v);
+    }).catch(() => {});
+    AsyncStorage.getItem(MODE_KEY).then((v) => {
+      if (v === "4") {
+        setPlayerCount(4);
+        setState(createInitialState(4));
+      }
     }).catch(() => {});
   }, []);
   const pickDifficulty = useCallback((d: DammaDifficulty) => {
     setDifficulty(d);
     AsyncStorage.setItem(DIFF_KEY, d).catch(() => {});
     setShowDiffPicker(false);
+  }, []);
+  const pickMode = useCallback((n: 2 | 4) => {
+    setPlayerCount(n);
+    AsyncStorage.setItem(MODE_KEY, String(n)).catch(() => {});
+    setState(createInitialState(n));
+    setSelectedTile(null);
+    setTurnTimeLeft(TURN_SECONDS);
+    setShowModePicker(false);
+    setCounting(true);
+    recordedRef.current = false;
+    setResult(null);
   }, []);
 
   // ── Animated tile-play helper ──────────────────────────────────────────────
@@ -239,7 +264,7 @@ export default function DammaScreen() {
   };
 
   const reset = () => {
-    setState(createInitialState(2));
+    setState(createInitialState(playerCount));
     setSelectedTile(null);
     setResult(null);
     recordedRef.current = false;
@@ -359,6 +384,9 @@ export default function DammaScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>{t("play_damma") || "Damma"}</Text>
         <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity onPress={() => setShowModePicker(true)} style={styles.iconBtn}>
+            <Ionicons name={playerCount === 4 ? "people" : "person"} size={22} color={GOLD} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowDiffPicker(true)} style={styles.iconBtn}>
             <Ionicons name="hardware-chip-outline" size={22} color={diffMeta.color} />
           </TouchableOpacity>
@@ -412,18 +440,65 @@ export default function DammaScreen() {
         </View>
       </View>
 
-      {/* Opponent hand (face down) */}
+      {/* Opponent hand (face down) — top player (player2 in 2P, player3 in 4P) */}
       <View style={styles.oppHand}>
-        {state.hands.player2.map((_, i) => (
-          <LinearGradient
-            key={i}
-            colors={[pal.railLight, pal.rail]}
-            style={styles.tileBack}
-          />
+        {playerCount === 4 && state.hands.player3 && (
+          <View style={styles.topPlayerCard}>
+            <View style={[styles.smallAvatar, state.turn === "player3" && styles.smallAvatarActive]}>
+              <Ionicons name="hardware-chip" size={18} color={GOLD} />
+            </View>
+            <View style={{ alignItems: "center" }}>
+              <Text style={styles.smallPlayerName}>🤖 لاعب 3</Text>
+              <Text style={styles.smallScoreVal}>{state.scores.player3 ?? 0}</Text>
+            </View>
+            <View style={styles.tileCountBadge}>
+              <Ionicons name="apps" size={11} color={GOLD} />
+              <Text style={styles.tileCountText}>{state.hands.player3.length}</Text>
+            </View>
+          </View>
+        )}
+        {playerCount === 2 && state.hands.player2.map((_, i) => (
+          <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
+        ))}
+        {playerCount === 4 && state.hands.player3?.map((_, i) => (
+          <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
         ))}
       </View>
 
-      {/* Felt table + Boneyard side-pile */}
+      {/* Side player cards (for 4-player mode) */}
+      {playerCount === 4 && (
+        <View style={styles.sidePlayersRow}>
+          <View style={[styles.sidePlayerCard, state.turn === "player2" && styles.scoreActive]}>
+            <View style={[styles.smallAvatar, state.turn === "player2" && styles.smallAvatarActive]}>
+              <Ionicons name="hardware-chip" size={18} color={GOLD} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 6 }}>
+              <Text style={styles.smallPlayerName}>🤖 لاعب 2</Text>
+              <Text style={styles.smallScoreVal}>{state.scores.player2}</Text>
+            </View>
+            <View style={styles.tileCountBadge}>
+              <Ionicons name="apps" size={10} color={GOLD} />
+              <Text style={styles.tileCountText}>{state.hands.player2?.length ?? 0}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.sidePlayerCard, state.turn === "player4" && styles.scoreActive]}>
+            <View style={[styles.smallAvatar, state.turn === "player4" && styles.smallAvatarActive]}>
+              <Ionicons name="hardware-chip" size={18} color={GOLD} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 6 }}>
+              <Text style={styles.smallPlayerName}>🤖 لاعب 4</Text>
+              <Text style={styles.smallScoreVal}>{state.scores.player4 ?? 0}</Text>
+            </View>
+            <View style={styles.tileCountBadge}>
+              <Ionicons name="apps" size={10} color={GOLD} />
+              <Text style={styles.tileCountText}>{state.hands.player4?.length ?? 0}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Table row */}
       <View style={styles.tableRow}>
         <View style={[styles.tableWrap, { shadowColor: pal.glow }]}>
           <LinearGradient
@@ -644,8 +719,7 @@ export default function DammaScreen() {
       {/* Difficulty picker modal */}
       <Modal visible={showDiffPicker} transparent animationType="fade" onRequestClose={() => setShowDiffPicker(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setShowDiffPicker(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>🤖 صعوبة البوت</Text>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>            <Text style={styles.modalTitle}>🤖 صعوبة البوت</Text>
             <Text style={styles.modalSubtitle}>اختر مستوى التحدي</Text>
             {DIFF_OPTIONS.map((opt) => {
               const sel = difficulty === opt.id;
@@ -659,6 +733,36 @@ export default function DammaScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.diffLabel}>{opt.label}</Text>
                     <Text style={[styles.diffHint, { color: opt.color }]}>{opt.hint}</Text>
+                  </View>
+                  {sel && <Ionicons name="checkmark-circle" size={24} color="#4ADE80" />}
+                </TouchableOpacity>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Mode picker modal (1v1 vs 4-Player) */}
+      <Modal visible={showModePicker} transparent animationType="fade" onRequestClose={() => setShowModePicker(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowModePicker(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>🎯 وضع اللعب</Text>
+            <Text style={styles.modalSubtitle}>اختر عدد اللاعبين على الطاولة</Text>
+            {[
+              { id: 2 as const, label: "ثنائي (1 vs 1)", emoji: "👤", hint: "أنت ضد بوت واحد" },
+              { id: 4 as const, label: "رباعي (4 لاعبين)", emoji: "👥", hint: "أنت + 3 بوتات حول الطاولة" },
+            ].map((opt) => {
+              const sel = playerCount === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.diffRow, sel && styles.diffRowActive]}
+                  onPress={() => pickMode(opt.id)}
+                >
+                  <Text style={styles.diffEmoji}>{opt.emoji}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.diffLabel}>{opt.label}</Text>
+                    <Text style={[styles.diffHint, { color: GOLD }]}>{opt.hint}</Text>
                   </View>
                   {sel && <Ionicons name="checkmark-circle" size={24} color="#4ADE80" />}
                 </TouchableOpacity>
@@ -730,7 +834,14 @@ const styles = StyleSheet.create({
   // ── Table row (felt + boneyard) ────────────────────────────────────────────
   tableRow: { flex: 1, flexDirection: "row", marginHorizontal: 8, marginVertical: 4, gap: 6 },
   tableWrap: { flex: 1, shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
-  table: { flex: 1, borderRadius: 18, borderWidth: 8, paddingVertical: 10, paddingHorizontal: 8, overflow: "hidden" },
+  table: {
+    flex: 1, borderRadius: 18,
+    borderWidth: 8,
+    paddingVertical: 10, paddingHorizontal: 8,
+    overflow: "hidden",
+    // Premium gold double-edge: outer wooden frame + inner gold trim via shadow
+    shadowColor: GOLD, shadowOpacity: 0.4, shadowRadius: 10,
+  },
   tableInlay: { margin: 4, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
   tableGlow: { position: "absolute", top: -40, left: -40, width: 180, height: 180, borderRadius: 999, opacity: 0.8 },
   tableGlowB: { position: "absolute", bottom: -50, right: -50, width: 200, height: 200, borderRadius: 999 },
@@ -861,4 +972,44 @@ const styles = StyleSheet.create({
   diffEmoji: { fontSize: 30, marginRight: 12 },
   diffLabel: { color: "#FFF", fontSize: 16, fontWeight: "700" },
   diffHint: { fontSize: 12, marginTop: 2 },
+
+  // ── 4-player layout: side player cards + top player card ───────────────────
+  sidePlayersRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    paddingHorizontal: 10, paddingVertical: 4, gap: 8,
+  },
+  sidePlayerCard: {
+    flex: 1, flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1, borderColor: GOLD_SOFT,
+    minHeight: 44,
+  },
+  topPlayerCard: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
+    backgroundColor: FUTURISTIC.surface1,
+    borderWidth: 1, borderColor: GOLD_SOFT,
+    marginBottom: 6,
+  },
+  smallAvatar: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: FUTURISTIC.surface2,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
+  },
+  smallAvatarActive: {
+    borderColor: GOLD,
+    shadowColor: GOLD, shadowOpacity: 0.6, shadowRadius: 4,
+  },
+  smallPlayerName: { color: FUTURISTIC.textPrimary, fontSize: 11, fontWeight: "700" },
+  smallScoreVal: { color: GOLD, fontSize: 14, fontWeight: "900" },
+  tileCountBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: withAlpha(GOLD, 0.12),
+    borderRadius: 8,
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.4),
+  },
+  tileCountText: { color: GOLD, fontSize: 10, fontWeight: "800" },
 });
