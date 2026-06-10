@@ -137,6 +137,11 @@ export default function RoomScreen() {
   // In-room private messages (DM) overlay — opens WITHOUT leaving the room,
   // so the room WebSocket / playback state are never torn down (#3).
   const [showDMs, setShowDMs] = useState(false);
+  // Translation hook — MUST be declared before any callbacks that capture `t`,
+  // otherwise React evaluates the `useCallback` dependency array while `t`
+  // is still in the Temporal Dead Zone, throwing a ReferenceError that
+  // crashes the entire RoomScreen on mount.
+  const { t, tErr } = useT();
   // Voice mic (#2): button + permission + mute/unmute via the shared comms
   // layer. (Real-time cross-user audio transport is a separate piece of
   // infrastructure and is intentionally not wired here.)
@@ -166,7 +171,6 @@ export default function RoomScreen() {
   const [votingMode, setVotingMode] = useState<"allowed" | "owner_only">("allowed");
   const [voteToast, setVoteToast] = useState<string | null>(null);
   const consumedAddedVideoRef = useRef<string | null>(null);
-  const { t, tErr } = useT();
 
   const videoId = extractYouTubeId(videoUrl || "");
   const fullscreen = isLandscape || forceFullscreen;

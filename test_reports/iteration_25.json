@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only regression test for Room opening flow after TDZ fix in /app/frontend/app/room/[id].tsx. Logged in as testuser1, opened existing public room 'G', and confirmed RoomScreen mounts WITHOUT 'Cannot access t before initialization' ReferenceError. All 6 header buttons render (room-leave, room-mic-toggle, room-dms-open, room-friends-open, room-settings-open, room-fullscreen), chat-input is present, WebSocket connects ('1 live' shown next to green dot), and the DM overlay opens (Messages list shows 5 peer threads) and closes cleanly via room-dm-close, returning to the room with WS still alive. Zero TDZ / ReferenceError entries in console or pageerror listener. Mic button is tappable but on web preview the icon glyph length did not visibly change after one tap — most likely because navigator.mediaDevices permission resolves to 'denied'/'prompt' in headless Chromium and the toggle short-circuits with an Alert (expected behavior per code at room/[id].tsx:151-160, not a regression).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/tmp/02_after_login.png",
+    "/tmp/03_room_screen.png",
+    "/tmp/04_after_mic_toggle.png",
+    "/tmp/05_dm_overlay.png",
+    "/tmp/06_after_dm_close.png"
+  ],
+  "action_items": [
+    "TDZ fix verified — no further action needed for this regression.",
+    "(Optional) On web preview, the mic permission prompt is suppressed by headless Chromium so the toggle silently does nothing after Alert dismissal. Consider showing a small inline toast for web users so they understand the mic only works on native builds."
+  ],
+  "critical_code_review_comments": [
+    "Fix at room/[id].tsx:144 correctly moves `const { t, tErr } = useT();` before the `toggleMic` useCallback (which depends on `t`). The comment block at lines 140-143 explicitly documents the TDZ rationale — good defensive documentation.",
+    "Note: handleServerEvent (line 193) and several other callbacks below still reference `t` and have `t` in their dependency arrays; they remain correct because they are declared after the useT() call. The reorder fully resolves the TDZ chain."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None. Reused pre-existing public room 'G' (id cea9696b-5024-4f78-822f-c53d38d222cf) hosted by Amir4R that was already present in the rooms list.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Room screen TDZ regression is fixed and verified end-to-end (login → room list → enter room → header buttons → WS connect → DM overlay open/close). Test credentials: testuser1 / pass1234. Login testIDs: login-username-input, login-password-input, login-submit-button. Room screen testIDs: room-leave, room-mic-toggle, room-dms-open, room-friends-open, room-settings-open, room-fullscreen, chat-input, room-dm-close.",
+  "rca_of_issue": "ROOT CAUSE: In the previous commit (party4r-changes.zip merge), `const toggleMic = useCallback(async () => { ... t(...) ... }, [micMode, ensureMicPermission, setMicMode, t]);` was inserted ABOVE `const { t, tErr } = useT();`. JavaScript's `let`/`const` are subject to the Temporal Dead Zone — referencing `t` in the useCallback's dependency array on first render threw `ReferenceError: Cannot access 't' before initialization`, which crashed the RoomScreen function component and rendered nothing (blank screen → user reported 'لم استطع فتح غرفه'). FIX: useT() destructuring was moved up to line 144 (before toggleMic). REPRODUCTION (pre-fix): Login → tap any room card → blank screen + console error. MITIGATION (post-fix): Confirmed by browser automation — room mounts with full header, WS connects ('1 live'), chat composer renders, DM overlay opens/closes, no ReferenceError in console or pageerror handler."
+}
