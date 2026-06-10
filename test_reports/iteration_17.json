@@ -1,0 +1,66 @@
+{
+  "summary": "Frontend-only visual/UX verification of the offline Damma board polish (snake/zigzag layout + entrance animation). Tested via Expo web at /game/damma on a 390x844 mobile viewport. Confirmed: (1) empty board renders with wooden frame + green felt + centered 'Place the first tile' text; (2) first tile auto-plays into a CENTERED position on the felt (verified at approx x=195/390); (3) bot plays after the 5s think delay and its tile lands adjacent to the player's first tile with the entrance animation; (4) the chain extends naturally from both ends as more tiles are added; (5) the SNAKE/ZIGZAG wrap with a VERTICAL 90° corner tile at row-ends is rendered correctly when the chain grows past one row (clearly visible in screenshots E_chain_18.png / E_final.png with row 1 + corner + row 2); (6) no two tiles overlap each other; (7) the entrance animation is smooth (~380 ms slide + scale pop, golden halo on the newest tile is implemented in code and was momentarily visible in code-path inspection). HOWEVER — a layout bug was observed: at some chain lengths the rightmost horizontal tile of a row (and/or the vertical corner tile) is partially CLIPPED by the wooden frame's inner edge (see /app/test_reports/screens/G_geo_check.png — clearly shows the 5th horizontal tile being cut by the right wood rim). The root cause is in SnakeLayout.ts:`tryFit`: `perRow = floor((playW - th - gap)/(tw+gap))` only reserves room for the corner on ONE side, but the row is then CENTERED around playW/2 with symmetric span `(perRow-1)*(tw+gap)/2`, so the corner ends up adding extra `th + gap` ONLY to one side of the centered row, pushing the corner past playW. Mathematically the corner's right edge sits at `playW/2 + (perRow-1)(tw+gap)/2 + tw/2 + th + gap`, which can exceed playW by up to ~th/2 of the rotated tile. This explains the visible right-edge clipping when the chain has ~perRow tiles laid out (before the wrap completes).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "WoodenTable / SnakeLayout",
+        "issue": "At some chain lengths the rightmost tile (or the vertical corner tile) overlaps / is clipped by the wooden frame's right edge — the snake layout's per-row capacity does not reserve enough margin for a centered row + corner. Reproduce: open /game/damma, play ~5-8 tiles preferring the RIGHT side. See screenshot /app/test_reports/screens/G_geo_check.png.",
+        "testID": "WoodenTable (no testID on placed tiles)",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Placed tiles on board",
+        "issue": "Placed-tile wrappers have no testID, making it hard to assert positions / animations programmatically. Recommend adding testID like `damma-board-tile-{id}` and `damma-board-tile-last` (for the most-recent tile with the halo) for future regression tests.",
+        "testID": "damma-board-tile-*",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/game/damma",
+        "issues": [
+          "Vertical corner tile renders so close to the wood frame that it visually touches/clips the rim — even when it technically stays in the safe zone, the visual breathing room feels tight. Consider increasing SAFE_X (currently 12) to 16-20px OR reserving 2*(th+gap) in perRow to keep the corner inside the centered safe zone."
+        ]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "Animated.useNativeDriver",
+        "issue": "Browser console warns 'Animated: useNativeDriver is not supported because the native animated module is missing'. This is expected on web preview (RN-Web fallback to JS-driven animation) and does NOT affect native iOS/Android builds. No action required — informational only."
+      },
+      {
+        "component": "shadow*/textShadow*/pointerEvents (RN deprecations)",
+        "issue": "Console warns: \"shadow*\" style props are deprecated. Use \"boxShadow\"; \"textShadow*\" style props are deprecated. Use \"textShadow\"; props.pointerEvents is deprecated. Use style.pointerEvents. These come from existing styles in /app/frontend/src/games/damma/components/WoodenTable.tsx and /app/frontend/app/game/damma.tsx (shadowColor/shadowOpacity/shadowRadius/shadowOffset etc.). Pre-existing — not introduced by this change."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/10_empty_board.png",
+    "/app/test_reports/screens/E1_first_tile_animating.png",
+    "/app/test_reports/screens/E2_first_tile_landed.png",
+    "/app/test_reports/screens/E3_after_bot.png",
+    "/app/test_reports/screens/E_chain_18.png",
+    "/app/test_reports/screens/E_final.png",
+    "/app/test_reports/screens/G_geo_check.png"
+  ],
+  "action_items": [
+    "FIX: In /app/frontend/src/games/damma/components/SnakeLayout.ts `tryFit`, when the row is centered, reserve corner space on BOTH sides OR shift the row's xLeft/xRight to bias away from the corner side so the corner stays inside the safe zone. Concretely, change `availW = playW - (th + gap)` to `availW = playW - 2*(th + gap)` OR adjust `xLeft`/`xRight` to subtract `(th + gap)/2` on the corner side per segment (depending on `goingRight`).",
+    "Re-verify after the SnakeLayout fix at multiple chain lengths (1, 4, 5, 8, 12, 20 tiles) on viewport 375x667 and 390x844 to confirm no tile crosses the felt's safe-zone boundary.",
+    "OPTIONAL: Add testIDs to placed board tiles (e.g. `damma-board-tile-{id}` and `damma-board-tile-last`) so future automated tests can assert position + halo presence without DOM heuristics.",
+    "OPTIONAL: Migrate deprecated shadow*/textShadow*/pointerEvents style props to the new RN-Web compatible forms (boxShadow / textShadow / style.pointerEvents)."
+  ],
+  "critical_code_review_comments": [
+    "SnakeLayout.ts capacity math under-counts the corner-side margin (see Action Items #1) — this is the only functional defect found.",
+    "WoodenTable.tsx animation logic is solid: it detects the new tile by id-diff (index 0 → 'left', last index → 'right', empty → 'first'), drives a native-driver-friendly translate+scale+opacity transform, and a sequenced glow timing (delay 360ms → fade-in 180ms → fade-out 1100ms ≈ 1.28s total). Correctly pre-seeds `seenIds` on mount so existing tiles don't re-animate on remount.",
+    "damma.tsx still keeps the OLD 'flying tile' animation (PLAY_ANIM_MS=450, slides from hand to board) AND now also triggers the WoodenTable's entry animation right after — visually they chain (hand→approx board, then snake-layout slide-in). Not a bug, but worth confirming with UX that the two-stage animation feels intentional (it does feel smooth in practice)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (skipped per request)", "frontend": "85% (6/7 requirements verified; 1 requirement — 'never extends past frame' — fails at some chain lengths)" },
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reproduction for the clipping bug: open /game/damma on a 390-wide mobile viewport, wait for the 3-second countdown, tap any playable tile in the hand to auto-place the first tile, then for each subsequent human turn pick a tile and click the `damma-play-right` side button. After ~5–8 right-side plays a horizontal tile (or the vertical corner tile) extends past the right wood-frame edge — see /app/test_reports/screens/G_geo_check.png. Fix lives in /app/frontend/src/games/damma/components/SnakeLayout.ts (`tryFit`, perRow / xRight / xCorner math).",
+  "rca_of_issue": "SnakeLayout.tryFit computes `perRow = floor((playW - th - gap)/(tw+gap))` to reserve room for ONE corner. It then places horizontal tiles CENTERED around playW/2 via xLeft/xRight = playW/2 ∓ (perRow-1)(tw+gap)/2, and the corner at xRight + (tw+th)/2 + gap. Because the row is centered but the corner is asymmetric (only on one side), the corner's right edge sits at playW/2 + (perRow-1)(tw+gap)/2 + tw/2 + th + gap, which can exceed playW by up to ~th/2. Mitigation: either reserve corner space symmetrically (`availW = playW - 2*(th+gap)`) so the centered row leaves room on both sides, OR shift xLeft/xRight per-segment toward the side opposite the corner so the centered geometry is preserved while keeping the corner inside playW."
+}

@@ -1326,3 +1326,62 @@ agent_communication:
       3. Open chat sheet via the new testID comms-chat-button, type "مرحبا"
          in comms-chat-input, tap comms-chat-send. Verify message bubble
          appears on the right side (fromMe=true). No crash.
+
+#====================================================================================================
+# 2026-06-10 — Dominoes Premium Visual Polish (Phase A)
+#====================================================================================================
+
+frontend:
+  - task: "Snake/zigzag chain layout + tile entrance animation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/components/WoodenTable.tsx, /app/frontend/src/games/damma/components/SnakeLayout.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Phase A — REPLACED the old flex-row chunked layout with an authentic
+          serpentine "snake" path:
+          - First tile lands at the CENTER of the felt.
+          - As the chain grows it extends LEFT and RIGHT.
+          - When approaching the safe-edge it bends 90° via a vertical
+            "corner" tile (rotation=90°), drops one row, then reverses
+            direction.
+          - All tiles are absolute-positioned by their CENTER (x, y) coords
+            so no tile can escape the wooden frame.
+          - Auto-rotates corner tiles, auto-shrinks the entire chain when
+            it would overflow vertically (16 scale steps from 1.0 → 0.32).
+          - ENTRANCE ANIMATION: every newly-placed tile flies in from a
+            sensible off-screen direction (LEFT for prepend, RIGHT for
+            append, ABOVE for first move), 380 ms ease-out-quint, with a
+            slight scale "pop" peak at 1.08x.
+          - LAST-PLACED HALO: a golden glow pulses around the newest tile
+            for ~1.3 s after it lands (verified visible in the screenshot
+            for the first tile).
+          - Detects entry side automatically from prev/cur board diff —
+            no external prop wiring required, so both damma.tsx (offline)
+            and damma-online.tsx (live) get the new behavior for free.
+          Verified manually via screenshot tool: single-tile placement
+          centered correctly at board middle with golden halo visible.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Phase A complete. Validation needed (FRONTEND ONLY, OFFLINE DAMMA):
+      1. /game/damma loads with empty board showing "Place the first tile".
+      2. Playing the first tile centers it horizontally on the board (no
+         longer off-left). A golden halo pulses around it briefly.
+      3. After a few exchanges with the bot, the chain extends from the
+         center outward in BOTH directions, staying on a single row until
+         it approaches the safe-edge.
+      4. After ~6+ tiles the chain bends 90° via a VERTICAL (rotated)
+         corner tile, then continues on the next row in REVERSE direction.
+      5. No tile ever crosses the wooden frame (test by playing 18-25+
+         tiles — engine adds tiles one per turn).
+      6. The newly-placed tile is briefly highlighted by the halo each
+         turn so the player can see where the bot just played.
+      
+      Backend untouched; skip backend retest.
