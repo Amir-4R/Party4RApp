@@ -7,13 +7,15 @@
 //   • اتصال WebSocket مستقل تماماً (/ws/dms) — اتصال الغرفة لا يُغلق ولا يُعاد
 //     تحميله، وحالة المشغّل/الفيديو تبقى كما هي.
 //   • الإغلاق يعيدك للغرفة فوراً بدون فقدان الحالة.
+//   • مدخل النص موحَّد عبر ChatComposer (memoized + auto-refocus + RTL).
 // تصميم متناسق مع Party4R، ولا يغيّر أي شيء في باقي التطبيق.
 // =============================================================================
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput,
-  Image, ActivityIndicator, Modal, KeyboardAvoidingView, Platform,
+  View, Text, StyleSheet, TouchableOpacity, FlatList,
+  Image, ActivityIndicator, Modal, Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { apiGet, apiPost, API_BASE, TOKEN_KEY } from "@/src/api/client";
@@ -22,6 +24,7 @@ import { getAvatarUrl } from "@/src/constants/avatars";
 import { FUTURISTIC } from "@/src/theme/futuristic";
 import { useT } from "@/src/context/LanguageContext";
 import { useAuth } from "@/src/context/AuthContext";
+import ChatComposer, { ChatComposerHandle } from "@/src/comms/ui/ChatComposer";
 
 interface DM {
   id: string;
@@ -58,12 +61,11 @@ export default function RoomDMOverlay({
   const [active, setActive] = useState<Conversation["friend"] | null>(null);
   const [messages, setMessages] = useState<DM[]>([]);
   const [loadingChat, setLoadingChat] = useState(false);
-  const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<FlatList<DM>>(null);
-  const inputRef = useRef<TextInput>(null);
+  const composerRef = useRef<ChatComposerHandle | null>(null);
 
   // ── Load conversation list whenever the overlay opens ──────────────────
   const loadList = useCallback(async () => {
@@ -137,30 +139,35 @@ export default function RoomDMOverlay({
     }
   }, [messages.length]);
 
-  const send = useCallback(async () => {
-    const tt = draft.trim();
-    if (!tt || sending || !active) return;
-    setSending(true);
-    try {
-      await apiPost(`/dms/${active.id}`, { text: tt });
-      setDraft("");
-      // Optimistic local echo so the sender sees it instantly even if the
-      // socket round-trip lags.
-      setMessages((m) => [
-        ...m,
-        {
-          id: `local-${Date.now()}`,
-          from_id: myId,
-          to_id: active.id,
-          text: tt,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-      requestAnimationFrame(() => { try { inputRef.current?.focus(); } catch {} });
-    } catch { /* ignore */ } finally {
-      setSending(false);
-    }
-  }, [draft, sending, active, myId]);
+  // Universal send handler used by the memoized ChatComposer. Returns `true`
+  // on success (so the composer clears + refocuses), `false` otherwise.
+  const handleSendDM = useCallback(
+    async (text: string): Promise<boolean> => {
+      if (sending || !active) return false;
+      setSending(true);
+      try {
+        await apiPost(`/dms/${active.id}`, { text });
+        // Optimistic local echo so the sender sees the message instantly
+        // even if the WS round-trip lags.
+        setMessages((m) => [
+          ...m,
+          {
+            id: `local-${Date.now()}`,
+            from_id: myId,
+            to_id: active.id,
+            text,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        setSending(false);
+      }
+    },
+    [sending, active, myId],
+  );
 
   const avatarFor = (f: { avatar?: string; avatar_image?: string | null }) =>
     f.avatar_image || getAvatarUrl(f.avatar || "");
@@ -229,7 +236,11 @@ export default function RoomDMOverlay({
         {/* ───────── Single conversation ───────── */}
         {active && (
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            // Chat-optimized behavior — keyboard-controller animates the
+            // entire panel up in lockstep with the OS keyboard. Works on
+            // iOS, Android (Samsung/Pixel/Xiaomi), edge-to-edge & web.
+            behavior={Platform.OS === "ios" ? "padding" : "translate-with-padding"}
+            keyboardVerticalOffset={0}
             style={{ flex: 1 }}
           >
             {loadingChat ? (
@@ -239,7 +250,7 @@ export default function RoomDMOverlay({
                 ref={listRef}
                 data={messages.filter((m) => !m.deleted)}
                 keyExtractor={(m) => m.id}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 contentContainerStyle={{ padding: 12, paddingBottom: 6 }}
                 renderItem={({ item }) => {
                   const mine = item.from_id === myId;
@@ -258,27 +269,14 @@ export default function RoomDMOverlay({
                 }
               />
             )}
-            <View style={styles.composer}>
-              <TextInput
-                ref={inputRef}
-                value={draft}
-                onChangeText={setDraft}
-                placeholder={t("send_message") || "اكتب رسالة…"}
-                placeholderTextColor={FUTURISTIC.textMuted}
-                style={styles.input}
-                onSubmitEditing={send}
-                returnKeyType="send"
-                blurOnSubmit={false}
-                multiline={false}
-              />
-              <TouchableOpacity
-                onPress={send}
-                style={[styles.sendBtn, { opacity: draft.trim() ? 1 : 0.4 }]}
-                disabled={!draft.trim()}
-              >
-                <Ionicons name="send" size={18} color={FUTURISTIC.bg} />
-              </TouchableOpacity>
-            </View>
+            <ChatComposer
+              ref={composerRef}
+              onSend={handleSendDM}
+              placeholder={t("send_message") || "اكتب رسالة…"}
+              disabled={sending}
+              testIDInput="dm-chat-input"
+              testIDSend="dm-chat-send"
+            />
           </KeyboardAvoidingView>
         )}
       </SafeAreaView>
@@ -314,17 +312,4 @@ const styles = StyleSheet.create({
   bubbleMine: { backgroundColor: FUTURISTIC.brand, borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: FUTURISTIC.surface2, borderBottomLeftRadius: 4 },
   msgText: { color: FUTURISTIC.textPrimary, fontSize: 14 },
-  composer: {
-    flexDirection: "row", alignItems: "center", gap: 8, padding: 10,
-    borderTopWidth: 1, borderTopColor: FUTURISTIC.borderSoft, backgroundColor: FUTURISTIC.surface1,
-  },
-  input: {
-    flex: 1, backgroundColor: FUTURISTIC.surface2, borderRadius: 22,
-    paddingHorizontal: 16, paddingVertical: Platform.OS === "ios" ? 10 : 6,
-    color: FUTURISTIC.textPrimary, fontSize: 14,
-  },
-  sendBtn: {
-    width: 42, height: 42, borderRadius: 21, backgroundColor: FUTURISTIC.brand,
-    alignItems: "center", justifyContent: "center",
-  },
 });

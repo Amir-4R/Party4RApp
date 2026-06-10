@@ -4,19 +4,22 @@
 // دردشة نصية داخل اللعبة:
 //   • Bottom sheet مرتّب لا يغطّي اللوحة بالكامل ويُغلق بسهولة.
 //   • رسائل باسم اللاعب وصورته وبترتيب واضح (الأحدث أسفل).
-//   • إرسال سريع بدون تعليق، يراعي SafeArea والكيبورد على Android/iOS.
-//   • مكوّن مُتحكَّم به (controlled): الحالة تُحفظ في الأب فلا تضيع عند الإغلاق.
+//   • مدخل النص موحَّد عبر ChatComposer (memoized + auto-refocus + RTL).
+//     يحافظ على الـ focus عبر جميع الأجهزة (Samsung/Pixel/Xiaomi…).
+//   • يحترم SafeArea والكيبورد على Android/iOS باستخدام
+//     react-native-keyboard-controller.
 // =============================================================================
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
-  View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList,
-  TouchableOpacity, KeyboardAvoidingView, Platform, Image,
+  View, Text, StyleSheet, Modal, Pressable, FlatList,
+  TouchableOpacity, Platform, Image,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FUTURISTIC } from "@/src/theme/futuristic";
-import { withAlpha } from "@/src/games/shared/gameTheme";
 import { useT } from "@/src/context/LanguageContext";
+import ChatComposer, { ChatComposerHandle } from "@/src/comms/ui/ChatComposer";
 
 export interface ChatMessage {
   id: string;
@@ -38,14 +41,12 @@ export default function GameChatSheet({
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useT();
-  const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const composerRef = useRef<ChatComposerHandle | null>(null);
 
-  const send = () => {
-    const text = draft.trim();
-    if (!text) return;
+  const handleSend = (text: string) => {
     onSend(text);
-    setDraft("");
+    return true; // tell composer to clear & refocus
   };
 
   const renderItem = ({ item }: { item: ChatMessage }) => (
@@ -66,7 +67,10 @@ export default function GameChatSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // Chat-app behavior — keyboard-controller library handles iOS,
+        // Android (Samsung/Pixel/Xiaomi), edge-to-edge, predictive back,
+        // and split-screen consistently.
+        behavior={Platform.OS === "ios" ? "padding" : "translate-with-padding"}
         style={styles.kav}
       >
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -90,26 +94,18 @@ export default function GameChatSheet({
             ListEmptyComponent={
               <Text style={styles.empty}>{t("no_messages_yet") || "لا رسائل بعد — ابدأ المحادثة"}</Text>
             }
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
           />
 
-          <View style={styles.inputRow}>
-            <TextInput
-              testID="comms-chat-input"
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={t("type_message") || "اكتب رسالة…"}
-              placeholderTextColor={FUTURISTIC.textMuted}
-              style={styles.input}
-              onSubmitEditing={send}
-              returnKeyType="send"
-              blurOnSubmit={false}
-              multiline
-            />
-            <TouchableOpacity testID="comms-chat-send" style={[styles.sendBtn, { opacity: draft.trim() ? 1 : 0.5 }]} onPress={send} disabled={!draft.trim()} activeOpacity={0.85}>
-              <Ionicons name="send" size={18} color={FUTURISTIC.bg} />
-            </TouchableOpacity>
-          </View>
+          <ChatComposer
+            ref={composerRef}
+            onSend={handleSend}
+            placeholder={t("type_message") || "اكتب رسالة…"}
+            multiline
+            testIDInput="comms-chat-input"
+            testIDSend="comms-chat-send"
+            containerStyle={styles.composerOverride}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -142,13 +138,14 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: FUTURISTIC.surface2, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: FUTURISTIC.borderSoft },
   bubbleName: { color: FUTURISTIC.brand, fontSize: 11, fontWeight: "800", marginBottom: 2 },
   bubbleText: { color: FUTURISTIC.textPrimary, fontSize: 14, lineHeight: 19 },
-  inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: FUTURISTIC.borderSoft },
-  input: {
-    flex: 1, maxHeight: 110, minHeight: 42,
-    backgroundColor: FUTURISTIC.surface2, borderRadius: 14,
-    borderWidth: 1, borderColor: FUTURISTIC.borderSoft,
-    paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10,
-    color: FUTURISTIC.textPrimary, fontSize: 14,
+  // Slim composer override for the bottom-sheet variant — drop the heavy
+  // top-border the universal composer applies by default since the
+  // sheet already provides its own visual separator above the input.
+  composerOverride: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: FUTURISTIC.borderSoft,
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingTop: 6,
   },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: FUTURISTIC.brand, alignItems: "center", justifyContent: "center" },
 });

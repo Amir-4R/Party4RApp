@@ -18,7 +18,6 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
@@ -27,6 +26,7 @@ import {
   useWindowDimensions,
   StatusBar as RNStatusBar,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { WebView } from "react-native-webview";
 import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -46,6 +46,7 @@ import LightBeam from "@/src/components/futuristic/LightBeam";
 import GlowDivider from "@/src/components/futuristic/GlowDivider";
 import { useComms } from "@/src/comms/CommsContext";
 import RoomDMOverlay from "@/src/comms/ui/RoomDMOverlay";
+import ChatComposer, { ChatComposerHandle } from "@/src/comms/ui/ChatComposer";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,7 +109,6 @@ export default function RoomScreen() {
   const [members, setMembers] = useState<Member[]>([]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const { shouldMute } = useMutedWords();
-  const [draft, setDraft] = useState("");
   const [forceFullscreen, setForceFullscreen] = useState(false);
   // Playing state for the YoutubePlayer controlled `play` prop
   const [playing, setPlaying] = useState(true);
@@ -473,23 +473,19 @@ export default function RoomScreen() {
   // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
-  // Persistent ref to the chat input so we can manually re-focus after a
-  // send. react-native-web does NOT honour `blurOnSubmit={false}`, so the
-  // browser's native Enter behaviour blurs the input. We restore focus on
-  // the very next tick to keep the keyboard open and the conversation
-  // flowing without re-taps.
-  const chatInputRef = useRef<TextInput>(null);
+  // Composer ref — lets us programmatically focus/clear from outside if
+  // needed (e.g. after the user picks an image). The actual draft state and
+  // input ref live INSIDE the memoized ChatComposer so unrelated WS messages
+  // never trigger a re-render of the input → focus is preserved across every
+  // incoming chat update, vote toast, member join, etc.
+  const composerRef = useRef<ChatComposerHandle | null>(null);
 
-  const sendChat = () => {
-    const text = draft.trim();
-    if (!text || !wsRef.current) return;
-    wsRef.current.send(JSON.stringify({ type: "chat", text }));
-    setDraft("");
-    // Restore focus so the keyboard stays open across consecutive sends.
-    requestAnimationFrame(() => {
-      try { chatInputRef.current?.focus(); } catch {}
-    });
-  };
+  const handleSendChat = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(JSON.stringify({ type: "chat", text }));
+    return true;
+  }, []);
 
   const changeVideo = (videoIdOrUrl: string) => {
     const url = videoIdOrUrl.startsWith("http")
@@ -923,13 +919,13 @@ export default function RoomScreen() {
         {/* Chat panel + composer */}
         {!fullscreen && (
           <KeyboardAvoidingView
-            // Android already pans the window for the focused input
-            // (softwareKeyboardLayoutMode: "pan" / windowSoftInputMode=adjustPan).
-            // Adding "height" avoidance on top of that double-shifts the layout
-            // the instant the field focuses, which was yanking focus and making
-            // the keyboard pop open then immediately close. Let the OS handle it
-            // on Android; only iOS needs manual padding avoidance.
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            // `translate-with-padding` is the recommended chat-app behavior
+            // from react-native-keyboard-controller. It animates the entire
+            // panel up in sync with the OS keyboard (Android 12+ predictive,
+            // iOS, react-native-web) and adds bottom padding so the composer
+            // never overlaps the keyboard. Works identically on Samsung,
+            // Pixel, Xiaomi, edge-to-edge displays, and split-screen.
+            behavior={Platform.OS === "ios" ? "padding" : "translate-with-padding"}
             keyboardVerticalOffset={0}
             style={styles.chatPanel}
           >
@@ -993,7 +989,7 @@ export default function RoomScreen() {
             <FlatList
               data={messages.filter((m) => !shouldMute(m.text))}
               keyExtractor={(m) => m.id}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
               keyboardDismissMode="interactive"
               renderItem={({ item }) => {
                 const mine = item.user_id === user?.id;
@@ -1047,38 +1043,16 @@ export default function RoomScreen() {
               }
             />
 
-            <View style={styles.composer}>
-              <TouchableOpacity
-                testID="chat-attach"
-                onPress={sendImage}
-                style={styles.attachBtn}
-              >
-                <Ionicons name="image-outline" size={20} color={COLORS.brand} />
-              </TouchableOpacity>
-              <TextInput
-                ref={chatInputRef}
-                testID="chat-input"
-                value={draft}
-                onChangeText={setDraft}
-                placeholder={t("send_message")}
-                placeholderTextColor={COLORS.textDisabled}
-                style={styles.composerInput}
-                onSubmitEditing={sendChat}
-                returnKeyType="send"
-                blurOnSubmit={false}
-                multiline={false}
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                testID="chat-send"
-                onPress={sendChat}
-                style={styles.sendBtn}
-                disabled={!draft.trim()}
-              >
-                <Ionicons name="send" size={18} color={COLORS.bg} />
-              </TouchableOpacity>
-            </View>
+            {/* Universal, memoized composer — survives parent re-renders */}
+            <ChatComposer
+              ref={composerRef}
+              onSend={handleSendChat}
+              onAttach={sendImage}
+              placeholder={t("send_message")}
+              testIDInput="chat-input"
+              testIDSend="chat-send"
+              testIDAttach="chat-attach"
+            />
           </KeyboardAvoidingView>
         )}
 

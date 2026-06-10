@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { LanguageProvider } from "@/src/context/LanguageContext";
 import { ThemeProvider, useTheme } from "@/src/context/ThemeContext";
@@ -43,19 +44,21 @@ function RootShell() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <LanguageProvider>
-          <AuthProvider>
-            <CloudSyncProvider>
-              <GameProvider>
-                <CommsProvider>
-                  <RootShell />
-                </CommsProvider>
-              </GameProvider>
-            </CloudSyncProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </ThemeProvider>
+      <KeyboardProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <CloudSyncProvider>
+                <GameProvider>
+                  <CommsProvider>
+                    <RootShell />
+                  </CommsProvider>
+                </GameProvider>
+              </CloudSyncProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

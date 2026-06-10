@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only verification of the universal keyboard/chat-input refactor (react-native-keyboard-controller + memoized ChatComposer + KeyboardAvoidingView). Logged in as testuser1/pass1234, created a new room 'KeyboardTest' via the + FAB, room screen mounted with all 6 header buttons (room-leave, room-mic-toggle, room-dms-open, room-friends-open, room-settings-open, room-fullscreen). Chat composer tested with 6 consecutive sends (hello1..hello6) — every send cleared the input AND preserved focus on [data-testid=chat-input] (document.activeElement == 'chat-input' after every Enter, val=='' after every send). All 6 messages rendered as bubbles. Parent-re-render test: tapped room-mic-toggle (which dismisses an Alert + calls setMicMode) — composer survived (no unmount, no state loss). After re-focusing, an additional 'post-mic' message was sent successfully with focus + clear restored. DM overlay opened (Messages list visible with 5 peer conversations), closed via room-dm-close, room re-appeared with chat-input still visible and WS still alive (a final 'after-dm-close' message was sent successfully and rendered). Zero pageerror events; zero KeyboardProvider/keyboard-controller/TDZ warnings in console. Only console warnings are pre-existing RN-Web style deprecations (shadow*, textShadow*, pointerEvents) and an expo-notifications web warning — none related to this fix.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/tmp/k02_room.png",
+    "/tmp/k03_dm.png"
+  ],
+  "action_items": [
+    "(Optional) Add a testID on each DM conversation row (e.g. testID={`dm-conv-${friend.id}`}) so future tests can open a thread and exercise the dm-chat-input / dm-chat-send composer directly. Today the rows are unlabelled TouchableOpacity items so the DM-composer focus loop could not be exercised via testIDs in this run — only the overlay open/close path was verified."
+  ],
+  "critical_code_review_comments": [
+    "ChatComposer.tsx is well-structured: local useState for draft, useImperativeHandle for parent control, requestAnimationFrame refocus after send, and a strict memo equality function that ignores the parent's draft. This is exactly the right pattern to defeat WS-triggered re-renders on Samsung/Pixel/Xiaomi.",
+    "KeyboardProvider is correctly placed at the SafeAreaProvider's child level in _layout.tsx — every screen is wrapped, so the react-native-keyboard-controller KeyboardAvoidingView inside room/[id].tsx, RoomDMOverlay.tsx, and GameChatSheet.tsx will work without 'KeyboardProvider missing' warnings.",
+    "Note (not a bug): The composer passes textAlign='right' on native platforms which is correct for RTL Arabic but may visually surprise English-first users typing in landscape. Since `dir=\"auto\"` handles the per-character direction, this is acceptable. No action needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "Created one room titled 'KeyboardTest' as testuser1 because the rooms list was empty when this iteration ran (previous 'G' room is gone). No other seed data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Universal keyboard refactor is verified end-to-end. ChatComposer (testID=chat-input/chat-send/chat-attach) preserves focus and clears across N consecutive sends and survives parent state updates (mic toggle, WS messages). DM overlay opens via room-dms-open / closes via room-dm-close — to exercise dm-chat-input / dm-chat-send in future runs, ask main agent to add a testID on each DM conversation row in RoomDMOverlay.tsx. Test creds: testuser1 / pass1234. KeyboardProvider is wired at the root layout. No deprecated keyboard package usage detected.",
+  "rca_of_issue": "N/A — this iteration is a forward-going feature verification, not a bug fix. Reproduction of the original issue (Android focus loss on WS re-render) was simulated on web by triggering a parent state update (mic toggle) while the composer was focused — the React.memo wrapper successfully prevented the composer from re-mounting, and the subsequent send completed normally with input cleared + focused."
+}
