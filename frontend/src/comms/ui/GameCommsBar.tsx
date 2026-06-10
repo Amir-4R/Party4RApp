@@ -8,12 +8,11 @@
 //   • الحالة تُحفظ داخل هذا المكوّن (يبقى مُركَّباً مع اللعبة) فلا تضيع الدردشة
 //     عند الإغلاق أو الخروج المؤقت.
 // =============================================================================
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FUTURISTIC } from "@/src/theme/futuristic";
-import { withAlpha } from "@/src/games/shared/gameTheme";
 import GameChatSheet, { ChatMessage } from "./GameChatSheet";
 import FriendsQuickOverlay from "./FriendsQuickOverlay";
 import MicButton from "./MicButton";
@@ -26,12 +25,19 @@ export default function GameCommsBar({
   showMic = true,
   botReplies = true,
   style,
+  // ── Online-mode bridge: when provided, every "send" is routed through
+  //    this callback (WS → server → broadcast) instead of the local bot
+  //    simulator. Incoming messages should be piped in via `externalMessages`.
+  onSendInGame,
+  externalMessages,
 }: {
   opponentName?: string;
   opponentAvatar?: string;
   showMic?: boolean;
   botReplies?: boolean;
   style?: ViewStyle;
+  onSendInGame?: (text: string) => void;
+  externalMessages?: { id: string; from: string; text: string; ts: number; fromMe?: boolean }[];
 }) {
   const insets = useSafeAreaInsets();
   const [chatOpen, setChatOpen] = useState(false);
@@ -39,8 +45,43 @@ export default function GameCommsBar({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [unread, setUnread] = useState(0);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastExternalIdRef = useRef<string | null>(null);
+
+  // When the screen wires `externalMessages` (e.g. online match) we mirror
+  // them into the chat sheet's message list so the player sees everything in
+  // ONE conversation panel. Local "fromMe" messages get tagged accordingly.
+  useEffect(() => {
+    if (!externalMessages || externalMessages.length === 0) return;
+    const last = externalMessages[externalMessages.length - 1];
+    if (lastExternalIdRef.current === last.id) return;
+    lastExternalIdRef.current = last.id;
+    const newOnes = externalMessages.filter((m) => {
+      // De-dupe by id so we don't add the same message twice.
+      return !messages.some((existing) => existing.id === m.id);
+    });
+    if (newOnes.length === 0) return;
+    setMessages((prev) => [...prev, ...newOnes.map((m) => ({
+      id: m.id,
+      fromMe: !!m.fromMe,
+      name: m.fromMe ? "" : m.from,
+      text: m.text,
+      ts: m.ts,
+    } as ChatMessage))]);
+    // Surface unread if the panel is closed and the message wasn't from me.
+    setChatOpen((open) => {
+      if (!open && !last.fromMe) setUnread((u) => u + 1);
+      return open;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalMessages]);
 
   const handleSend = useCallback((text: string) => {
+    // Online mode: route through the parent callback and DO NOT add a local
+    // bubble — the server will echo it back via `externalMessages`.
+    if (onSendInGame) {
+      onSendInGame(text);
+      return;
+    }
     setMessages((prev) => [...prev, { id: `me_${Date.now()}`, fromMe: true, name: "", text, ts: Date.now() }]);
     // Light, local bot acknowledgement so chat feels alive in practice mode.
     if (botReplies) {
@@ -56,7 +97,7 @@ export default function GameCommsBar({
         });
       }, 900 + Math.random() * 800);
     }
-  }, [botReplies, opponentName, opponentAvatar]);
+  }, [botReplies, opponentName, opponentAvatar, onSendInGame]);
 
   const openChat = () => { setChatOpen(true); setUnread(0); };
 

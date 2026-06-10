@@ -256,9 +256,8 @@ export default function DammaLobbyScreen() {
 
   const enterMatchedRoom = useCallback(() => {
     if (!matchedRid) return;
-    // Phase 5 will hook this room into damma-online gameplay. For now we
-    // forward the room id as a query param so damma.tsx can read it later.
-    router.replace({ pathname: "/game/damma", params: { rid: matchedRid, online: "1" } });
+    // Phase 5: Navigate to the dedicated online screen wired to the backend WS.
+    router.replace({ pathname: "/game/damma-online", params: { rid: matchedRid } });
   }, [matchedRid, router]);
 
   // Cleanup on unmount: leave queue if still searching

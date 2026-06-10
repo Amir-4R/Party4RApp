@@ -78,9 +78,9 @@ QUEUE_FILL_WITH_BOTS_AFTER = 25.0  # seconds
 # ── Domino engine — server-authoritative duplicate of client rules ──────────
 def _full_set() -> List[Dict[str, int]]:
     tiles = []
-    for l in range(0, 7):
-        for r in range(l, 7):
-            tiles.append({"id": f"{l}-{r}", "left": l, "right": r})
+    for left in range(0, 7):
+        for right in range(left, 7):
+            tiles.append({"id": f"{left}-{right}", "left": left, "right": right})
     return tiles
 
 
@@ -367,6 +367,8 @@ async def start_room(rid: str, body: JoinBody) -> Dict[str, Any]:
     room.turn_deadline = time.time() + TURN_SECONDS
     await room.broadcast({"type": "room", "room": room.snapshot()})
     await room.send_state()
+    # If the first player is a bot, kick off bot auto-play immediately.
+    await _maybe_schedule_bot_turn(room)
     return {"room": room.snapshot()}
 
 
@@ -507,6 +509,9 @@ async def _drain_queue(num_players: int) -> None:
     for entry in picks:
         QUEUE_RESULTS[entry["user_id"]] = {"rid": rid, "matched_at": matched_at}
 
+    # If the starting turn belongs to a bot (e.g. timeout-fill), kick autoplay.
+    await _maybe_schedule_bot_turn(room)
+
 
 # ── WebSocket: live updates + moves ─────────────────────────────────────────
 @damma_online_router.websocket("/ws/{rid}")
@@ -548,6 +553,7 @@ async def _handle_message(room: Room, slot: Slot, msg: Dict[str, Any]) -> None:
         await room.broadcast({
             "type": "chat",
             "from": slot.name,
+            "from_pid": slot.pid,
             "text": str(msg.get("text", ""))[:200],
         })
         return
@@ -574,6 +580,64 @@ async def _handle_message(room: Room, slot: Slot, msg: Dict[str, Any]) -> None:
             "winner": room.state.get("winner"),
             "scores": room.state["scores"],
         })
+    # If the next turn is a bot, schedule an auto-play so the match never
+    # stalls when a human is replaced or every seat is a bot.
+    await _maybe_schedule_bot_turn(room)
+
+
+async def _maybe_schedule_bot_turn(room: Room) -> None:
+    """If it's a bot's turn, queue a delayed auto-move so the match flows."""
+    if room.state is None or room.state.get("phase") != "playing":
+        return
+    cur_pid = room.state["turn"]
+    cur_slot = next((s for s in room.slots if s.pid == cur_pid), None)
+    if cur_slot is None or not cur_slot.is_bot:
+        return
+    asyncio.create_task(_play_bot_turn(room, cur_slot))
+
+
+async def _play_bot_turn(room: Room, slot: Slot, think_ms: int = 1100) -> None:
+    """Simple bot: think for ~1s, then play first legal tile → else draw → else pass.
+    Keeps playing as long as the bot's turn persists."""
+    await asyncio.sleep(think_ms / 1000.0)
+    if room.state is None or room.state.get("phase") != "playing":
+        return
+    if room.state["turn"] != slot.pid:
+        return
+    hand = list(room.state["hands"].get(slot.pid, []))
+    played = False
+    for tile in hand:
+        sides = _playable_sides(room.state, tile)
+        if sides:
+            _apply_move(room.state, slot.pid, tile["id"], sides[0])
+            played = True
+            break
+    if not played:
+        if room.state["boneyard"]:
+            _draw_tile(room.state, slot.pid)
+            # After drawing, try once more to play; otherwise pass.
+            new_hand = list(room.state["hands"].get(slot.pid, []))
+            if new_hand:
+                last_tile = new_hand[-1]
+                sides = _playable_sides(room.state, last_tile)
+                if sides:
+                    _apply_move(room.state, slot.pid, last_tile["id"], sides[0])
+                    played = True
+            if not played:
+                _pass_turn(room.state, slot.pid)
+        else:
+            _pass_turn(room.state, slot.pid)
+    room.turn_deadline = time.time() + TURN_SECONDS
+    await room.send_state()
+    if room.state.get("phase") == "game_over":
+        await room.broadcast({
+            "type": "end",
+            "winner": room.state.get("winner"),
+            "scores": room.state["scores"],
+        })
+        return
+    # Cascade: if next is also a bot, recurse.
+    await _maybe_schedule_bot_turn(room)
 
 
 async def _disconnect_watcher(room: Room, slot: Slot) -> None:
@@ -587,3 +651,6 @@ async def _disconnect_watcher(room: Room, slot: Slot) -> None:
     slot.is_bot = True
     slot.name = f"🤖 {slot.name} (bot)"
     await room.broadcast({"type": "room", "room": room.snapshot()})
+    # If it's currently this slot's turn, the bot should auto-play it now so
+    # the remaining humans don't sit forever waiting on a ghost.
+    await _maybe_schedule_bot_turn(room)

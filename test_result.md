@@ -1197,3 +1197,100 @@ agent_communication:
 
       No backend code changes. No testing-agent run is required for these
       frontend-only fixes — visual verification was done via screenshot tool.
+
+#====================================================================================================
+# 2026-06-10 — Dominoes Phase 5: Real-time online multiplayer gameplay
+#====================================================================================================
+
+backend:
+  - task: "Damma WebSocket gameplay events (play/draw/pass + bot auto-play)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/damma_online.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Phase 5 — Implemented server-side bot auto-play for slots flagged as
+          bots (timeout-fill or disconnect-converted). Added `_maybe_schedule_bot_turn`
+          + `_play_bot_turn` and hooked them into `/rooms/{rid}/start`, queue
+          drain, disconnect-watcher, and the per-move handler. Also added
+          `from_pid` to chat broadcasts so clients can reliably mark messages
+          as "fromMe". Fixed ambiguous variable name ruff E741.
+
+frontend:
+  - task: "Online Dominoes screen (real-time WS gameplay)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/game/damma-online.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Phase 5 — New screen wired to the WS via `useDammaOnline` hook.
+          Reuses WoodenTable/HandTray/PlayerChip/BoneyardPanel. Rotates seats
+          so MY pid is always at the bottom. Server-driven state, hands,
+          scores, tile counts, turn timer. Connecting/Reconnecting/Error
+          overlays. Lobby now navigates here on match-found. Chat bridge
+          through GameCommsBar (`onSendInGame` + `externalMessages`).
+
+  - task: "useDammaOnline React hook"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/useDammaOnline.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Wraps DammaOnlineClient with reconciliation into a DammaState-shaped
+          object so existing presentation components render unchanged. Handles
+          reconnect with backoff (5 attempts), heartbeats every 25 s, chat
+          log, end payload, and graceful disconnect.
+
+  - task: "Damma matchmaking lobby — navigate to /game/damma-online on match"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/game/damma-lobby.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Tiny redirect change: matched room now opens /game/damma-online?rid={rid}
+          instead of /game/damma. Offline path (/game/damma) untouched.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 14
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Damma WebSocket gameplay events (play/draw/pass + bot auto-play)"
+    - "Online Dominoes screen (real-time WS gameplay)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Phase 5 complete. Validation needed:
+      1. Backend: queue join → match → bot auto-play → game progresses end-to-end.
+      2. WS: receive `room`, `state` (with private hand), `chat` (with from_pid),
+         and `end` events.
+      3. Frontend: log in as testuser1 → /game/damma-lobby → press "ابحث عن
+         مباراة أونلاين" → wait ~25s for the bot-fill timeout → confirms it
+         navigates to /game/damma-online and shows board + hand + opponents.
