@@ -1927,3 +1927,32 @@ agent_communication:
          draggable → drag and release → reload screen → positions persist.
       4. Verify no Console warnings about `Invalid style property of
          "direction"`.
+
+
+  - agent: "main"
+    message: |
+      Regression fix — Room screen could not open ("لم استطع فتح غرفه").
+
+      ROOT CAUSE (TDZ): In /app/frontend/app/room/[id].tsx the `toggleMic`
+      `useCallback` was created with `t` in BOTH its body and dependency
+      array, but `const { t, tErr } = useT()` was declared AFTER it. During
+      render React eagerly evaluates the dep-array, so it referenced `t`
+      while still in the Temporal Dead Zone, throwing
+      "Cannot access 't' before initialization" and crashing the whole
+      RoomScreen on mount.
+
+      FIX: Hoisted `const { t, tErr } = useT();` ABOVE the `useComms()` +
+      `toggleMic` block (now line 144 vs previously 169). Added an inline
+      comment explaining the ordering requirement so it doesn't regress.
+
+      VERIFIED (testing_agent iteration_25):
+        - Room screen mounts cleanly, no pageerror, no TDZ crash.
+        - All 6 header buttons present: leave, mic, dms, friends, settings,
+          fullscreen.
+        - WS connects (`/api/ws/rooms/{room_id}`), status "1 live".
+        - DM overlay (RoomDMOverlay) opens + closes without tearing down
+          the room WebSocket.
+        - Mic toggle is interactive on web (real audio is native-only —
+          out of scope here).
+
+      No backend changes. No other files touched.
