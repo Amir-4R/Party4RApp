@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
 
   // ── Header & title ──────────────────────────────────────────────────────
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
-  iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 34, height: 40, alignItems: "center", justifyContent: "center" },
   titleWrap: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     paddingHorizontal: 10,

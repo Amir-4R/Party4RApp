@@ -141,15 +141,8 @@ const styles = StyleSheet.create({
     paddingVertical: 18, paddingHorizontal: 16,
     overflow: "hidden",
   },
-  feltHighlight: {
-    position: "absolute",
-    top: -40, left: "10%", right: "10%", height: 240,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 9999,
-  },
   tableInlay: { margin: 4, borderRadius: 10, borderWidth: 1, borderStyle: "dashed" },
-  tableGlow:  { position: "absolute", top: -40, left: -40, width: 180, height: 180, borderRadius: 999, opacity: 0.8 },
-  tableGlowB: { position: "absolute", bottom: -50, right: -50, width: 200, height: 200, borderRadius: 999 },
+  // (feltHighlight + tableGlow + tableGlowB removed — they're no longer rendered)
   endsLabel: { fontSize: 12, fontWeight: "700", textAlign: "center", marginBottom: 6 },
   boardWrap: { paddingVertical: 8, alignItems: "center", justifyContent: "center", flexGrow: 1 },
   boardRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginVertical: 2 },
