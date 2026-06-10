@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   },
   // Gold filigree ornament image (real generated PNG) flanking the title.
   titleOrnamentImg: {
-    width: 64, height: 22,
+    width: 46, height: 18,
   },
   titleArabic: {
     color: GOLD, fontSize: 20, fontWeight: "900",
