@@ -1,0 +1,78 @@
+{
+  "final_board_len": 8,
+  "horizontal_widths": [
+    44.62
+  ],
+  "horizontal_heights": [
+    22.31
+  ],
+  "vertical_widths": [
+    22.31
+  ],
+  "vertical_heights": [
+    44.62
+  ],
+  "expected_scale": 0.62,
+  "expected_horiz_size_px": [
+    44.64,
+    22.32
+  ],
+  "identity_drifts_total": 0,
+  "big_drifts_count": 0,
+  "big_drifts_sample": [],
+  "chain": [
+    [
+      4,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      3
+    ],
+    [
+      3,
+      6
+    ],
+    [
+      6,
+      0
+    ],
+    [
+      0,
+      2
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      2,
+      5
+    ]
+  ],
+  "adjacency_violations": [],
+  "moves_log": [
+    "played",
+    "played",
+    "played",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw"
+  ]
+}

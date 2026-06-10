@@ -1,0 +1,47 @@
+{
+  "final_board_len": 2,
+  "horizontal_widths": [
+    72
+  ],
+  "horizontal_heights": [
+    36
+  ],
+  "vertical_widths": [],
+  "vertical_heights": [],
+  "identity_drifts_total": 24,
+  "unique_identity_drifts": 1,
+  "drift_samples": [
+    {
+      "key": [
+        3,
+        5
+      ],
+      "first": {
+        "x": 5.204010009765625,
+        "y": 241.93629455566406,
+        "w": 68.31965637207031,
+        "h": 34.15983581542969,
+        "first_label": "T1_human",
+        "first_idx": 0
+      },
+      "now": {
+        "x": 114,
+        "y": 285,
+        "idx": 0
+      },
+      "dx": 108.79598999023438,
+      "dy": 43.06370544433594
+    }
+  ],
+  "chain": [
+    [
+      3,
+      5
+    ],
+    [
+      5,
+      5
+    ]
+  ],
+  "adjacency_violations": []
+}

@@ -1681,3 +1681,60 @@ agent_communication:
         6 = two columns of three.
       
       Backend untouched. Skip backend testing.
+
+#====================================================================================================
+# 2026-06-10 — DAMMA: STABLE layout with fixed tile size (no auto-shrink)
+#====================================================================================================
+
+frontend:
+  - task: "Damma — SnakeLayout uses FIXED tile scale; existing tiles never reposition"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/games/damma/components/SnakeLayout.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          User-diagnosed root cause: "الطاولة صغيرة وكل مرة العب بحجر يضطر
+          الحجار يتغير شكلهم عشان يجو على الطاولة". The previous SnakeLayout
+          tried 16 progressive scales (1.0 → 0.32) until the chain fit,
+          which meant EVERY new tile triggered a recompute that often
+          shrank existing tiles. Compounded with the vertical centring
+          based on actual segment count, this shifted tiles around on
+          every play.
+          
+          New design:
+          1. FIXED_TILE_SCALE = 0.62. Every tile renders at the same size,
+             always. No auto-shrink loop.
+          2. Vertical centring uses ASSUMED_TOTAL_ROWS = 4 (so y of row 0
+             is a CONSTANT regardless of how many tiles exist).
+          3. Position of board[i] depends ONLY on (i, playW, playH, scale)
+             — all of which are stable across renders.
+          
+          Net effect: once a tile is placed at (x, y), it STAYS at (x, y)
+          for the rest of the match. New tiles append at the next position
+          in the snake path without disturbing the existing chain.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Damma layout stability fix applied per user's diagnosis.
+      
+      Validation needed (FRONTEND ONLY):
+      1. /game/damma. Play 1 tile. Note its (x, y) position. Take screenshot.
+      2. Wait for bot to play. Take screenshot. VERIFY: the player's first
+         tile is at the SAME (x, y) — has not moved.
+      3. Continue playing 8-12 tiles. At each step, take a screenshot.
+         VERIFY: every previously-placed tile is at the EXACT SAME (x, y)
+         it was at when first placed. The new tile just extends the chain.
+      4. Tile size: all tiles are at scale 0.62 (about 45×22 px). Smaller
+         than before but more fit on the board (~6 per row × 4 rows = 24
+         tiles before having to wrap).
+      5. Chain still bends 90° at row ends via vertical corner tiles. Left-
+         going rows rotate tiles 180° for visual continuity.
+      6. Adjacency invariant still holds (board[i].right === board[i+1].left).
+      
+      Backend untouched. Skip backend.
