@@ -45,11 +45,8 @@ const ME: PlayerId = "player1";
 // Premium gold accent palette
 const GOLD = "#D4AF37";
 const GOLD_SOFT = "#B8860B";
-const GOLD_DARK = "#7A5C18";
-const GOLD_GLOW = "rgba(212,175,55,0.35)";
 
 // ── Premium "luxury table" palette (UI only — no engine changes) ─────────────
-const WOOD_OUTER  = "#1A0E06";   // deep mahogany outer rim
 const WOOD_MID    = "#4A2E16";   // rich walnut frame
 const WOOD_LIGHT  = "#6E4520";   // upper highlight on the wood
 const WOOD_DARK   = "#1F0E05";   // shadow side of the wood
@@ -87,7 +84,7 @@ function PipFace({ value, size, color }: { value: number; size: number; color: s
 // ── Tile renderer — accepts an explicit `scale` so the board can shrink
 // the played chain while the hand keeps its standard size. ───────────────────
 function DominoTile({
-  domino, onPress, selected, horizontal, pal, scale = 1,
+  domino, onPress, selected, horizontal, pal, scale = 1, testID,
 }: {
   domino: Domino | PlacedDomino;
   onPress?: () => void;
@@ -95,12 +92,14 @@ function DominoTile({
   horizontal?: boolean;
   pal: ReturnType<typeof dammaPalette>;
   scale?: number;
+  testID?: string;
 }) {
   const W = (horizontal ? 72 : 40) * scale;
   const H = (horizontal ? 40 : 72) * scale;
   const faceSize = (horizontal ? 30 : 28) * scale;
   return (
     <TouchableOpacity
+      testID={testID}
       onPress={onPress}
       disabled={!onPress}
       activeOpacity={0.85}
@@ -398,7 +397,7 @@ export default function DammaScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+        <TouchableOpacity testID="damma-back-btn" onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={26} color={FUTURISTIC.textPrimary} />
         </TouchableOpacity>
         {/* Premium centered title pill with gold filigree */}
@@ -409,16 +408,16 @@ export default function DammaScreen() {
           <View style={styles.titleOrnament} />
         </View>
         <View style={{ flexDirection: "row" }}>
-          <TouchableOpacity onPress={() => router.push("/game/damma-lobby")} style={styles.iconBtn}>
+          <TouchableOpacity testID="damma-lobby-link" onPress={() => router.push("/game/damma-lobby")} style={styles.iconBtn}>
             <Ionicons name="people-circle-outline" size={24} color={GOLD} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowModePicker(true)} style={styles.iconBtn}>
+          <TouchableOpacity testID="damma-mode-picker" onPress={() => setShowModePicker(true)} style={styles.iconBtn}>
             <Ionicons name={playerCount === 4 ? "people" : "person"} size={22} color={GOLD} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowDiffPicker(true)} style={styles.iconBtn}>
+          <TouchableOpacity testID="damma-difficulty-picker" onPress={() => setShowDiffPicker(true)} style={styles.iconBtn}>
             <Ionicons name="hardware-chip-outline" size={22} color={diffMeta.color} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={reset} style={styles.iconBtn}>
+          <TouchableOpacity testID="damma-reset-btn" onPress={reset} style={styles.iconBtn}>
             <Ionicons name="refresh" size={22} color={FUTURISTIC.textPrimary} />
           </TouchableOpacity>
         </View>
@@ -427,7 +426,7 @@ export default function DammaScreen() {
       {/* Scores + Turn timer  ── with avatars & usernames for BOTH players */}
       <View style={styles.scoreBar}>
         {/* Player card (you) */}
-        <View style={[styles.playerScoreCard, isMyTurn && styles.scoreActive]}>
+        <View testID="damma-player-card-me" style={[styles.playerScoreCard, isMyTurn && styles.scoreActive]}>
           <Image
             source={{ uri: getAvatarUrl(user?.avatar || "avatar_ninja") }}
             style={[styles.avatar, isMyTurn && styles.avatarActive]}
@@ -441,7 +440,7 @@ export default function DammaScreen() {
         </View>
 
         {/* Turn timer */}
-        <View style={[styles.timerBox, isMyTurn && turnTimeLeft <= 10 && styles.timerWarn]}>
+        <View testID="damma-timer" style={[styles.timerBox, isMyTurn && turnTimeLeft <= 10 && styles.timerWarn]}>
           <Ionicons
             name="time-outline" size={16}
             color={isMyTurn && turnTimeLeft <= 10 ? "#FF5C5C" : FUTURISTIC.brand}
@@ -455,7 +454,7 @@ export default function DammaScreen() {
         </View>
 
         {/* Opponent card (bot) */}
-        <View style={[styles.playerScoreCard, !isMyTurn && styles.scoreActive]}>
+        <View testID="damma-player-card-bot" style={[styles.playerScoreCard, !isMyTurn && styles.scoreActive]}>
           <View style={{ flex: 1, marginRight: 8, alignItems: "flex-end" }}>
             <Text style={styles.playerName} numberOfLines={1}>
               🤖 {diffMeta.label}
@@ -471,7 +470,7 @@ export default function DammaScreen() {
       {/* Opponent hand (face down) — top player (player2 in 2P, player3 in 4P) */}
       <View style={styles.oppHand}>
         {playerCount === 4 && state.hands.player3 && (
-          <View style={styles.topPlayerCard}>
+          <View testID="damma-player-card-top" style={styles.topPlayerCard}>
             <View style={[styles.smallAvatar, state.turn === "player3" && styles.smallAvatarActive]}>
               <Ionicons name="hardware-chip" size={18} color={GOLD} />
             </View>
@@ -496,7 +495,7 @@ export default function DammaScreen() {
       {/* Side player cards (for 4-player mode) */}
       {playerCount === 4 && (
         <View style={styles.sidePlayersRow}>
-          <View style={[styles.sidePlayerCard, state.turn === "player2" && styles.scoreActive]}>
+          <View testID="damma-player-card-left" style={[styles.sidePlayerCard, state.turn === "player2" && styles.scoreActive]}>
             <View style={[styles.smallAvatar, state.turn === "player2" && styles.smallAvatarActive]}>
               <Ionicons name="hardware-chip" size={18} color={GOLD} />
             </View>
@@ -510,7 +509,7 @@ export default function DammaScreen() {
             </View>
           </View>
 
-          <View style={[styles.sidePlayerCard, state.turn === "player4" && styles.scoreActive]}>
+          <View testID="damma-player-card-right" style={[styles.sidePlayerCard, state.turn === "player4" && styles.scoreActive]}>
             <View style={[styles.smallAvatar, state.turn === "player4" && styles.smallAvatarActive]}>
               <Ionicons name="hardware-chip" size={18} color={GOLD} />
             </View>
@@ -602,6 +601,7 @@ export default function DammaScreen() {
           <View style={styles.boneyard}>
             <Text style={styles.boneyardLabel}>{t("boneyard") || "السحب"}</Text>
           <TouchableOpacity
+            testID="damma-boneyard"
             disabled={!isMyTurn || !options.mustDraw}
             onPress={handleDraw}
             activeOpacity={0.85}
@@ -662,7 +662,7 @@ export default function DammaScreen() {
         <View style={styles.myHandArea}>
         {/* Bot "Thinking..." indicator (5-second delay before AI plays) */}
         {botThinking && (
-          <View style={styles.thinkingBox}>
+          <View testID="damma-thinking" style={styles.thinkingBox}>
             <View style={styles.thinkingDot} />
             <Text style={styles.thinkingText}>🤖 {t("thinking") || "البوت يفكر..."}</Text>
           </View>
@@ -673,7 +673,7 @@ export default function DammaScreen() {
         {selectedTile && isMyTurn && state.board.length > 0 && (
           <View style={styles.sideButtons}>
             {playableSides.includes("left") && (
-              <TouchableOpacity style={styles.sideBtn} onPress={() => handlePlay("left")} activeOpacity={0.9}>
+              <TouchableOpacity testID="damma-play-left" style={styles.sideBtn} onPress={() => handlePlay("left")} activeOpacity={0.9}>
                 <Ionicons name="arrow-back" size={18} color={FUTURISTIC.bg} />
                 <Text style={styles.sideBtnText}>{t("left") || "يسار"}</Text>
               </TouchableOpacity>
@@ -681,7 +681,7 @@ export default function DammaScreen() {
             {/* spacer ensures Left & Right never touch each other */}
             <View style={{ width: 24 }} />
             {playableSides.includes("right") && (
-              <TouchableOpacity style={styles.sideBtn} onPress={() => handlePlay("right")} activeOpacity={0.9}>
+              <TouchableOpacity testID="damma-play-right" style={styles.sideBtn} onPress={() => handlePlay("right")} activeOpacity={0.9}>
                 <Text style={styles.sideBtnText}>{t("right") || "يمين"}</Text>
                 <Ionicons name="arrow-forward" size={18} color={FUTURISTIC.bg} />
               </TouchableOpacity>
@@ -710,6 +710,7 @@ export default function DammaScreen() {
                 <DominoTile
                   domino={d}
                   pal={pal}
+                  testID={`damma-hand-tile-${d.left}-${d.right}`}
                   selected={selectedTile === d.id}
                   onPress={() => {
                     if (!isMyTurn || counting || flying) return;
@@ -727,7 +728,7 @@ export default function DammaScreen() {
         </ScrollView>
 
         {isMyTurn && options.mustPass && (
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: FUTURISTIC.textMuted }]} onPress={handlePass} activeOpacity={0.9}>
+          <TouchableOpacity testID="damma-pass-btn" style={[styles.actionBtn, { backgroundColor: FUTURISTIC.textMuted }]} onPress={handlePass} activeOpacity={0.9}>
             <Text style={styles.actionText}>{t("pass") || "تخطي"}</Text>
           </TouchableOpacity>
         )}
@@ -782,6 +783,7 @@ export default function DammaScreen() {
               return (
                 <TouchableOpacity
                   key={opt.id}
+                  testID={`damma-diff-${opt.id}`}
                   style={[styles.diffRow, sel && styles.diffRowActive]}
                   onPress={() => pickDifficulty(opt.id)}
                 >
@@ -812,6 +814,7 @@ export default function DammaScreen() {
               return (
                 <TouchableOpacity
                   key={opt.id}
+                  testID={`damma-mode-${opt.id}`}
                   style={[styles.diffRow, sel && styles.diffRowActive]}
                   onPress={() => pickMode(opt.id)}
                 >
