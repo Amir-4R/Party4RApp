@@ -1,0 +1,45 @@
+{
+  "summary": "FRONTEND-ONLY regression of iteration 9 Damma layout restructure on viewport 390x844. 10 of 11 acceptance criteria PASS. One MINOR regression discovered: the damma-reset-btn (4th right-side header icon) overflows the viewport by 28px (rect right=418, viewport=390) — same root cause as the issue 'fixed' in iter 8 but reintroduced because the title block sits next to a 4-icon (160 px) cluster that no longer fits after the title ornaments. The icon still receives clicks via JS (Playwright force=True), but ~37 of 40 px sit OFF-screen so a real touch is unreliable on a 390 px device. Detailed verification: (1) BUNDLER OK — /game/damma loads without compile errors in both modes. (2) WHITE GLARE GONE — no element with rgba(255,255,255,0.04) of height>50 found anywhere on the felt; the two corner glows are also gone (`glareElems = []`). (3) BOARD DOMINANCE — wooden frame approx y=140→668 ≈ 528 px tall ≈ 63 % of 844 px viewport in 1v1, and side columns measure 553 px tall in 4P (=board area height by sibling-flex) ≈ 65 %; both within the 60–75 % target. (4) ME CARD MOVED — `damma-player-card-me` rect = x:12 y:687 w:366 h:43 is firmly inside the bottom HandTray, with avatar + 'Tester' + 'Your Turn' caption + a SCORE box (label 'SCORE' + value 0) all visible; no large ME card exists at the top anymore. (5) 4P SIDE COLUMNS — left x:6 w:42 h:553 / right x:282 w:42 h:553 flanking the table, both showing avatar + 'P2'/'P4' label + a tiny tile-count badge (5 and 4 respectively). (6) 4P TOP CARD — `damma-player-card-top` rect x:83 y:64 w:147 h:44 centered between the empty timer-spacer (left, flex:1) and the timer chip on the right. (7) BONEYARD SHRUNK — BoneyardPanel outer wood frame measures w=56 px (was 84) and the pile inside is 40×56. The integer count badge (`14` in 1v1 / `8` after some bot turns in 4P) renders correctly, and the 'اضغط للسحب' (Tap-to-draw) hint logic is intact (label localised in Arabic — only shown when canDraw=true, gated by options.mustDraw, which we did not trigger but the code path is unchanged). (8) TESTIDS — exactly the expected set in each mode: in 1v1 → 8 base + damma-player-card-bot=1 + top/left/right=0; in 4P → 8 base + bot=0 + top/left/right=1 each. (9) GAMEPLAY REGRESSION — countdown observed, tapping the 6-6 tile on an empty board auto-plays it (Ends label updated to '6 / 6'), the `damma-thinking` indicator appears during the bot's turn (5 s delay observed), timer ticks down (60s → 57s → 56s sampled), Reset button works (succeeded after force-click), Lobby link navigates to /game/damma-lobby. (10) HAND TRAY SAFE AREA — bottom-most tile at y≈824 leaves 20 px above the iOS home indicator (insets.bottom respected). (11) RESPONSIVE — RESET BUTTON OVERFLOWS — left:378 right:418 width:40 on viewport 390 → 28 px clipped on the right.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Header right-icon cluster",
+        "issue": "damma-reset-btn overflows the 390 px viewport on the right by 28 px (icon rect 378→418). Only ~3 px of the actual refresh glyph is visible — a real touch on the visible sliver is unreliable. Same root cause as iter-7: the four 40-px header icons (lobby+mode+diff+reset = 160 px) + back-btn (40) + titleWrap (~206 px incl. 46-px ornaments) = ~406 px > 390 px usable. Reference: /app/frontend/app/game/damma.tsx:340-353 (right icon group) and styles.titleOrnamentImg width:46 (line 645-647).",
+        "testID": "damma-reset-btn",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/game/damma",
+        "issues": [
+          "Header cluster width is fragile: 4 right-side icons + back + ornamented title nearly fills 390 px and any change to title text length or ornament size will reintroduce overflow. Consider reducing iconBtn width from 40→32, or shrinking titleOrnamentImg from 46→32, or moving one icon (e.g. lobby) into a dropdown.",
+          "i18n drift (Your Turn / Place the first tile / Boneyard) still in English under the Arabic title — explicitly to be skipped per the agent_to_agent context."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix damma-reset-btn off-screen on 390-px width: either (a) reduce header iconBtn from 40→32 px (160→128 px cluster) or (b) shrink titleOrnamentImg from 46→32 px or (c) drop one icon from the 4-icon cluster (e.g. fold lobby-link into the mode picker as a row). Verify with viewport 390 that reset.right ≤ 390."
+  ],
+  "critical_code_review_comments": [
+    "All major layout changes in iter-9 match the spec correctly: BoneyardPanel.styles.boneyardWoodFrame width:56 (was 84) ✓; WoodenTable removed feltHighlight + tableGlow + tableGlowB ✓ (styles still declared but no JSX references them — recommend deleting dead style entries `feltHighlight`, `tableGlow`, `tableGlowB` from WoodenTable.tsx lines 144-152 to avoid future confusion); HandTray now contains damma-player-card-me as a slim row at the top of myHandArea ✓; tableRow correctly wraps WoodenTable with vertical sideColumn (42 px) on left+right only when playerCount===4 ✓; CHAIN_HORIZONTAL_CHROME is now 236 (4P) / 144 (1v1) — the comment math (lines 263-267) is consistent with the new BoneyardPanel width (56) and reduced wood-frame padding (6).",
+    "scoreBar (line 660) is the slim top status row; in 4P (`scoreBarCompact`, paddingVertical:4) it correctly holds [P3-card | timer | empty]. In 1v1 it holds [empty-spacer | timer | bot-chip]. No vertical waste. ✓",
+    "Dead style entry: WoodenTable.tsx has `tableInlay`, `feltHighlight`, `tableGlow`, `tableGlowB` declared but only `tableInlay` is now used. Recommend removing the 3 unused entries.",
+    "Header overflow risk: damma.tsx lines 340-353 hard-code four 40 px iconBtns; this leaves no breathing room next to the titleWrap and will overflow as soon as titleArabic + 46-px ornaments fill ~200 px. Consider testing on the smallest target viewport (375 or 360 px) before shipping — at 360 px the overflow is 58 px."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only request)",
+    "frontend": "91% — 10 of 11 acceptance criteria pass; the Responsive criterion fails on damma-reset-btn overflow (regression of an iter-7 issue)."
+  },
+  "seed_data_creation": "Logged in as testuser1 / pass1234 (from /app/memory/test_credentials.md). Toggled AsyncStorage damma_player_count between 2 and 4 — will persist as last set value (2) after this run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter-9 layout overhaul VERIFIED for: white-glare removal, board dominance (≈63 % of 844 px), ME-card relocation to HandTray, 4P side columns, 4P top card, 56-px boneyard, all required testIDs in both modes, gameplay (countdown → tap → bot-thinking → bot play → timer ticks → reset). ONE regression: damma-reset-btn x=378 w=40 → right edge 418 vs viewport 390 (28 px off-screen). Repro: login testuser1/pass1234 → /game/damma at viewport 390x844 → wait for countdown → measure `[data-testid=\"damma-reset-btn\"]`.getBoundingClientRect().right; if > 390, regression persists. The wooden-table size cannot be measured by simple parent-walk of the boneyard sibling because react-native-web inserts a `LinearGradient` with a fragment child; use textContent.startsWith('Ends:') and walk up until height > 300 but stop before reaching the screen root.",
+  "rca_of_issue": "Header overflow RCA: The header (damma.tsx lines 319-354) is a flex row with `justify-content: space-between` and three children: back-btn (40 px), titleWrap (~206 px after the 46-px ornaments on each side of the 'ضمنة' + 'Classic Game' stack), and a right-side <View flexDirection:row> containing four 40-px icon buttons (160 px). Total intrinsic width ≈ 40 + 206 + 160 = 406 px, but only 390-2*12=366 px is usable (paddingHorizontal:12). React-native-web (via yoga) lets the right cluster overflow rather than shrink because none of the three children have `flexShrink:1`. Mitigation options (any one is sufficient): (1) styles.iconBtn width:40 → 32 (saves 32 px across the 4-icon cluster), (2) styles.titleOrnamentImg width:46 → 32 (saves 28 px), (3) drop lobby-link from the header and surface it inside the mode-picker modal."
+}

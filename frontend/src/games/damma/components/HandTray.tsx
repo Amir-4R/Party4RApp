@@ -6,7 +6,7 @@
 // button. The parent owns all engine state — this component is purely visual.
 // =============================================================================
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ImageBackground } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ImageBackground, Image } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { FUTURISTIC } from "@/src/theme/futuristic";
@@ -40,6 +40,11 @@ export interface HandTrayProps {
   /** Damma palette. */
   pal: ReturnType<typeof dammaPalette>;
 
+  // ── ME mini-card (slim header inside the tray) ────────────────────────────
+  meName: string;
+  meScore: number;
+  meAvatarUri?: string;
+
   // ── Localised labels ─────────────────────────────────────────────────────
   turnText: string;       // "Your Turn" / "Opponent's Turn"
   thinkingText: string;   // "AI is thinking…"
@@ -58,6 +63,7 @@ export default function HandTray({
   selectedTileId, flyingTileId,
   botThinking, mustPass, playableSides,
   bottomInset, pal,
+  meName, meScore, meAvatarUri,
   turnText, thinkingText, leftText, rightText, passText,
   onTilePress, onPlay, onPass,
 }: HandTrayProps) {
@@ -79,6 +85,21 @@ export default function HandTray({
       />
       <View pointerEvents="none" style={styles.handTrayGoldTrim} />
       <View style={styles.myHandArea}>
+
+        {/* ── Slim ME mini-card (replaces the big top score card) ─────── */}
+        <View testID="damma-player-card-me" style={[styles.meCardSlim, isMyTurn && styles.meCardSlimActive]}>
+          {meAvatarUri && (
+            <Image source={{ uri: meAvatarUri }} style={[styles.meCardAvatar, isMyTurn && styles.meCardAvatarActive]} />
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.meCardName} numberOfLines={1}>{meName}</Text>
+            <Text style={styles.meCardScore}>{turnText}</Text>
+          </View>
+          <View style={styles.meCardScoreBox}>
+            <Text style={styles.meCardScoreLabel}>SCORE</Text>
+            <Text style={styles.meCardScoreVal}>{meScore}</Text>
+          </View>
+        </View>
 
         {/* Bot "Thinking…" indicator (5-second delay before AI plays). */}
         {botThinking && (
@@ -174,12 +195,40 @@ const styles = StyleSheet.create({
     borderColor: withAlpha(GOLD, 0.55),
   },
   myHandArea: {
-    paddingVertical: 12, paddingHorizontal: 8,
+    paddingVertical: 6, paddingHorizontal: 6,
     backgroundColor: "rgba(8,4,2,0.55)",
-    borderRadius: 16,
+    borderRadius: 14,
   },
-  turnText: { color: GOLD, fontSize: 14, fontWeight: "800", textAlign: "center", marginBottom: 8, letterSpacing: 0.5 },
-  handScroll: { gap: 6, paddingHorizontal: 8, paddingTop: 12, alignItems: "flex-end", minHeight: 90 },
+  turnText: { color: GOLD, fontSize: 12, fontWeight: "800", textAlign: "center", marginBottom: 4, letterSpacing: 0.3 },
+  handScroll: { gap: 6, paddingHorizontal: 6, paddingTop: 4, alignItems: "flex-end", minHeight: 76 },
+
+  // ── Slim ME mini-card displayed at the top of the hand area ─────────────
+  meCardSlim: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "rgba(20,22,28,0.92)",
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.25),
+    marginBottom: 6,
+    gap: 8,
+  },
+  meCardSlimActive: {
+    borderColor: "#4ADE80",
+    backgroundColor: "rgba(74,222,128,0.10)",
+  },
+  meCardAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#1F2530" },
+  meCardAvatarActive: { borderWidth: 1.5, borderColor: "#4ADE80" },
+  meCardName: { color: "#FFF", fontSize: 12, fontWeight: "800", maxWidth: 120 },
+  meCardScore: { color: GOLD, fontSize: 10, fontWeight: "700", marginTop: 1 },
+  meCardScoreBox: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: withAlpha(GOLD, 0.12),
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.35),
+    alignItems: "center",
+  },
+  meCardScoreLabel: { color: GOLD, fontSize: 7, fontWeight: "800", letterSpacing: 0.5 },
+  meCardScoreVal: { color: GOLD, fontSize: 14, fontWeight: "900" },
 
   thinkingBox: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,

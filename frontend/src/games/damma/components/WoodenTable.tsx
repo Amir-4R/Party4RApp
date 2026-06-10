@@ -70,13 +70,10 @@ export default function WoodenTable({
             style={StyleSheet.absoluteFill}
             imageStyle={{ opacity: 0.32, borderRadius: 14 }}
           />
-          {/* Soft radial-style highlight overlay on the felt (fabric look) */}
-          <View pointerEvents="none" style={styles.feltHighlight} />
+          {/* (white feltHighlight removed — was distracting, reduced tile readability) */}
           {/* Inner stitched bevel — keeps the old elegant dashed inlay */}
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tableInlay, { borderColor: withAlpha(pal.railLight, 0.45) }]} />
-          {/* Ambient corner glows */}
-          <View pointerEvents="none" style={[styles.tableGlow,  { backgroundColor: withAlpha(pal.glow, 0.18) }]} />
-          <View pointerEvents="none" style={[styles.tableGlowB, { backgroundColor: withAlpha("#000000", 0.15) }]} />
+          {/* (ambient corner glows removed — kept the board clean and readable) */}
 
           <Text style={[styles.endsLabel, { color: withAlpha("#FFFFFF", 0.75) }]}>
             {endsLabel}: {leftEnd ?? "—"} / {rightEnd ?? "—"}
@@ -118,8 +115,8 @@ export default function WoodenTable({
 const styles = StyleSheet.create({
   woodFrame: {
     flex: 1,
-    borderRadius: 22,
-    padding: 10,
+    borderRadius: 18,
+    padding: 6,
     shadowColor: "#000", shadowOpacity: 0.8, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
     elevation: 10,
     position: "relative",
@@ -127,8 +124,8 @@ const styles = StyleSheet.create({
   },
   woodGoldTrim: {
     ...StyleSheet.absoluteFillObject,
-    margin: 6,
-    borderRadius: 16,
+    margin: 4,
+    borderRadius: 14,
     borderWidth: 1.2,
     borderColor: withAlpha(GOLD, 0.55),
   },

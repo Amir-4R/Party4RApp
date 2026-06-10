@@ -260,12 +260,11 @@ export default function DammaScreen() {
   }, [counting, state, isMyTurn, turnTimeLeft, advanceAI]);
 
   // ── Responsive tile scale for the chain ────────────────────────────────────
-  // Take into account ALL the horizontal chrome around the board:
-  //   tableRow horizontal margin (16) + gap to boneyard (6) + boneyard width
-  //   (84) + wood-frame padding (20) + felt padding (24) + internal safe-zone
-  //   (16). When the chain grows long we shrink linearly down to a 0.42×
-  //   floor so tiles never bleed past the safe area.
-  const CHAIN_HORIZONTAL_CHROME = 16 + 6 + 84 + 20 + 24 + 16; // = 166 px
+  // The horizontal chrome that surrounds the chain depends on player count:
+  //   • 1v1: 16 (tableRow margin) + 4 (gap) + 56 (compact boneyard) +
+  //          20 (wood frame padding) + 32 (felt padding) + 16 (safe zone) = 144 px
+  //   • 4P : add 2× side column (42 each) + 2× side gap (4 each) = +92 px → 236 px
+  const CHAIN_HORIZONTAL_CHROME = playerCount === 4 ? 236 : 144;
   const CHAIN_MIN_SCALE = 0.42;
   const CHAIN_TILE_W = 72;
   const CHAIN_GAP = 4;
@@ -354,23 +353,31 @@ export default function DammaScreen() {
         </View>
       </View>
 
-      {/* ── Score-bar row ──
-          In 1v1 mode: shows the big ME card + timer + big BOT card.
-          In 4P mode: the big BOT card is HIDDEN — player2 is rendered as the
-          left side card instead, so we keep this row to just ME + timer (slim).
-      */}
+      {/* ── Compact top status row ────────────────────────────────────────
+          A minimal strip with:
+            • 1v1 mode → BOT chip on the right.
+            • 4P  mode → P3 compact card centered.
+          The big ME card has been moved into the HandTray header to free
+          up vertical space for the board.                                    */}
       <View style={[styles.scoreBar, playerCount === 4 && styles.scoreBarCompact]}>
-        {/* Player card (you) — variant=me, large card */}
-        <PlayerCard
-          testID="damma-player-card-me"
-          variant="me"
-          name={user?.nickname || user?.username || (t("you") || "أنت")}
-          score={state.scores.player1}
-          avatarUri={getAvatarUrl(user?.avatar || "avatar_ninja")}
-          active={isMyTurn}
-        />
+        {/* In 4P: P3 (top opposite) chip occupies the centre; in 1v1: empty
+            spacer keeps the timer on the right. */}
+        {playerCount === 4 && state.hands.player3 ? (
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <PlayerCard
+              testID="damma-player-card-top"
+              variant="top"
+              name="🤖 لاعب 3"
+              score={state.scores.player3 ?? 0}
+              tileCount={state.hands.player3.length}
+              active={state.turn === "player3"}
+            />
+          </View>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
 
-        {/* Turn timer */}
+        {/* Turn timer (always shown) */}
         <View testID="damma-timer" style={[styles.timerBox, isMyTurn && turnTimeLeft <= 10 && styles.timerWarn]}>
           <Ionicons
             name="time-outline" size={16}
@@ -384,7 +391,7 @@ export default function DammaScreen() {
           </Text>
         </View>
 
-        {/* Opponent card (bot) — 1v1 ONLY (in 4P it'd duplicate the side card). */}
+        {/* 1v1 BOT compact chip (replaces the old large BOT card). */}
         {playerCount === 2 && (
           <PlayerCard
             testID="damma-player-card-bot"
@@ -397,56 +404,26 @@ export default function DammaScreen() {
         )}
       </View>
 
-      {/* Opponent hand (face down) — 1v1 only.
-          In 4P mode opponent hands are shown as tile-count badges on each side
-          card, so we drop the face-down row entirely to give the board more
-          vertical room. */}
-      {playerCount === 2 && (
-        <View style={styles.oppHand}>
-          {state.hands.player2.map((_, i) => (
-            <LinearGradient key={i} colors={[pal.railLight, pal.rail]} style={styles.tileBack} />
-          ))}
-        </View>
-      )}
+      {/* (Opponent face-down tile row REMOVED in both modes — was using up
+          vertical space without adding gameplay value. Tile counts are now
+          shown as badges on each compact player card.) */}
 
-      {/* Top player card (4P only) — single compact card above the board. */}
-      {playerCount === 4 && state.hands.player3 && (
-        <View style={styles.topPlayerRow}>
-          <PlayerCard
-            testID="damma-player-card-top"
-            variant="top"
-            name="🤖 لاعب 3"
-            score={state.scores.player3 ?? 0}
-            tileCount={state.hands.player3.length}
-            active={state.turn === "player3"}
-          />
-        </View>
-      )}
-
-      {/* Side player cards (for 4-player mode) */}
-      {playerCount === 4 && (
-        <View style={styles.sidePlayersRow}>
-          <PlayerCard
-            testID="damma-player-card-left"
-            variant="side"
-            name="🤖 لاعب 2"
-            score={state.scores.player2}
-            tileCount={state.hands.player2?.length ?? 0}
-            active={state.turn === "player2"}
-          />
-          <PlayerCard
-            testID="damma-player-card-right"
-            variant="side"
-            name="🤖 لاعب 4"
-            score={state.scores.player4 ?? 0}
-            tileCount={state.hands.player4?.length ?? 0}
-            active={state.turn === "player4"}
-          />
-        </View>
-      )}
-
-      {/* Table row */}
+      {/* Table row (4P wraps the table with vertical side indicators). */}
       <View style={styles.tableRow}>
+        {playerCount === 4 && (
+          <View style={[styles.sideColumn, state.turn === "player2" && styles.sideColumnActive]} testID="damma-player-card-left">
+            <Image
+              source={{ uri: getAvatarUrl("avatar_robot") }}
+              style={[styles.sideColumnAvatar, state.turn === "player2" && styles.sideColumnAvatarActive]}
+            />
+            <Text style={styles.sideColumnName}>P2</Text>
+            <View style={styles.sideColumnBadge}>
+              <Ionicons name="apps" size={9} color={GOLD} />
+              <Text style={styles.sideColumnBadgeText}>{state.hands.player2?.length ?? 0}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Wooden frame + green felt + chain (extracted) */}
         <WoodenTable
           boardRows={boardRows}
@@ -457,6 +434,20 @@ export default function DammaScreen() {
           endsLabel={t("ends") || "Ends"}
           emptyText={t("place_first_tile") || "ضع أول قطعة"}
         />
+
+        {playerCount === 4 && (
+          <View style={[styles.sideColumn, state.turn === "player4" && styles.sideColumnActive]} testID="damma-player-card-right">
+            <Image
+              source={{ uri: getAvatarUrl("avatar_tiger") }}
+              style={[styles.sideColumnAvatar, state.turn === "player4" && styles.sideColumnAvatarActive]}
+            />
+            <Text style={styles.sideColumnName}>P4</Text>
+            <View style={styles.sideColumnBadge}>
+              <Ionicons name="apps" size={9} color={GOLD} />
+              <Text style={styles.sideColumnBadgeText}>{state.hands.player4?.length ?? 0}</Text>
+            </View>
+          </View>
+        )}
 
         {/* Boneyard pile (extracted) */}
         <BoneyardPanel
@@ -483,6 +474,9 @@ export default function DammaScreen() {
         playableSides={playableSides}
         bottomInset={insets.bottom}
         pal={pal}
+        meName={user?.nickname || user?.username || (t("you") || "أنت")}
+        meScore={state.scores.player1}
+        meAvatarUri={getAvatarUrl(user?.avatar || "avatar_ninja")}
         turnText={isMyTurn ? (t("your_turn") || "دورك") : (t("opponent_turn") || "دور الخصم")}
         thinkingText={t("thinking") || "البوت يفكر..."}
         leftText={t("left") || "يسار"}
@@ -689,7 +683,38 @@ const styles = StyleSheet.create({
   },
 
   // Table row container — WoodenTable + BoneyardPanel are siblings here.
-  tableRow: { flex: 1, flexDirection: "row", marginHorizontal: 8, marginVertical: 4, gap: 6 },
+  tableRow: { flex: 1, flexDirection: "row", marginHorizontal: 6, marginVertical: 2, gap: 4 },
+
+  // 4-Player: vertical compact column flanking the table (P2 left, P4 right).
+  // Replaces the wide horizontal sidePlayerCard so the board can stretch.
+  sideColumn: {
+    width: 42,
+    alignItems: "center", justifyContent: "center",
+    paddingVertical: 6, gap: 4,
+    borderRadius: 12,
+    backgroundColor: "rgba(20,22,28,0.85)",
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.30),
+  },
+  sideColumnActive: {
+    borderColor: "#4ADE80",
+    backgroundColor: "rgba(74,222,128,0.10)",
+  },
+  sideColumnAvatar: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "#1F2530",
+  },
+  sideColumnAvatarActive: {
+    borderWidth: 2, borderColor: "#4ADE80",
+  },
+  sideColumnName: { color: "#FFF", fontSize: 9, fontWeight: "800" },
+  sideColumnBadge: {
+    flexDirection: "row", alignItems: "center", gap: 2,
+    backgroundColor: withAlpha(GOLD, 0.18),
+    paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: 1, borderColor: withAlpha(GOLD, 0.45),
+  },
+  sideColumnBadgeText: { color: GOLD, fontSize: 9, fontWeight: "900" },
 
   // Flying tile (slides from hand → board)
   flyingTile: {
