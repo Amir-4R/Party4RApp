@@ -80,6 +80,7 @@ class UserPublic(BaseModel):
     avatar_image: Optional[str] = None
     bio: Optional[str] = None
     banner_id: Optional[str] = None
+    background_image: Optional[str] = None
     badges: list = []
     created_at: Optional[str] = None
     total_seconds: int = 0
@@ -178,6 +179,7 @@ def user_to_public(u: dict) -> UserPublic:
         avatar_image=u.get("avatar_image"),
         bio=u.get("bio"),
         banner_id=u.get("banner_id"),
+        background_image=u.get("background_image"),
         badges=u.get("badges", []),
         created_at=u.get("created_at"),
         total_seconds=int(u.get("total_seconds", 0)),
@@ -366,6 +368,7 @@ async def update_profile(
     avatar_image: Optional[str] = None,
     bio: Optional[str] = None,
     banner_id: Optional[str] = None,
+    background_image: Optional[str] = None,
     badge: Optional[str] = None,
     current: dict = Depends(get_current_user),
 ):
@@ -383,6 +386,15 @@ async def update_profile(
         updates["bio"] = bio[:280]
     if banner_id is not None:
         updates["banner_id"] = banner_id
+    if background_image is not None:
+        # Empty string explicitly clears the custom profile background.
+        if background_image == "":
+            updates["background_image"] = None
+        else:
+            # base64 data URI capped at ~900KB (background is wider than avatar)
+            if len(background_image) > 920_000:
+                raise HTTPException(400, "Background image too large (max ~650KB)")
+            updates["background_image"] = background_image
     if badge is not None:
         # toggle badge in/out of badges array
         existing = current.get("badges", [])

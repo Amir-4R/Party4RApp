@@ -11,6 +11,7 @@ export interface User {
   avatar_image?: string | null;
   bio?: string | null;
   banner_id?: string | null;
+  background_image?: string | null;
   badges?: string[];
   created_at?: string;
   total_seconds?: number;

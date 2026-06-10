@@ -44,6 +44,8 @@ import VotingOverlay, { ActiveVote } from "@/src/components/VotingOverlay";
 import { FUTURISTIC, GRADIENTS } from "@/src/theme/futuristic";
 import LightBeam from "@/src/components/futuristic/LightBeam";
 import GlowDivider from "@/src/components/futuristic/GlowDivider";
+import { useComms } from "@/src/comms/CommsContext";
+import RoomDMOverlay from "@/src/comms/ui/RoomDMOverlay";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -132,6 +134,31 @@ export default function RoomScreen() {
   // In-room control center
   const [showSettings, setShowSettings] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
+  // In-room private messages (DM) overlay — opens WITHOUT leaving the room,
+  // so the room WebSocket / playback state are never torn down (#3).
+  const [showDMs, setShowDMs] = useState(false);
+  // Voice mic (#2): button + permission + mute/unmute via the shared comms
+  // layer. (Real-time cross-user audio transport is a separate piece of
+  // infrastructure and is intentionally not wired here.)
+  const { micMode, micActive, setMicMode, ensureMicPermission } = useComms();
+  const lastMicModeRef = useRef<"opponent" | "friends" | "everyone">("everyone");
+  const toggleMic = useCallback(async () => {
+    if (micMode === "off") {
+      const p = await ensureMicPermission();
+      if (p === "denied") {
+        Alert.alert(
+          t("mic_perm_title") || "صلاحية المايك",
+          t("mic_perm_body") ||
+            "فعّل صلاحية الميكروفون من إعدادات الجهاز لاستخدام المايك.",
+        );
+        return;
+      }
+      setMicMode(lastMicModeRef.current);
+    } else {
+      lastMicModeRef.current = micMode as "opponent" | "friends" | "everyone";
+      setMicMode("off");
+    }
+  }, [micMode, ensureMicPermission, setMicMode, t]);
   const [videoVolume, setVideoVolume] = useState(100); // 0..100
   // Phase 4 — Voting state
   const [activeVote, setActiveVote] = useState<ActiveVote | null>(null);
@@ -759,6 +786,24 @@ export default function RoomScreen() {
               </View>
             </View>
             <TouchableOpacity
+              testID="room-mic-toggle"
+              onPress={toggleMic}
+              style={styles.iconBtn}
+            >
+              <Ionicons
+                name={micActive ? "mic" : micMode === "off" ? "mic-off" : "mic-outline"}
+                size={22}
+                color={micActive ? "#FF3B3B" : micMode === "off" ? COLORS.textDisabled : COLORS.success}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="room-dms-open"
+              onPress={() => setShowDMs(true)}
+              style={styles.iconBtn}
+            >
+              <Ionicons name="chatbubble-ellipses" size={22} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
               testID="room-friends-open"
               onPress={() => setShowFriends(true)}
               style={styles.iconBtn}
@@ -874,8 +919,14 @@ export default function RoomScreen() {
         {/* Chat panel + composer */}
         {!fullscreen && (
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+            // Android already pans the window for the focused input
+            // (softwareKeyboardLayoutMode: "pan" / windowSoftInputMode=adjustPan).
+            // Adding "height" avoidance on top of that double-shifts the layout
+            // the instant the field focuses, which was yanking focus and making
+            // the keyboard pop open then immediately close. Let the OS handle it
+            // on Android; only iOS needs manual padding avoidance.
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            keyboardVerticalOffset={0}
             style={styles.chatPanel}
           >
             {/* Action bar: visible to everyone (host vs guest buttons differ) */}
@@ -1354,6 +1405,9 @@ export default function RoomScreen() {
             <RoomFriendsList />
           </SafeAreaView>
         </Modal>
+
+        {/* Private messages (DM) — full overlay that keeps the room alive */}
+        <RoomDMOverlay visible={showDMs} onClose={() => setShowDMs(false)} />
       </SafeAreaView>
     </View>
   );

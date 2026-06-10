@@ -83,6 +83,7 @@ export default function ProfileScreen() {
   );
 
   const banner = getBanner(user?.banner_id);
+  const bgImage = user?.background_image || null;
   const userBadges = user?.badges || [];
   const avatarSrc = user?.avatar_image || getAvatarUrl(user?.avatar || "");
 
@@ -139,6 +140,52 @@ export default function ProfileScreen() {
     setBusy(false);
   };
 
+  // ── Custom profile background (behind the avatar) ────────────────────────
+  // Picked from the phone gallery, saved to the account, and removable.
+  const uploadBackground = async () => {
+    const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+    let granted = perm.granted;
+    if (!granted && perm.canAskAgain) {
+      granted = (await ImagePicker.requestMediaLibraryPermissionsAsync()).granted;
+    }
+    if (!granted) {
+      Alert.alert(
+        t("gallery_access_needed"),
+        t("gallery_access_msg_profile"),
+        [
+          { text: t("cancel"), style: "cancel" },
+          { text: t("open_settings"), onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 0.4,
+      allowsEditing: true,
+      aspect: [16, 9],
+    });
+    if (res.canceled || !res.assets?.[0]?.base64) return;
+    const a = res.assets[0];
+    const dataUri = `data:${a.mimeType || "image/jpeg"};base64,${a.base64}`;
+    if (dataUri.length > 900_000) {
+      Alert.alert(t("image_too_large"), t("pick_under_500kb"));
+      return;
+    }
+    setBusy(true);
+    await patchProfileBody({ background_image: dataUri });
+    await refresh();
+    setBusy(false);
+  };
+
+  const removeBackground = async () => {
+    setBusy(true);
+    await patchProfileBody({ background_image: "" });
+    await refresh();
+    setBusy(false);
+  };
+
   const toggleBadge = async (id: string) => {
     setBusy(true);
     await patchProfileBody({ badge: id });
@@ -167,7 +214,7 @@ export default function ProfileScreen() {
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* Banner */}
+        {/* Banner — custom gallery image if set, otherwise preset color banner */}
         <View
           style={[
             styles.bannerWrap,
@@ -175,12 +222,53 @@ export default function ProfileScreen() {
           ]}
           testID="profile-banner"
         >
-          <View
-            style={[
-              styles.bannerOverlay,
-              { backgroundColor: banner.colors[0], opacity: 0.5 },
-            ]}
-          />
+          {bgImage ? (
+            <>
+              <Image
+                source={{ uri: bgImage }}
+                style={StyleSheet.absoluteFill as any}
+                resizeMode="cover"
+              />
+              {/* Subtle dim so the avatar/name stay legible over any photo */}
+              <View
+                style={[
+                  StyleSheet.absoluteFill as any,
+                  { backgroundColor: "rgba(0,0,0,0.28)" },
+                ]}
+              />
+            </>
+          ) : (
+            <View
+              style={[
+                styles.bannerOverlay,
+                { backgroundColor: banner.colors[0], opacity: 0.5 },
+              ]}
+            />
+          )}
+
+          {/* Background controls (change / remove) */}
+          <View style={styles.bgControls}>
+            <TouchableOpacity
+              testID="profile-bg-change"
+              onPress={uploadBackground}
+              style={styles.bgBtn}
+              activeOpacity={0.85}
+              disabled={busy}
+            >
+              <Ionicons name="image" size={15} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            {bgImage && (
+              <TouchableOpacity
+                testID="profile-bg-remove"
+                onPress={removeBackground}
+                style={styles.bgBtn}
+                activeOpacity={0.85}
+                disabled={busy}
+              >
+                <Ionicons name="trash" size={15} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Avatar overlay */}
@@ -460,8 +548,17 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
-  bannerWrap: { height: 150, position: "relative" },
+  bannerWrap: { height: 150, position: "relative", overflow: "hidden" },
   bannerOverlay: { ...StyleSheet.absoluteFillObject },
+  bgControls: {
+    position: "absolute", top: 10, right: 12, flexDirection: "row", gap: 8,
+  },
+  bgBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.25)",
+  },
   avatarRow: { alignItems: "center", marginTop: -54 },
   avatarLg: {
     width: 108,

@@ -39,8 +39,18 @@ import GameCommsBar from "@/src/comms/ui/GameCommsBar";
 import { useGamePersistence } from "@/src/comms/useGamePersistence";
 
 const { width } = Dimensions.get("window");
+// Outer board size (felt + wooden frame). Unchanged — keeps the same look/size.
 const DISPLAY = Math.min(width - 24, 380);
-const SCALE = DISPLAY / BOARD_SIZE;
+// Wooden frame thickness — MUST equal styles.board.borderWidth (8).
+// In React Native, position:absolute children are laid out from INSIDE the
+// border (the padding edge), so the logical 740×740 playfield must be mapped
+// onto the inner felt area (DISPLAY − 2·frame), NOT the full outer size.
+// Mapping onto the full size was the root cause of the 4 pockets / coins /
+// touch being offset by the frame thickness (only the top-left corner —
+// nearest the 0,0 origin — looked correct).
+const BOARD_FRAME = 8;
+const PLAY = DISPLAY - BOARD_FRAME * 2;   // inner felt size in px
+const SCALE = PLAY / BOARD_SIZE;          // logical units → felt px (1:1 with engine)
 
 const COIN_COLORS = {
   white: "#F4ECD8",
@@ -62,6 +72,9 @@ export default function CarromScreen() {
   const [state, setState] = useState<CarromState>(createInitialState);
   const [aimAngle, setAimAngle] = useState(-Math.PI / 2);
   const [power, setPower] = useState(0);
+  // Dev-only debug overlay (#14). __DEV__ is false in production builds, so
+  // neither the toggle nor the overlay ever ship to users.
+  const [debug, setDebug] = useState(false);
   // Refs to capture the latest aim/power values inside the PanResponder
   // closure (which is created only ONCE on mount). Without these refs the
   // release callback would always see the stale initial values, so the
@@ -193,8 +206,12 @@ export default function CarromScreen() {
       onPanResponderMove: (e) => {
         const s = stateRef.current;
         if (s.phase !== "aiming") return;
-        const touchBoardX = (e.nativeEvent.pageX - boardOriginRef.current.x) / SCALE;
-        const touchBoardY = (e.nativeEvent.pageY - boardOriginRef.current.y) / SCALE;
+        // boardOriginRef is measured at the board's OUTER top-left corner, but
+        // the felt (where coins live) starts BOARD_FRAME px further in on each
+        // axis. Subtract the frame so touch coords share the exact same space
+        // as the rendered pieces and the physics engine.
+        const touchBoardX = (e.nativeEvent.pageX - boardOriginRef.current.x - BOARD_FRAME) / SCALE;
+        const touchBoardY = (e.nativeEvent.pageY - boardOriginRef.current.y - BOARD_FRAME) / SCALE;
         const dx = touchBoardX - s.striker.pos.x;
         const dy = touchBoardY - s.striker.pos.y;
         // Clamp drag length so the arrow can't extend forever
@@ -623,8 +640,78 @@ export default function CarromScreen() {
               }} />
             </>
           )}
+
+          {/* ── DEV-ONLY DEBUG OVERLAY (#14) — never ships to users ── */}
+          {__DEV__ && debug && (
+            <>
+              {/* Play-area outline = the real collision boundary (0..BOARD_SIZE) */}
+              <View pointerEvents="none" style={{
+                position: "absolute", left: 0, top: 0,
+                width: BOARD_SIZE * SCALE, height: BOARD_SIZE * SCALE,
+                borderWidth: 1, borderColor: "#00E0FF",
+              }} />
+              {/* Board center crosshair */}
+              <View pointerEvents="none" style={{
+                position: "absolute", left: (BOARD_SIZE / 2) * SCALE - 8, top: (BOARD_SIZE / 2) * SCALE - 0.5,
+                width: 16, height: 1, backgroundColor: "#FF00E5",
+              }} />
+              <View pointerEvents="none" style={{
+                position: "absolute", left: (BOARD_SIZE / 2) * SCALE - 0.5, top: (BOARD_SIZE / 2) * SCALE - 8,
+                width: 1, height: 16, backgroundColor: "#FF00E5",
+              }} />
+              {/* Pocket collision centers + coords */}
+              {POCKETS.map((p, i) => (
+                <View key={`dbg-pk-${i}`} pointerEvents="none" style={{
+                  position: "absolute",
+                  left: p.x * SCALE - POCKET_RADIUS * SCALE,
+                  top: p.y * SCALE - POCKET_RADIUS * SCALE,
+                  width: POCKET_RADIUS * 2 * SCALE, height: POCKET_RADIUS * 2 * SCALE,
+                  borderRadius: POCKET_RADIUS * SCALE,
+                  borderWidth: 1, borderColor: "#FFEA00",
+                }}>
+                  <Text style={{ position: "absolute", top: -12, left: 0, color: "#FFEA00", fontSize: 7 }}>
+                    {Math.round(p.x)},{Math.round(p.y)}
+                  </Text>
+                </View>
+              ))}
+              {/* Coin collision centers */}
+              {state.coins.filter((c) => c.active).map((c) => (
+                <View key={`dbg-coin-${c.id}`} pointerEvents="none" style={{
+                  position: "absolute",
+                  left: c.pos.x * SCALE - 1, top: c.pos.y * SCALE - 1,
+                  width: 2, height: 2, backgroundColor: "#00FF6A",
+                }} />
+              ))}
+              {/* Readout: aspect + scale */}
+              <View pointerEvents="none" style={{
+                position: "absolute", left: 2, top: 2, backgroundColor: "rgba(0,0,0,0.6)", padding: 3, borderRadius: 4,
+              }}>
+                <Text style={{ color: "#fff", fontSize: 7 }}>
+                  board {BOARD_SIZE}×{BOARD_SIZE} • aspect 1.000 • scale {SCALE.toFixed(3)}
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 7 }}>
+                  frame {BOARD_FRAME}px • play {Math.round(PLAY)}px
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
+
+      {/* Dev-only debug toggle */}
+      {__DEV__ && (
+        <TouchableOpacity
+          testID="carrom-debug-toggle"
+          onPress={() => setDebug((d) => !d)}
+          style={{
+            position: "absolute", left: 10, top: insets.top + 6, zIndex: 60,
+            backgroundColor: debug ? "#00E0FF" : "rgba(0,0,0,0.5)",
+            paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: debug ? "#000" : "#fff", fontSize: 10, fontWeight: "800" }}>DEBUG</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Controls */}
       {state.phase === "aiming" && (
@@ -666,7 +753,11 @@ export default function CarromScreen() {
       )}
 
       {/* In-game comms: opponent chat + friends + mic */}
-      <GameCommsBar opponentName={`🤖 ${t("bot") || "Bot"}`} />
+      <GameCommsBar
+        opponentName={`🤖 ${t("bot") || "Bot"}`}
+        editable
+        persistKey={`party_carrom_btns:${user?.id || "guest"}`}
+      />
     </View>
   );
 }
@@ -753,6 +844,11 @@ const styles = StyleSheet.create({
   board: {
     position: "relative", backgroundColor: "#D4A772",
     borderRadius: 6, borderWidth: 8, borderColor: "#6B4F2E",
+    // Game space is language-independent: force LTR so RTL (Arabic) never
+    // mirrors pocket/coin/striker positions. Pure absolute left/top already
+    // resist flipping, which is the actual protection. We previously also
+    // had `direction: "ltr"` here but RN logs `Invalid style property of
+    // "direction"` so we removed it — no behavioural impact.
   },
   coin: { position: "absolute" },
   striker: {

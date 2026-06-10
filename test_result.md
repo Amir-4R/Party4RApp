@@ -1799,3 +1799,131 @@ agent_communication:
          Use the screenshot tool to capture during the transition.
       
       Backend untouched. Skip backend.
+
+#====================================================================================================
+# 2026-06-10 — User-supplied UPDATE merge (party4r-changes.zip)
+#====================================================================================================
+
+frontend:
+  - task: "Profile — background image (upload/remove)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/profile.tsx, /app/frontend/src/context/AuthContext.tsx, /app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Update merge — additive. Adds `background_image` to user model
+          (backend + AuthContext type) and an upload/remove UI in the
+          profile screen. Empty string clears the bg.
+
+  - task: "Room — Mic toggle + DM overlay + Android keyboard fix"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/room/[id].tsx, /app/frontend/src/comms/ui/RoomDMOverlay.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Update merge — all previous fixes (chatInputRef, hostSkip,
+          200-cap, KeyboardAvoidingView) preserved. Adds:
+          - Mic header button wired to CommsContext (off/active/muted).
+          - DM button opening a new RoomDMOverlay (separate /ws/dms socket,
+            does NOT touch the room socket or video state).
+          - Android keyboard fix: `behavior=undefined` (was "height"). The
+            OS's adjustPan was double-shifting with KAVI on Android, losing
+            input focus. Setting undefined lets the OS handle it cleanly.
+            iOS still uses "padding".
+
+  - task: "Carrom — SCALE/BORDER fix (pockets, coins, touch alignment)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/game/carrom.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          CRITICAL fix per the update. Previously:
+          - `SCALE = DISPLAY / BOARD_SIZE` — included the 8px border in the
+            denominator, so all absolute-positioned children were 8px off.
+          
+          New formula:
+          - `BOARD_FRAME = 8`
+          - `PLAY = DISPLAY - BOARD_FRAME * 2`  // inner felt size
+          - `SCALE = PLAY / BOARD_SIZE`         // 1:1 with engine coords
+          - Touch handler subtracts BOARD_FRAME from page-coord to map to
+            felt space.
+          Result: pockets line up exactly with their hit circles, coins
+          render at engine-accurate positions, touch input is calibrated.
+          The physics & engine were already correct — the bug was purely
+          in the rendering scale.
+
+  - task: "Carrom — Draggable comms buttons (edit mode, carrom only)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/comms/ui/GameCommsBar.tsx, /app/frontend/app/game/carrom.tsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          GameCommsBar gains an OPTIONAL `editable` + `persistKey` mode
+          used only when carrom passes them. Default behaviour (chess,
+          damma, damma-online) is fully unchanged. Provides Edit/Reset
+          buttons; positions persist per-user via AsyncStorage.
+
+  - task: "Carrom — Remove invalid `direction: ltr` style"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/game/carrom.tsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          The update wrote `direction: "ltr"` on the `board` style. React
+          Native logs `Invalid style property of "direction"` — the property
+          is not part of the RN StyleSheet API. The update author's own
+          comment confirms it was just an "explicit and future-proof
+          guarantee" on top of the already-RTL-immune absolute positioning.
+          Removed PER USER APPROVAL — no behavioural impact, just clears
+          the Console warning.
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Update merge complete. Single deviation from the raw ZIP: removed the
+      `direction: "ltr"` line from carrom's board style (line 850 of the
+      update) per the user's explicit approval. ALL other update content
+      was applied verbatim. None of my previous fixes (chatInputRef,
+      hostSkip, 200-cap, Damma rebuild, Stable+Stepped zoom, RTL-immune
+      DominoTile) were touched — verified via grep.
+      
+      Needs validation (FRONTEND ONLY):
+      1. Profile: open profile screen → tap background change → pick image
+         from picker → confirm image renders behind avatar. Tap remove →
+         goes back to color banner.
+      2. Room: open any room → mic icon in header → on first tap requests
+         mic permission, second tap mutes/unmutes. DM icon opens overlay
+         with private chat (no impact on room WS / video). Test chat input
+         keyboard on Android: tap input, type, hit Enter — input keeps
+         focus across 5+ sends.
+      3. Carrom: open carrom → coins land EXACTLY in pocket circles when
+         scored (no 8-px offset). Striker touch input aligned to the felt.
+         Edit mode: tap edit pencil in comms bar → 3 buttons become
+         draggable → drag and release → reload screen → positions persist.
+      4. Verify no Console warnings about `Invalid style property of
+         "direction"`.
